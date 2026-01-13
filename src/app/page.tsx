@@ -1,59 +1,161 @@
-import Dashboard from "@/components/Dashboard";
-import { LayoutDashboard, TrendingUp } from "lucide-react";
+"use client";
 
-export default function Home() {
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Header */}
-        <header className="mb-8">
-          <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-800/50 p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-blue-600 rounded-xl blur-lg opacity-20"></div>
-                  <div className="relative bg-gradient-to-br from-blue-600 to-purple-600 p-3 rounded-xl shadow-lg">
-                    <LayoutDashboard className="w-7 h-7 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                    Portfolio Saham IDX
-                  </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4" />
-                    Kelola investasi Anda dengan data real-time
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="px-4 py-2 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="text-xs font-medium text-green-700 dark:text-green-400">Market Status</div>
-                  <div className="text-sm font-bold text-green-600 dark:text-green-500 flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    IDX Live
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+import { useMemo } from "react";
+import { usePortfolio } from "@/hooks/usePortfolio";
+import { useMarketData } from "@/hooks/useMarketData";
+import { useCashAndHistory } from "@/hooks/useCashAndHistory";
+import { SummaryCard } from "@/components/SummaryCard";
+import { AllocationChart } from "@/components/AllocationChart";
+import { GainLossChart } from "@/components/GainLossChart";
+import { CashManager } from "@/components/CashManager";
+import { Briefcase, DollarSign, TrendingUp, Activity } from "lucide-react";
+import { formatIDR, formatPercentage } from "@/lib/utils";
+import Link from "next/link";
 
-        {/* Dashboard */}
-        <Dashboard />
+export default function HomePage() {
+  const { portfolio, isLoaded } = usePortfolio();
+  const { cash, updateCash } = useCashAndHistory();
 
-        {/* Footer */}
-        <footer className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
-          <div className="text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              © {new Date().getFullYear()} Portfolio Saham IDX • Data by Yahoo Finance
-            </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Bukan saran investasi • Gunakan dengan bijak
-            </p>
-          </div>
-        </footer>
+  const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
+  const { prices, loading: pricesLoading, lastUpdated } = useMarketData(tickers);
+
+  const summary = useMemo(() => {
+    let totalInvested = 0;
+    let totalMarketValue = 0;
+
+    portfolio.forEach((item) => {
+      const livePrice = prices[item.ticker]?.price || 0;
+      const marketPrice = livePrice > 0 ? livePrice : 0;
+
+      totalInvested += item.lots * 100 * item.averagePrice;
+      totalMarketValue += item.lots * 100 * marketPrice;
+    });
+
+    const totalPL = totalMarketValue - totalInvested;
+    const returnPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
+
+    return { totalInvested, totalMarketValue, totalPL, returnPercent };
+  }, [portfolio, prices]);
+
+  const chartData = useMemo(() => {
+    return portfolio.map((item) => ({
+      name: item.ticker,
+      value: item.lots * 100 * (prices[item.ticker]?.price || item.averagePrice),
+    })).filter(d => d.value > 0);
+  }, [portfolio, prices]);
+
+  const gainLossChartData = useMemo(() => {
+    const totalGainLoss = portfolio.reduce((sum, item) => {
+      const livePrice = prices[item.ticker]?.price || 0;
+      if (livePrice === 0) return sum;
+
+      const marketValue = item.lots * 100 * livePrice;
+      const initialValue = item.lots * 100 * item.averagePrice;
+      return sum + Math.abs(marketValue - initialValue);
+    }, 0);
+
+    return portfolio.map((item) => {
+      const livePrice = prices[item.ticker]?.price || 0;
+      const marketValue = item.lots * 100 * livePrice;
+      const initialValue = item.lots * 100 * item.averagePrice;
+      const gainLoss = marketValue - initialValue;
+      const percentage = totalGainLoss > 0 ? (Math.abs(gainLoss) / totalGainLoss) * 100 : 0;
+
+      return {
+        name: item.ticker,
+        value: Math.abs(gainLoss),
+        gainLoss: gainLoss,
+        percentage: percentage,
+      };
+    }).filter(d => d.gainLoss !== 0);
+  }, [portfolio, prices]);
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Memuat data...</p>
+        </div>
       </div>
-    </main>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Mobile Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {lastUpdated ? `Update: ${lastUpdated.toLocaleTimeString('id-ID')}` : 'Real-time data'}
+          </p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <SummaryCard
+            title="Total Modal"
+            value={formatIDR(summary.totalInvested)}
+            icon={Briefcase}
+          />
+          <SummaryCard
+            title="Total Portfolio"
+            value={formatIDR(summary.totalMarketValue + cash)}
+            subValue={pricesLoading ? "..." : "Live"}
+            icon={Activity}
+            trend="neutral"
+          />
+          <SummaryCard
+            title="Unrealized P/L"
+            value={summary.totalPL > 0 ? `+${formatIDR(summary.totalPL)}` : formatIDR(summary.totalPL)}
+            icon={DollarSign}
+            trend={summary.totalPL >= 0 ? "up" : "down"}
+          />
+          <SummaryCard
+            title="Return"
+            value={formatPercentage(summary.returnPercent)}
+            icon={TrendingUp}
+            trend={summary.returnPercent >= 0 ? "up" : "down"}
+          />
+        </div>
+
+        {/* Cash Manager - Mobile Full Width */}
+        <div className="mb-6">
+          <CashManager cash={cash} onUpdateCash={updateCash} />
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <AllocationChart data={chartData} />
+          <GainLossChart data={gainLossChartData} />
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-4">
+          <Link
+            href="/portfolio"
+            className="p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow text-center"
+          >
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <Briefcase className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Portfolio</h3>
+            <p className="text-xs text-gray-500">{portfolio.length} saham</p>
+          </Link>
+
+          <Link
+            href="/analytics"
+            className="p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow text-center"
+          >
+            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            </div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Analytics</h3>
+            <p className="text-xs text-gray-500">Lihat growth</p>
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }

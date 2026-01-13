@@ -11,6 +11,7 @@ import { StockForm } from "./StockForm";
 import { CashManager } from "./CashManager";
 import { GrowthChart } from "./GrowthChart";
 import { TransactionHistory } from "./TransactionHistory";
+import { GainLossChart } from "./GainLossChart";
 import { Briefcase, DollarSign, TrendingUp, Activity, Plus } from "lucide-react";
 import { formatIDR, formatPercentage } from "@/lib/utils";
 
@@ -65,6 +66,33 @@ export default function Dashboard() {
             name: item.ticker,
             value: item.lots * 100 * (prices[item.ticker]?.price || item.averagePrice), // Fallback to avgPrice if live missing for chart
         })).filter(d => d.value > 0);
+    }, [portfolio, prices]);
+
+    // Data for Gain/Loss Chart
+    const gainLossChartData = useMemo(() => {
+        const totalGainLoss = portfolio.reduce((sum, item) => {
+            const livePrice = prices[item.ticker]?.price || 0;
+            if (livePrice === 0) return sum;
+
+            const marketValue = item.lots * 100 * livePrice;
+            const initialValue = item.lots * 100 * item.averagePrice;
+            return sum + Math.abs(marketValue - initialValue);
+        }, 0);
+
+        return portfolio.map((item) => {
+            const livePrice = prices[item.ticker]?.price || 0;
+            const marketValue = item.lots * 100 * livePrice;
+            const initialValue = item.lots * 100 * item.averagePrice;
+            const gainLoss = marketValue - initialValue;
+            const percentage = totalGainLoss > 0 ? (Math.abs(gainLoss) / totalGainLoss) * 100 : 0;
+
+            return {
+                name: item.ticker,
+                value: Math.abs(gainLoss),
+                gainLoss: gainLoss,
+                percentage: percentage,
+            };
+        }).filter(d => d.gainLoss !== 0); // Only show stocks with gain/loss
     }, [portfolio, prices]);
 
     // Wrapper to add stock and record transaction
@@ -140,7 +168,10 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Col: Chart */}
                 <div className="lg:col-span-2 space-y-6">
-                    <AllocationChart data={chartData} />
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <AllocationChart data={chartData} />
+                        <GainLossChart data={gainLossChartData} />
+                    </div>
                     <GrowthChart getGrowth={getGrowth} getHistoryForPeriod={getHistoryForPeriod} />
                 </div>
 
