@@ -1,0 +1,30 @@
+[
+    {
+        "id": "1",
+        "ticker": "BBCA.JK",
+        "name": "Bank Central Asia Tbk",
+        "lots": 10,
+        "averagePrice": 9200
+    },
+    {
+        "id": "2",
+        "ticker": "BBRI.JK",
+        "name": "Bank Rakyat Indonesia (Persero) Tbk",
+        "lots": 50,
+        "averagePrice": 5400
+    },
+    {
+        "id": "3",
+        "ticker": "TLKM.JK",
+        "name": "Telkom Indonesia (Persero) Tbk",
+        "lots": 25,
+        "averagePrice": 3200
+    },
+    {
+        "id": "4",
+        "ticker": "ASII.JK",
+        "name": "Astra International Tbk",
+        "lots": 15,
+        "averagePrice": 5100
+    }
+]
