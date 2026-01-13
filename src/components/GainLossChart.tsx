@@ -87,7 +87,7 @@ export function GainLossChart({ data }: GainLossChartProps) {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-[500px]">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Kontribusi Gain/Loss</h3>
@@ -153,48 +153,50 @@ export function GainLossChart({ data }: GainLossChartProps) {
             </div>
 
             {/* Chart */}
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={110}
-                        paddingAngle={2}
-                        dataKey="displayValue"
-                    >
-                        {chartData.map((entry, index) => {
-                            const isProfit = entry.gainLoss > 0;
-                            const colorArray = isProfit ? COLORS.profit : COLORS.loss;
-                            const colorIndex = index % colorArray.length;
-                            return (
-                                <Cell
-                                    key={`cell-${index}`}
-                                    fill={colorArray[colorIndex]}
-                                    stroke={isProfit ? "#10b981" : "#ef4444"}
-                                    strokeWidth={1}
-                                />
-                            );
-                        })}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend
-                        formatter={(value, entry: any) => {
-                            const data = entry.payload;
-                            return (
-                                <span className={cn(
-                                    "text-xs font-medium",
-                                    data.gainLoss >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
-                                )}>
-                                    {value} ({data.gainLoss >= 0 ? "+" : ""}{data.percentage.toFixed(1)}%)
-                                </span>
-                            );
-                        }}
-                        wrapperStyle={{ fontSize: '12px' }}
-                    />
-                </PieChart>
-            </ResponsiveContainer>
+            <div className="flex-1 min-h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={110}
+                            paddingAngle={2}
+                            dataKey="displayValue"
+                        >
+                            {chartData.map((entry, index) => {
+                                const isProfit = entry.gainLoss > 0;
+                                const colorArray = isProfit ? COLORS.profit : COLORS.loss;
+                                const colorIndex = index % colorArray.length;
+                                return (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={colorArray[colorIndex]}
+                                        stroke={isProfit ? "#10b981" : "#ef4444"}
+                                        strokeWidth={1}
+                                    />
+                                );
+                            })}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend
+                            formatter={(value, entry: any) => {
+                                const data = entry.payload;
+                                return (
+                                    <span className={cn(
+                                        "text-xs font-medium",
+                                        data.gainLoss >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+                                    )}>
+                                        {value} ({data.gainLoss >= 0 ? "+" : ""}{data.percentage.toFixed(1)}%)
+                                    </span>
+                                );
+                            }}
+                            wrapperStyle={{ fontSize: '12px' }}
+                        />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
         </div>
     );
 }

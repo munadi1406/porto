@@ -127,8 +127,12 @@ export default function HomePage() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <AllocationChart data={chartData} />
-          <GainLossChart data={gainLossChartData} />
+          <div className="min-h-[450px]">
+            <AllocationChart data={chartData} />
+          </div>
+          <div className="min-h-[450px]">
+            <GainLossChart data={gainLossChartData} />
+          </div>
         </div>
 
         {/* Quick Actions */}
