@@ -18,7 +18,7 @@ export function SummaryCard({ title, value, subValue, subLabel, icon: Icon, tren
 
             <div className="relative">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                    <h3 className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide truncate pr-2">
                         {title}
                     </h3>
                     <div className={cn(
@@ -29,7 +29,7 @@ export function SummaryCard({ title, value, subValue, subLabel, icon: Icon, tren
                         (!trend || trend === "neutral") && "from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 group-hover:shadow-blue-200/50"
                     )}>
                         <Icon className={cn(
-                            "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
+                            "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 group-hover:scale-110 flex-shrink-0",
                             trend === "up" && "text-green-600 dark:text-green-400",
                             trend === "down" && "text-red-600 dark:text-red-400",
                             (!trend || trend === "neutral") && "text-blue-600 dark:text-blue-400"
@@ -38,15 +38,15 @@ export function SummaryCard({ title, value, subValue, subLabel, icon: Icon, tren
                 </div>
 
                 <div className="space-y-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                    <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900 dark:text-white tracking-tight break-all leading-tight">
                         {value}
                     </p>
                     {(subValue || subLabel) && (
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
                             {subValue && (
                                 <span
                                     className={cn(
-                                        "font-semibold px-2 py-0.5 rounded-md",
+                                        "font-semibold px-2 py-0.5 rounded-md whitespace-nowrap",
                                         trend === "up" && "text-green-700 dark:text-green-400 bg-green-100/50 dark:bg-green-900/20",
                                         trend === "down" && "text-red-700 dark:text-red-400 bg-red-100/50 dark:bg-red-900/20",
                                         (!trend || trend === "neutral") && "text-gray-600 dark:text-gray-400 bg-gray-100/50 dark:bg-gray-800/50"
@@ -56,7 +56,7 @@ export function SummaryCard({ title, value, subValue, subLabel, icon: Icon, tren
                                 </span>
                             )}
                             {subLabel && (
-                                <span className="text-gray-500 dark:text-gray-500 text-xs">
+                                <span className="text-gray-500 dark:text-gray-500 text-xs truncate">
                                     {subLabel}
                                 </span>
                             )}

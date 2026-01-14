@@ -5,12 +5,16 @@ import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
 import { GrowthChart } from "@/components/GrowthChart";
-import { AllocationChart } from "@/components/AllocationChart";
+import { AllocationTabs } from "@/components/AllocationTabs";
 import { GainLossChart } from "@/components/GainLossChart";
+import { PerformanceMetrics } from "@/components/PerformanceMetrics";
+import { DiversificationScore } from "@/components/DiversificationScore";
+import { CostBasisAnalysis } from "@/components/CostBasisAnalysis";
+import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
-    const { cash, recordSnapshot, getGrowth, getHistoryForPeriod, isLoaded: cashLoaded } = useCashAndHistory();
+    const { cash, recordSnapshot, getGrowth, getHistoryForPeriod, transactions, isLoaded: cashLoaded } = useCashAndHistory();
 
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const { prices, loading: pricesLoading } = useMarketData(tickers);
@@ -31,10 +35,24 @@ export default function AnalyticsPage() {
     }, [summary.totalMarketValue, cash, isLoaded, cashLoaded]);
 
     const chartData = useMemo(() => {
-        return portfolio.map((item) => ({
-            name: item.ticker,
-            value: item.lots * 100 * (prices[item.ticker]?.price || item.averagePrice),
-        })).filter(d => d.value > 0);
+        const totalValue = portfolio.reduce((sum, item) => {
+            return sum + (item.lots * 100 * (prices[item.ticker]?.price || item.averagePrice));
+        }, 0);
+
+        return portfolio.map((item) => {
+            const livePrice = prices[item.ticker]?.price || item.averagePrice;
+            const value = item.lots * 100 * livePrice;
+            const costBasis = item.lots * 100 * item.averagePrice;
+            const gainLoss = value - costBasis;
+            const percentage = totalValue > 0 ? (value / totalValue) * 100 : 0;
+
+            return {
+                name: item.ticker,
+                value,
+                percentage,
+                gainLoss,
+            };
+        }).filter(d => d.value > 0);
     }, [portfolio, prices]);
 
     const gainLossChartData = useMemo(() => {
@@ -90,14 +108,30 @@ export default function AnalyticsPage() {
                     <GrowthChart getGrowth={getGrowth} getHistoryForPeriod={getHistoryForPeriod} />
                 </div>
 
-                {/* Allocation & Gain/Loss Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="min-h-[450px]">
-                        <AllocationChart data={chartData} />
-                    </div>
-                    <div className="min-h-[450px]">
-                        <GainLossChart data={gainLossChartData} />
-                    </div>
+                {/* Performance Metrics - Full Width */}
+                <div className="mb-6">
+                    <PerformanceMetrics portfolio={portfolio} prices={prices} />
+                </div>
+
+                {/* Allocation Tabs (Stock & Sector) - Full Width */}
+                <div className="mb-6">
+                    <AllocationTabs portfolio={portfolio} prices={prices} allocationData={chartData} />
+                </div>
+
+                {/* Gain/Loss Chart - Full Width */}
+                <div className="mb-6">
+                    <GainLossChart data={gainLossChartData} />
+                </div>
+
+                {/* Diversification & Cost Basis */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <DiversificationScore portfolio={portfolio} prices={prices} />
+                    <CostBasisAnalysis portfolio={portfolio} prices={prices} />
+                </div>
+
+                {/* Holding Period Analysis - Full Width */}
+                <div className="mb-6">
+                    <HoldingPeriodAnalysis portfolio={portfolio} transactions={transactions} prices={prices} />
                 </div>
             </div>
         </div>

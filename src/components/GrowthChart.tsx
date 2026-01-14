@@ -133,64 +133,66 @@ export function GrowthChart({ getGrowth, getHistoryForPeriod }: GrowthChartProps
             {/* Chart */}
             <div className="px-2 pb-4">
                 {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop
-                                        offset="5%"
-                                        stopColor={isPositive ? "#10b981" : "#ef4444"}
-                                        stopOpacity={0.3}
-                                    />
-                                    <stop
-                                        offset="95%"
-                                        stopColor={isPositive ? "#10b981" : "#ef4444"}
-                                        stopOpacity={0}
-                                    />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke="#e5e7eb"
-                                vertical={false}
-                                opacity={0.5}
-                            />
-                            <XAxis
-                                dataKey="time"
-                                tick={{ fontSize: 11, fill: '#9ca3af' }}
-                                axisLine={false}
-                                tickLine={false}
-                                dy={10}
-                            />
-                            <YAxis
-                                tick={{ fontSize: 11, fill: '#9ca3af' }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(value) => {
-                                    if (value >= 1000000000) return `${(value / 1000000000).toFixed(1)}B`;
-                                    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                                    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                                    return value.toString();
-                                }}
-                                dx={-10}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Area
-                                type="monotone"
-                                dataKey="value"
-                                stroke={isPositive ? "#10b981" : "#ef4444"}
-                                strokeWidth={2.5}
-                                fill="url(#colorValue)"
-                                dot={false}
-                                activeDot={{
-                                    r: 5,
-                                    fill: isPositive ? "#10b981" : "#ef4444",
-                                    stroke: "#fff",
-                                    strokeWidth: 2
-                                }}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    <div className="min-h-[280px]">
+                        <ResponsiveContainer width="100%" height={280}>
+                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop
+                                            offset="5%"
+                                            stopColor={isPositive ? "#10b981" : "#ef4444"}
+                                            stopOpacity={0.3}
+                                        />
+                                        <stop
+                                            offset="95%"
+                                            stopColor={isPositive ? "#10b981" : "#ef4444"}
+                                            stopOpacity={0}
+                                        />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    stroke="#e5e7eb"
+                                    vertical={false}
+                                    opacity={0.5}
+                                />
+                                <XAxis
+                                    dataKey="time"
+                                    tick={{ fontSize: 11, fill: '#9ca3af' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    dy={10}
+                                />
+                                <YAxis
+                                    tick={{ fontSize: 11, fill: '#9ca3af' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tickFormatter={(value) => {
+                                        if (value >= 1000000000) return `${(value / 1000000000).toFixed(1)}B`;
+                                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                                        return value.toString();
+                                    }}
+                                    dx={-10}
+                                />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Area
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke={isPositive ? "#10b981" : "#ef4444"}
+                                    strokeWidth={2.5}
+                                    fill="url(#colorValue)"
+                                    dot={false}
+                                    activeDot={{
+                                        r: 5,
+                                        fill: isPositive ? "#10b981" : "#ef4444",
+                                        stroke: "#fff",
+                                        strokeWidth: 2
+                                    }}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
                 ) : (
                     <div className="h-[280px] flex flex-col items-center justify-center text-gray-400">
                         <Calendar className="w-12 h-12 mb-3 opacity-50" />

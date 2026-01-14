@@ -87,81 +87,73 @@ export function GainLossChart({ data }: GainLossChartProps) {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-                <div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Kontribusi Gain/Loss</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Per saham terhadap total P/L</p>
-                </div>
+        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col">
+            <div className="mb-3">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">Kontribusi Gain/Loss</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Per saham terhadap total P/L</p>
             </div>
 
-            {/* Summary Stats */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                    <div className="flex items-center gap-1 mb-1">
-                        <TrendingUp className="w-3 h-3 text-green-600" />
-                        <span className="text-xs font-semibold text-green-700 dark:text-green-400">Profit</span>
+            {/* Summary Stats - Stacked on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-green-700 dark:text-green-400">Profit</span>
+                        </div>
+                        <span className="text-xs text-green-600/70 dark:text-green-400/70">{profitStocks.length}</span>
                     </div>
-                    <p className="text-sm font-bold text-green-600 dark:text-green-500">
+                    <p className="text-sm font-bold text-green-600 dark:text-green-500 mt-1">
                         +{formatIDR(totalProfit)}
-                    </p>
-                    <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-0.5">
-                        {profitStocks.length} saham
                     </p>
                 </div>
 
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
-                    <div className="flex items-center gap-1 mb-1">
-                        <TrendingDown className="w-3 h-3 text-red-600" />
-                        <span className="text-xs font-semibold text-red-700 dark:text-red-400">Loss</span>
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                            <TrendingDown className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-red-700 dark:text-red-400">Loss</span>
+                        </div>
+                        <span className="text-xs text-red-600/70 dark:text-red-400/70">{lossStocks.length}</span>
                     </div>
-                    <p className="text-sm font-bold text-red-600 dark:text-red-500">
+                    <p className="text-sm font-bold text-red-600 dark:text-red-500 mt-1">
                         -{formatIDR(totalLoss)}
-                    </p>
-                    <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-0.5">
-                        {lossStocks.length} saham
                     </p>
                 </div>
 
                 <div className={cn(
-                    "p-3 rounded-xl border",
+                    "p-3 rounded-lg border",
                     netGainLoss >= 0
                         ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                         : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
                 )}>
-                    <div className="flex items-center gap-1 mb-1">
+                    <div className="flex items-center justify-between">
                         <span className={cn(
                             "text-xs font-semibold",
                             netGainLoss >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
                         )}>
-                            Net
+                            Net Total
                         </span>
                     </div>
                     <p className={cn(
-                        "text-sm font-bold",
+                        "text-sm font-bold mt-1",
                         netGainLoss >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"
                     )}>
                         {netGainLoss >= 0 ? "+" : ""}{formatIDR(netGainLoss)}
-                    </p>
-                    <p className={cn(
-                        "text-xs mt-0.5",
-                        netGainLoss >= 0 ? "text-green-600/70 dark:text-green-400/70" : "text-red-600/70 dark:text-red-400/70"
-                    )}>
-                        Total
                     </p>
                 </div>
             </div>
 
             {/* Chart */}
-            <div className="flex-1 min-h-[250px]">
+            <div className="h-[300px] sm:h-[350px] min-h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={chartData}
                             cx="50%"
-                            cy="50%"
-                            innerRadius={70}
-                            outerRadius={110}
+                            cy="45%"
+                            innerRadius={60}
+                            outerRadius={90}
                             paddingAngle={2}
                             dataKey="displayValue"
                         >
@@ -181,6 +173,8 @@ export function GainLossChart({ data }: GainLossChartProps) {
                         </Pie>
                         <Tooltip content={<CustomTooltip />} />
                         <Legend
+                            verticalAlign="bottom"
+                            height={36}
                             formatter={(value, entry: any) => {
                                 const data = entry.payload;
                                 return (
@@ -188,11 +182,11 @@ export function GainLossChart({ data }: GainLossChartProps) {
                                         "text-xs font-medium",
                                         data.gainLoss >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
                                     )}>
-                                        {value} ({data.gainLoss >= 0 ? "+" : ""}{data.percentage.toFixed(1)}%)
+                                        {value} ({data.gainLoss >= 0 ? "+" : ""}{data.percentage.toFixed(0)}%)
                                     </span>
                                 );
                             }}
-                            wrapperStyle={{ fontSize: '12px' }}
+                            wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
                         />
                     </PieChart>
                 </ResponsiveContainer>

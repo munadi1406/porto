@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, PieChart, TrendingUp, History, Wallet } from "lucide-react";
+import { Home, PieChart, TrendingUp, History, Wallet, Building2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ const navigation = [
     { name: "Home", href: "/", icon: Home },
     { name: "Portfolio", href: "/portfolio", icon: PieChart },
     { name: "Analytics", href: "/analytics", icon: TrendingUp },
+    { name: "Fundamentals", href: "/fundamentals", icon: Building2 },
     { name: "History", href: "/history", icon: History },
 ];
 
@@ -19,7 +20,7 @@ export function MobileNav() {
         <>
             {/* Mobile Bottom Navigation */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 safe-area-bottom">
-                <div className="grid grid-cols-4 h-16">
+                <div className="grid grid-cols-5 h-16">
                     {navigation.map((item) => {
                         const isActive = pathname === item.href;
                         return (
