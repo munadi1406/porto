@@ -17,7 +17,7 @@ import { formatIDR, formatPercentage } from "@/lib/utils";
 
 export default function Dashboard() {
     const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
-    const { cash, updateCash, recordSnapshot, recordTransaction, getGrowth, getHistoryForPeriod, transactions, isLoaded: cashLoaded } = useCashAndHistory();
+    const { cash, updateCash, recordSnapshot, recordTransaction, getGrowth, getHistoryForPeriod, clearHistory, transactions, isLoaded: cashLoaded } = useCashAndHistory();
 
     // Extract tickers for market data fetching
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
@@ -172,7 +172,11 @@ export default function Dashboard() {
                         <AllocationChart data={chartData} />
                         <GainLossChart data={gainLossChartData} />
                     </div>
-                    <GrowthChart getGrowth={getGrowth} getHistoryForPeriod={getHistoryForPeriod} />
+                    <GrowthChart
+                        getGrowth={getGrowth}
+                        getHistoryForPeriod={getHistoryForPeriod}
+                        onResetHistory={clearHistory}
+                    />
                 </div>
 
                 {/* Right Col: Cash & Transactions */}
