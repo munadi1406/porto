@@ -7,20 +7,23 @@ import { formatIDR, formatPercentage, cn } from "@/lib/utils";
 import { PortfolioSnapshot } from "@/lib/types";
 
 interface GrowthChartProps {
-    getGrowth: (period: "day" | "week" | "year" | "all") => { value: number; percent: number };
-    getHistoryForPeriod: (period: "day" | "week" | "year" | "all") => PortfolioSnapshot[];
+    getGrowth: (period: "today" | "day" | "week" | "month" | "year" | "all") => { value: number; percent: number };
+    getHistoryForPeriod: (period: "today" | "day" | "week" | "month" | "year" | "all") => PortfolioSnapshot[];
+    onResetHistory: () => void;
 }
 
-type Period = "day" | "week" | "year" | "all";
+type Period = "today" | "day" | "week" | "month" | "year" | "all";
 
-export function GrowthChart({ getGrowth, getHistoryForPeriod }: GrowthChartProps) {
-    const [selectedPeriod, setSelectedPeriod] = useState<Period>("week");
+export function GrowthChart({ getGrowth, getHistoryForPeriod, onResetHistory }: GrowthChartProps) {
+    const [selectedPeriod, setSelectedPeriod] = useState<Period>("today");
 
     const periods: { key: Period; label: string; shortLabel: string }[] = [
-        { key: "day", label: "1 Hari", shortLabel: "1H" },
-        { key: "week", label: "1 Minggu", shortLabel: "1M" },
-        { key: "year", label: "1 Tahun", shortLabel: "1T" },
-        { key: "all", label: "Semua", shortLabel: "All" },
+        { key: "today", label: "Hari Ini", shortLabel: "HI" },
+        { key: "day", label: "24 Jam Terakhir", shortLabel: "24J" },
+        { key: "week", label: "1 Minggu Terakhir", shortLabel: "1M" },
+        { key: "month", label: "1 Bulan Terakhir", shortLabel: "1B" },
+        { key: "year", label: "1 Tahun Terakhir", shortLabel: "1T" },
+        { key: "all", label: "Semua Waktu", shortLabel: "All" },
     ];
 
     const growth = getGrowth(selectedPeriod);
@@ -32,10 +35,10 @@ export function GrowthChart({ getGrowth, getHistoryForPeriod }: GrowthChartProps
     // Format data for Recharts
     const chartData = historyData.map((snapshot) => ({
         time: new Date(snapshot.timestamp).toLocaleDateString('id-ID', {
-            month: 'short',
-            day: 'numeric',
-            hour: selectedPeriod === 'day' ? '2-digit' : undefined,
-            minute: selectedPeriod === 'day' ? '2-digit' : undefined,
+            month: (selectedPeriod === 'today' || selectedPeriod === 'day') ? undefined : 'short',
+            day: (selectedPeriod === 'today' || selectedPeriod === 'day') ? undefined : 'numeric',
+            hour: (selectedPeriod === 'today' || selectedPeriod === 'day') ? '2-digit' : undefined,
+            minute: (selectedPeriod === 'today' || selectedPeriod === 'day') ? '2-digit' : undefined,
         }),
         timestamp: snapshot.timestamp,
         value: snapshot.totalValue,
@@ -110,8 +113,8 @@ export function GrowthChart({ getGrowth, getHistoryForPeriod }: GrowthChartProps
                 </div>
             </div>
 
-            {/* Period Selector */}
-            <div className="px-6 pt-4 pb-2">
+            {/* Period Selector & Reset */}
+            <div className="px-6 pt-4 pb-2 flex items-center justify-between">
                 <div className="inline-flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
                     {periods.map((period) => (
                         <button
@@ -128,6 +131,17 @@ export function GrowthChart({ getGrowth, getHistoryForPeriod }: GrowthChartProps
                         </button>
                     ))}
                 </div>
+
+                <button
+                    onClick={() => {
+                        if (confirm('Bersihkan semua riwayat pertumbuhan portfolio?')) {
+                            onResetHistory();
+                        }
+                    }}
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors uppercase font-bold tracking-wider"
+                >
+                    Reset Data
+                </button>
             </div>
 
             {/* Chart */}

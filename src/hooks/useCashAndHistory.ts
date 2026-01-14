@@ -102,67 +102,126 @@ export function useCashAndHistory() {
 
         setHistory((prev) => {
             // Keep only last 365 days of snapshots
-            const oneDayAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-            const filtered = prev.filter((s) => s.timestamp > oneDayAgo);
+            const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+            const filtered = prev.filter((s) => s.timestamp > oneYearAgo);
 
-            // Avoid duplicate snapshots within 1 minute
             const lastSnapshot = filtered[filtered.length - 1];
-            if (lastSnapshot && (snapshot.timestamp - lastSnapshot.timestamp < 60000)) {
-                return prev;
+
+            // Record if:
+            // 1. No previous snapshot exists
+            // 2. More than 5 seconds passed (real-time tracking)
+            // 3. Value changed by more than 0.01% (significant change)
+            if (!lastSnapshot) {
+                console.log('[Snapshot] First snapshot recorded:', snapshot.totalValue);
+                return [snapshot];
             }
 
-            return [...filtered, snapshot];
+            const timeDiff = snapshot.timestamp - lastSnapshot.timestamp;
+            const valueDiff = Math.abs(snapshot.totalValue - lastSnapshot.totalValue);
+            const percentDiff = lastSnapshot.totalValue > 0
+                ? (valueDiff / lastSnapshot.totalValue) * 100
+                : 0;
+
+            // Record if enough time passed OR significant value change
+            if (timeDiff >= 5000 || percentDiff >= 0.01) {
+                console.log('[Snapshot] Recorded:', {
+                    value: snapshot.totalValue,
+                    timeDiff: `${(timeDiff / 1000).toFixed(0)}s`,
+                    valueDiff,
+                    percentDiff: `${percentDiff.toFixed(2)}%`
+                });
+                return [...filtered, snapshot];
+            }
+
+            // Skip if too recent and no significant change
+            return prev;
         });
     };
 
-    const getGrowth = (period: "day" | "week" | "year" | "all") => {
+    const getGrowth = (period: "today" | "day" | "week" | "month" | "year" | "all") => {
         if (history.length === 0) return { value: 0, percent: 0 };
+        if (history.length === 1) return { value: 0, percent: 0 };
 
         const now = Date.now();
         let startTime: number;
 
         switch (period) {
+            case "today":
+                // Start of today (midnight)
+                startTime = new Date().setHours(0, 0, 0, 0);
+                break;
             case "day":
+                // Last 24 hours
                 startTime = now - 24 * 60 * 60 * 1000;
                 break;
             case "week":
+                // Last 7 days
                 startTime = now - 7 * 24 * 60 * 60 * 1000;
                 break;
+            case "month":
+                // Last 30 days
+                startTime = now - 30 * 24 * 60 * 60 * 1000;
+                break;
             case "year":
+                // Last 365 days
                 startTime = now - 365 * 24 * 60 * 60 * 1000;
                 break;
             case "all":
                 startTime = 0;
                 break;
+            default:
+                startTime = 0;
         }
 
-        // Find closest snapshot to start time
-        const startSnapshot = history
-            .filter((s) => s.timestamp >= startTime)
-            .sort((a, b) => a.timestamp - b.timestamp)[0];
+        // Get all snapshots in the period, sorted by time
+        // FILTER OUT ZERO VALUES (corrupted data)
+        const periodSnapshots = history
+            .filter((s) => s.timestamp >= startTime && s.totalValue > 0)
+            .sort((a, b) => a.timestamp - b.timestamp);
 
-        if (!startSnapshot) return { value: 0, percent: 0 };
+        if (periodSnapshots.length === 0) return { value: 0, percent: 0 };
+        if (periodSnapshots.length === 1) return { value: 0, percent: 0 };
 
-        const currentSnapshot = history[history.length - 1];
+        // Compare FIRST and LAST snapshot in the period
+        const startSnapshot = periodSnapshots[0];
+        const currentSnapshot = periodSnapshots[periodSnapshots.length - 1];
+
         const growthValue = currentSnapshot.totalValue - startSnapshot.totalValue;
         const growthPercent =
             startSnapshot.totalValue > 0
                 ? (growthValue / startSnapshot.totalValue) * 100
                 : 0;
 
+        // Debug logging
+        console.log(`[Growth ${period}]`, {
+            periodSnapshots: periodSnapshots.length,
+            startValue: startSnapshot.totalValue,
+            currentValue: currentSnapshot.totalValue,
+            growthValue,
+            growthPercent: growthPercent.toFixed(2) + '%',
+            startDate: new Date(startSnapshot.timestamp).toLocaleString(),
+            endDate: new Date(currentSnapshot.timestamp).toLocaleString()
+        });
+
         return { value: growthValue, percent: growthPercent };
     };
 
-    const getHistoryForPeriod = (period: "day" | "week" | "year" | "all") => {
+    const getHistoryForPeriod = (period: "today" | "day" | "week" | "month" | "year" | "all") => {
         const now = Date.now();
         let startTime: number;
 
         switch (period) {
+            case "today":
+                startTime = new Date().setHours(0, 0, 0, 0);
+                break;
             case "day":
                 startTime = now - 24 * 60 * 60 * 1000;
                 break;
             case "week":
                 startTime = now - 7 * 24 * 60 * 60 * 1000;
+                break;
+            case "month":
+                startTime = now - 30 * 24 * 60 * 60 * 1000;
                 break;
             case "year":
                 startTime = now - 365 * 24 * 60 * 60 * 1000;
@@ -170,9 +229,18 @@ export function useCashAndHistory() {
             case "all":
                 startTime = 0;
                 break;
+            default:
+                startTime = 0;
         }
 
-        return history.filter((s) => s.timestamp >= startTime);
+        return history
+            .filter((s) => s.timestamp >= startTime && s.totalValue > 0)
+            .sort((a, b) => a.timestamp - b.timestamp);
+    };
+
+    const clearHistory = () => {
+        setHistory([]);
+        localStorage.removeItem(HISTORY_STORAGE_KEY);
     };
 
     return {
@@ -187,5 +255,6 @@ export function useCashAndHistory() {
         recordSnapshot,
         getGrowth,
         getHistoryForPeriod,
+        clearHistory,
     };
 }

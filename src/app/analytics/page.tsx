@@ -14,7 +14,7 @@ import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
-    const { cash, recordSnapshot, getGrowth, getHistoryForPeriod, transactions, isLoaded: cashLoaded } = useCashAndHistory();
+    const { cash, recordSnapshot, getGrowth, getHistoryForPeriod, clearHistory, transactions, isLoaded: cashLoaded } = useCashAndHistory();
 
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const { prices, loading: pricesLoading } = useMarketData(tickers);
@@ -28,11 +28,25 @@ export default function AnalyticsPage() {
         return { totalMarketValue };
     }, [portfolio, prices]);
 
+    // Record portfolio snapshot for growth tracking (on value change)
     useEffect(() => {
-        if (isLoaded && cashLoaded && !pricesLoading && portfolio.length > 0) {
+        if (isLoaded && cashLoaded && !pricesLoading) {
             recordSnapshot(summary.totalMarketValue, cash);
         }
-    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded]);
+    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading]);
+
+    // Periodic snapshot recording (every 30 seconds for real-time tracking)
+    useEffect(() => {
+        if (!isLoaded || !cashLoaded) return;
+
+        const interval = setInterval(() => {
+            if (!pricesLoading) {
+                recordSnapshot(summary.totalMarketValue, cash);
+            }
+        }, 5000); // 5 seconds
+
+        return () => clearInterval(interval);
+    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, recordSnapshot]);
 
     const chartData = useMemo(() => {
         const totalValue = portfolio.reduce((sum, item) => {
@@ -105,7 +119,11 @@ export default function AnalyticsPage() {
 
                 {/* Growth Chart - Full Width */}
                 <div className="mb-6">
-                    <GrowthChart getGrowth={getGrowth} getHistoryForPeriod={getHistoryForPeriod} />
+                    <GrowthChart
+                        getGrowth={getGrowth}
+                        getHistoryForPeriod={getHistoryForPeriod}
+                        onResetHistory={clearHistory}
+                    />
                 </div>
 
                 {/* Performance Metrics - Full Width */}
