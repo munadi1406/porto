@@ -184,7 +184,7 @@ export function AllocationTabs({ portfolio, prices, allocationData }: Allocation
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(value: number) => formatIDR(value)}
+                                        formatter={(value: any) => [formatIDR(Number(value)), "Value"]}
                                         contentStyle={{
                                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                             border: '1px solid #e5e7eb',
@@ -232,7 +232,7 @@ export function AllocationTabs({ portfolio, prices, allocationData }: Allocation
                                                 ))}
                                             </Pie>
                                             <Tooltip
-                                                formatter={(value: number) => formatIDR(value)}
+                                                formatter={(value: any) => [formatIDR(Number(value)), "Value"]}
                                                 contentStyle={{
                                                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                                     border: '1px solid #e5e7eb',
