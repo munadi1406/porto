@@ -31,11 +31,34 @@ export function usePortfolio() {
     }, [portfolio, isLoaded]);
 
     const addStock = (item: Omit<PortfolioItem, "id">) => {
-        const newItem: PortfolioItem = {
-            ...item,
-            id: crypto.randomUUID(),
-        };
-        setPortfolio((prev) => [...prev, newItem]);
+        // Check if ticker already exists
+        const existingStock = portfolio.find(p => p.ticker === item.ticker);
+
+        if (existingStock) {
+            // If ticker exists, recalculate average price (same logic as buy transaction)
+            const totalCost = (existingStock.lots * existingStock.averagePrice) + (item.lots * item.averagePrice);
+            const totalLots = existingStock.lots + item.lots;
+            const newAverage = totalCost / totalLots;
+
+            setPortfolio((prev) =>
+                prev.map((p) =>
+                    p.ticker === item.ticker
+                        ? {
+                            ...p,
+                            lots: totalLots,
+                            averagePrice: Math.round(newAverage) // Round to nearest int IDR
+                        }
+                        : p
+                )
+            );
+        } else {
+            // If ticker doesn't exist, add as new stock
+            const newItem: PortfolioItem = {
+                ...item,
+                id: crypto.randomUUID(),
+            };
+            setPortfolio((prev) => [...prev, newItem]);
+        }
     };
 
     const removeStock = (id: string) => {
