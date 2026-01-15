@@ -33,36 +33,63 @@ export function GrowthChart({ getGrowth, getHistoryForPeriod, onResetHistory }: 
     const historyData = getHistoryForPeriod(selectedPeriod);
 
     // Format data for Recharts
-    const chartData = historyData.map((snapshot) => ({
-        time: new Date(snapshot.timestamp).toLocaleDateString('id-ID', {
-            month: (selectedPeriod === 'today' || selectedPeriod === 'day') ? undefined : 'short',
-            day: (selectedPeriod === 'today' || selectedPeriod === 'day') ? undefined : 'numeric',
-            hour: (selectedPeriod === 'today' || selectedPeriod === 'day') ? '2-digit' : undefined,
-            minute: (selectedPeriod === 'today' || selectedPeriod === 'day') ? '2-digit' : undefined,
+    const chartData = historyData.map((snapshot: any) => ({
+        time: new Date(snapshot.timestamp).toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
         }),
         timestamp: snapshot.timestamp,
-        value: snapshot.totalValue,
+        value: snapshot.close || snapshot.totalValue,
+        open: snapshot.open,
+        high: snapshot.high,
+        low: snapshot.low,
+        close: snapshot.close,
     }));
 
     // Custom tooltip
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
             const data = payload[0].payload;
+            const isOHLC = data.open !== undefined;
+
             return (
-                <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 backdrop-blur-md bg-opacity-95">
+                    <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                         {new Date(data.timestamp).toLocaleDateString('id-ID', {
-                            weekday: 'short',
                             day: 'numeric',
                             month: 'short',
-                            year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
                         })}
                     </p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">
-                        {formatIDR(data.value)}
-                    </p>
+                    <div className="space-y-1.5">
+                        <div className="flex justify-between gap-8">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Total</span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                {formatIDR(data.value)}
+                            </span>
+                        </div>
+                        {isOHLC && (
+                            <div className="pt-1.5 border-t border-gray-100 dark:border-gray-700/50 mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] text-gray-400">O:</span>
+                                    <span className="text-[10px] font-mono text-gray-600 dark:text-gray-300">{formatIDR(data.open)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] text-gray-400">H:</span>
+                                    <span className="text-[10px] font-mono text-green-500">{formatIDR(data.high)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] text-gray-400">L:</span>
+                                    <span className="text-[10px] font-mono text-red-500">{formatIDR(data.low)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] text-gray-400">C:</span>
+                                    <span className="text-[10px] font-mono text-gray-600 dark:text-gray-300">{formatIDR(data.close)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
         }

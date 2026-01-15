@@ -1,119 +1,160 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PortfolioItem } from "@/lib/types";
 
-const STORAGE_KEY = "my_stock_portfolio";
+// Fetch portfolio
+async function fetchPortfolio(): Promise<PortfolioItem[]> {
+    const response = await fetch('/api/portfolio');
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+}
+
+// Add stock
+async function addStockAPI(stock: Omit<PortfolioItem, "id">) {
+    const response = await fetch('/api/portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stock),
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+}
+
+// Update stock
+async function updateStockAPI(data: { id: string } & Partial<Omit<PortfolioItem, "id">>) {
+    const response = await fetch('/api/portfolio', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+}
+
+// Delete stock
+async function deleteStockAPI(id: string) {
+    const response = await fetch(`/api/portfolio?id=${id}`, {
+        method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result;
+}
+
+// Execute transaction
+async function executeTransactionAPI(data: {
+    id: string;
+    type: 'buy' | 'sell';
+    ticker: string;
+    name: string;
+    lots: number;
+    pricePerShare: number;
+}) {
+    const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+}
 
 export function usePortfolio() {
-    const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
-    const [isLoaded, setIsLoaded] = useState(false);
+    const queryClient = useQueryClient();
 
-    // Load from LocalStorage on mount
-    useEffect(() => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                setPortfolio(JSON.parse(stored));
-            }
-        } catch (error) {
-            console.error("Failed to load portfolio from storage", error);
-        } finally {
-            setIsLoaded(true);
-        }
-    }, []);
+    // Fetch portfolio with React Query
+    const { data: portfolio = [], isLoading, error } = useQuery({
+        queryKey: ['portfolio'],
+        queryFn: fetchPortfolio,
+    });
 
-    // Save to LocalStorage whenever portfolio changes
-    useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolio));
-        }
-    }, [portfolio, isLoaded]);
+    // Add stock mutation
+    const addStockMutation = useMutation({
+        mutationFn: addStockAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+        },
+    });
 
-    const addStock = (item: Omit<PortfolioItem, "id">) => {
-        // Check if ticker already exists
-        const existingStock = portfolio.find(p => p.ticker === item.ticker);
+    // Update stock mutation
+    const updateStockMutation = useMutation({
+        mutationFn: updateStockAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+        },
+    });
 
-        if (existingStock) {
-            // If ticker exists, recalculate average price (same logic as buy transaction)
-            const totalCost = (existingStock.lots * existingStock.averagePrice) + (item.lots * item.averagePrice);
-            const totalLots = existingStock.lots + item.lots;
-            const newAverage = totalCost / totalLots;
+    // Delete stock mutation
+    const deleteStockMutation = useMutation({
+        mutationFn: deleteStockAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+        },
+    });
 
-            setPortfolio((prev) =>
-                prev.map((p) =>
-                    p.ticker === item.ticker
-                        ? {
-                            ...p,
-                            lots: totalLots,
-                            averagePrice: Math.round(newAverage) // Round to nearest int IDR
-                        }
-                        : p
-                )
-            );
-        } else {
-            // If ticker doesn't exist, add as new stock
-            const newItem: PortfolioItem = {
-                ...item,
-                id: crypto.randomUUID(),
-            };
-            setPortfolio((prev) => [...prev, newItem]);
-        }
+    // Execute transaction mutation
+    const executeTransactionMutation = useMutation({
+        mutationFn: executeTransactionAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        },
+    });
+
+    const addStock = async (item: Omit<PortfolioItem, "id">) => {
+        await addStockMutation.mutateAsync(item);
     };
 
-    const removeStock = (id: string) => {
-        setPortfolio((prev) => prev.filter((item) => item.id !== id));
+    const removeStock = async (id: string) => {
+        await deleteStockMutation.mutateAsync(id);
     };
 
-    const updateStock = (id: string, updates: Partial<Omit<PortfolioItem, "id">>) => {
-        setPortfolio((prev) =>
-            prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
-        );
+    const updateStock = async (id: string, updates: Partial<Omit<PortfolioItem, "id">>) => {
+        await updateStockMutation.mutateAsync({ id, ...updates });
     };
 
-    const executeTransaction = (id: string, type: 'buy' | 'sell', transactionLots: number, transactionPrice: number) => {
-        setPortfolio((prev) =>
-            prev.map((item) => {
-                if (item.id !== id) return item;
+    const executeTransaction = async (
+        id: string,
+        type: 'buy' | 'sell',
+        lots: number,
+        price: number
+    ) => {
+        const item = portfolio.find(p => p.id === id);
+        if (!item) return;
 
-                if (type === 'buy') {
-                    // Average Down Logic
-                    const totalCost = (item.lots * item.averagePrice) + (transactionLots * transactionPrice);
-                    const totalLots = item.lots + transactionLots;
-                    const newAverage = totalCost / totalLots;
-
-                    return {
-                        ...item,
-                        lots: totalLots,
-                        averagePrice: Math.round(newAverage) // Round to nearest int IDR
-                    };
-                } else {
-                    // Sell (Reduce lots) Logic
-                    // Avg Price does not change on sell usually (FIFO/Weighted Avg Principle)
-                    // Unless we want to account for realized gain which we don't track here yet.
-                    const newLots = Math.max(0, item.lots - transactionLots);
-                    return {
-                        ...item,
-                        lots: newLots
-                    };
-                }
-            }).filter(item => item.lots > 0) // Remove if sold out
-        );
+        await executeTransactionMutation.mutateAsync({
+            id,
+            type,
+            ticker: item.ticker,
+            name: item.name,
+            lots,
+            pricePerShare: price,
+        });
     };
 
     const getPortfolioSummary = () => {
-        // This is just helper, real calculations need live prices
-        const totalInvested = portfolio.reduce((acc, item) => acc + (item.lots * 100 * item.averagePrice), 0);
+        const totalInvested = portfolio.reduce(
+            (acc, item) => acc + (item.lots * 100 * item.averagePrice),
+            0
+        );
         return { totalInvested };
     };
 
     return {
         portfolio,
-        isLoaded,
+        isLoaded: !isLoading,
+        isLoading,
+        error,
         addStock,
         removeStock,
         updateStock,
         executeTransaction,
-        getPortfolioSummary
+        getPortfolioSummary,
+        refreshPortfolio: () => queryClient.invalidateQueries({ queryKey: ['portfolio'] }),
     };
 }

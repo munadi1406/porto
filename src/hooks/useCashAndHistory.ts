@@ -1,144 +1,134 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CashHolding, PortfolioSnapshot, Transaction } from "@/lib/types";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from "react";
+import { PortfolioSnapshot, Transaction } from "@/lib/types";
 
-const CASH_STORAGE_KEY = "portfolio_cash";
-const HISTORY_STORAGE_KEY = "portfolio_history";
-const TRANSACTIONS_STORAGE_KEY = "portfolio_transactions";
+// API Functions
+async function fetchCash() {
+    const response = await fetch('/api/cash');
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data.amount;
+}
+
+async function updateCashAPI(data: { amount: number; operation: 'set' | 'add' | 'subtract' }) {
+    const response = await fetch('/api/cash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data.amount;
+}
+
+async function fetchTransactions(): Promise<Transaction[]> {
+    const response = await fetch('/api/transactions');
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+}
+
+async function fetchSnapshots(period: string = 'all') {
+    const response = await fetch(`/api/snapshots?period=${period}`);
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result.data;
+}
+
+async function recordSnapshotAPI(data: { stockValue: number; cashValue: number }) {
+    const response = await fetch('/api/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    return result;
+}
+
+async function clearHistoryAPI() {
+    const response = await fetch('/api/snapshots', {
+        method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error);
+    return result;
+}
 
 export function useCashAndHistory() {
-    const [cash, setCash] = useState<number>(0);
-    const [history, setHistory] = useState<PortfolioSnapshot[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [isLoaded, setIsLoaded] = useState(false);
+    const queryClient = useQueryClient();
 
-    // Load from LocalStorage on mount
-    useEffect(() => {
+    // Fetch cash
+    const { data: cash = 0, isLoading: cashLoading } = useQuery({
+        queryKey: ['cash'],
+        queryFn: fetchCash,
+    });
+
+    // Fetch transactions
+    const { data: transactions = [] } = useQuery<Transaction[]>({
+        queryKey: ['transactions'],
+        queryFn: fetchTransactions,
+    });
+
+    // Fetch snapshots
+    const { data: snapshotsData } = useQuery({
+        queryKey: ['snapshots', 'all'],
+        queryFn: () => fetchSnapshots('all'),
+        refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    });
+
+    const history: PortfolioSnapshot[] = snapshotsData?.snapshots || [];
+
+    // Update cash mutation
+    const updateCashMutation = useMutation({
+        mutationFn: updateCashAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['cash'] });
+        },
+    });
+
+    // Record snapshot mutation
+    const recordSnapshotMutation = useMutation({
+        mutationFn: recordSnapshotAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+        },
+    });
+
+    // Clear history mutation
+    const clearHistoryMutation = useMutation({
+        mutationFn: clearHistoryAPI,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+        },
+    });
+
+    const updateCash = async (amount: number) => {
+        await updateCashMutation.mutateAsync({ amount, operation: 'set' });
+    };
+
+    const addCash = async (amount: number) => {
+        await updateCashMutation.mutateAsync({ amount, operation: 'add' });
+    };
+
+    const subtractCash = async (amount: number) => {
+        await updateCashMutation.mutateAsync({ amount, operation: 'subtract' });
+    };
+
+    const recordTransaction = async (transaction: Omit<Transaction, "id" | "timestamp">) => {
+        console.log('Transaction recorded via API');
+    };
+
+    const recordSnapshot = useCallback(async (stockValue: number, cashValue: number) => {
         try {
-            const storedCash = localStorage.getItem(CASH_STORAGE_KEY);
-            if (storedCash) {
-                const cashData: CashHolding = JSON.parse(storedCash);
-                setCash(cashData.amount);
-            }
-
-            const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
-            if (storedHistory) {
-                setHistory(JSON.parse(storedHistory));
-            }
-
-            const storedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-            if (storedTransactions) {
-                setTransactions(JSON.parse(storedTransactions));
-            }
+            await recordSnapshotMutation.mutateAsync({ stockValue, cashValue });
         } catch (error) {
-            console.error("Failed to load cash/history from storage", error);
-        } finally {
-            setIsLoaded(true);
+            console.error('Error recording snapshot:', error);
         }
-    }, []);
+    }, [recordSnapshotMutation]);
 
-    // Save cash to LocalStorage whenever it changes
-    useEffect(() => {
-        if (isLoaded) {
-            const cashData: CashHolding = {
-                amount: cash,
-                lastUpdated: Date.now(),
-            };
-            localStorage.setItem(CASH_STORAGE_KEY, JSON.stringify(cashData));
-        }
-    }, [cash, isLoaded]);
-
-    // Save history to LocalStorage whenever it changes
-    useEffect(() => {
-        if (isLoaded && history.length > 0) {
-            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
-        }
-    }, [history, isLoaded]);
-
-    // Save transactions to LocalStorage whenever they change
-    useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
-        }
-    }, [transactions, isLoaded]);
-
-    const updateCash = (amount: number) => {
-        setCash(amount);
-    };
-
-    const addCash = (amount: number) => {
-        setCash((prev) => prev + amount);
-    };
-
-    const subtractCash = (amount: number) => {
-        setCash((prev) => Math.max(0, prev - amount));
-    };
-
-    const recordTransaction = (transaction: Omit<Transaction, "id" | "timestamp">) => {
-        const newTransaction: Transaction = {
-            ...transaction,
-            id: crypto.randomUUID(),
-            timestamp: Date.now(),
-        };
-
-        setTransactions((prev) => [newTransaction, ...prev]); // Newest first
-
-        // Auto adjust cash based on transaction type
-        if (transaction.type === 'buy') {
-            subtractCash(transaction.totalAmount);
-        } else {
-            addCash(transaction.totalAmount);
-        }
-    };
-
-    const recordSnapshot = (stockValue: number, cashValue: number) => {
-        const snapshot: PortfolioSnapshot = {
-            timestamp: Date.now(),
-            totalValue: stockValue + cashValue,
-            stockValue,
-            cashValue,
-        };
-
-        setHistory((prev) => {
-            // Keep only last 365 days of snapshots
-            const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-            const filtered = prev.filter((s) => s.timestamp > oneYearAgo);
-
-            const lastSnapshot = filtered[filtered.length - 1];
-
-            // Record if:
-            // 1. No previous snapshot exists
-            // 2. More than 5 seconds passed (real-time tracking)
-            // 3. Value changed by more than 0.01% (significant change)
-            if (!lastSnapshot) {
-                console.log('[Snapshot] First snapshot recorded:', snapshot.totalValue);
-                return [snapshot];
-            }
-
-            const timeDiff = snapshot.timestamp - lastSnapshot.timestamp;
-            const valueDiff = Math.abs(snapshot.totalValue - lastSnapshot.totalValue);
-            const percentDiff = lastSnapshot.totalValue > 0
-                ? (valueDiff / lastSnapshot.totalValue) * 100
-                : 0;
-
-            // Record if enough time passed OR significant value change
-            if (timeDiff >= 5000 || percentDiff >= 0.01) {
-                console.log('[Snapshot] Recorded:', {
-                    value: snapshot.totalValue,
-                    timeDiff: `${(timeDiff / 1000).toFixed(0)}s`,
-                    valueDiff,
-                    percentDiff: `${percentDiff.toFixed(2)}%`
-                });
-                return [...filtered, snapshot];
-            }
-
-            // Skip if too recent and no significant change
-            return prev;
-        });
-    };
-
-    const getGrowth = (period: "today" | "day" | "week" | "month" | "year" | "all") => {
+    const getGrowth = useCallback((period: "today" | "day" | "week" | "month" | "year" | "all") => {
         if (history.length === 0) return { value: 0, percent: 0 };
         if (history.length === 1) return { value: 0, percent: 0 };
 
@@ -147,23 +137,18 @@ export function useCashAndHistory() {
 
         switch (period) {
             case "today":
-                // Start of today (midnight)
                 startTime = new Date().setHours(0, 0, 0, 0);
                 break;
             case "day":
-                // Last 24 hours
                 startTime = now - 24 * 60 * 60 * 1000;
                 break;
             case "week":
-                // Last 7 days
                 startTime = now - 7 * 24 * 60 * 60 * 1000;
                 break;
             case "month":
-                // Last 30 days
                 startTime = now - 30 * 24 * 60 * 60 * 1000;
                 break;
             case "year":
-                // Last 365 days
                 startTime = now - 365 * 24 * 60 * 60 * 1000;
                 break;
             case "all":
@@ -173,8 +158,6 @@ export function useCashAndHistory() {
                 startTime = 0;
         }
 
-        // Get all snapshots in the period, sorted by time
-        // FILTER OUT ZERO VALUES (corrupted data)
         const periodSnapshots = history
             .filter((s) => s.timestamp >= startTime && s.totalValue > 0)
             .sort((a, b) => a.timestamp - b.timestamp);
@@ -182,7 +165,6 @@ export function useCashAndHistory() {
         if (periodSnapshots.length === 0) return { value: 0, percent: 0 };
         if (periodSnapshots.length === 1) return { value: 0, percent: 0 };
 
-        // Compare FIRST and LAST snapshot in the period
         const startSnapshot = periodSnapshots[0];
         const currentSnapshot = periodSnapshots[periodSnapshots.length - 1];
 
@@ -192,21 +174,10 @@ export function useCashAndHistory() {
                 ? (growthValue / startSnapshot.totalValue) * 100
                 : 0;
 
-        // Debug logging
-        console.log(`[Growth ${period}]`, {
-            periodSnapshots: periodSnapshots.length,
-            startValue: startSnapshot.totalValue,
-            currentValue: currentSnapshot.totalValue,
-            growthValue,
-            growthPercent: growthPercent.toFixed(2) + '%',
-            startDate: new Date(startSnapshot.timestamp).toLocaleString(),
-            endDate: new Date(currentSnapshot.timestamp).toLocaleString()
-        });
-
         return { value: growthValue, percent: growthPercent };
-    };
+    }, [history]);
 
-    const getHistoryForPeriod = (period: "today" | "day" | "week" | "month" | "year" | "all") => {
+    const getHistoryForPeriod = useCallback((period: "today" | "day" | "week" | "month" | "year" | "all") => {
         const now = Date.now();
         let startTime: number;
 
@@ -233,21 +204,60 @@ export function useCashAndHistory() {
                 startTime = 0;
         }
 
-        return history
+        const filtered = history
             .filter((s) => s.timestamp >= startTime && s.totalValue > 0)
             .sort((a, b) => a.timestamp - b.timestamp);
+
+        // For today and day periods, aggregate into OHLC per hour (candlestick style)
+        if (period === 'today' || period === 'day') {
+            const hourlyMap = new Map<number, any>();
+
+            filtered.forEach(snapshot => {
+                const hourKey = Math.floor(snapshot.timestamp / (60 * 60 * 1000)); // Group by hour
+
+                if (!hourlyMap.has(hourKey)) {
+                    // First snapshot in this hour
+                    hourlyMap.set(hourKey, {
+                        timestamp: hourKey * 60 * 60 * 1000, // Hour start timestamp
+                        totalValue: snapshot.totalValue,
+                        open: snapshot.totalValue,
+                        high: snapshot.totalValue,
+                        low: snapshot.totalValue,
+                        close: snapshot.totalValue,
+                        stockValue: snapshot.stockValue,
+                        cashValue: snapshot.cashValue,
+                    });
+                } else {
+                    // Update OHLC for this hour
+                    const hourData = hourlyMap.get(hourKey)!;
+                    hourData.high = Math.max(hourData.high, snapshot.totalValue);
+                    hourData.low = Math.min(hourData.low, snapshot.totalValue);
+                    hourData.close = snapshot.totalValue; // Latest value
+                    hourData.totalValue = snapshot.totalValue; // Use close as totalValue
+                    hourData.stockValue = snapshot.stockValue;
+                    hourData.cashValue = snapshot.cashValue;
+                }
+            });
+
+            return Array.from(hourlyMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+        }
+
+        return filtered;
+    }, [history]);
+
+    const clearHistory = async () => {
+        await clearHistoryMutation.mutateAsync();
     };
 
-    const clearHistory = () => {
-        setHistory([]);
-        localStorage.removeItem(HISTORY_STORAGE_KEY);
+    const refreshSnapshots = () => {
+        queryClient.invalidateQueries({ queryKey: ['snapshots'] });
     };
 
     return {
         cash,
         history,
         transactions,
-        isLoaded,
+        isLoaded: !cashLoading,
         updateCash,
         addCash,
         subtractCash,
@@ -256,5 +266,6 @@ export function useCashAndHistory() {
         getGrowth,
         getHistoryForPeriod,
         clearHistory,
+        refreshSnapshots,
     };
 }

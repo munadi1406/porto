@@ -26,6 +26,10 @@ export interface PortfolioSnapshot {
     totalValue: number; // stocks + cash
     stockValue: number;
     cashValue: number;
+    open?: number;
+    high?: number;
+    low?: number;
+    close?: number;
 }
 
 export interface CashHolding {

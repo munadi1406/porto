@@ -28,25 +28,19 @@ export default function AnalyticsPage() {
         return { totalMarketValue };
     }, [portfolio, prices]);
 
-    // Record portfolio snapshot for growth tracking (on value change)
+
+    // Record snapshot on value changes (with debounce to prevent spam)
     useEffect(() => {
-        if (isLoaded && cashLoaded && !pricesLoading) {
+        if (!isLoaded || !cashLoaded || pricesLoading) return;
+        if (summary.totalMarketValue === 0) return;
+
+        // Debounce to prevent too many calls
+        const timeoutId = setTimeout(() => {
             recordSnapshot(summary.totalMarketValue, cash);
-        }
+        }, 2000); // 2 second debounce
+
+        return () => clearTimeout(timeoutId);
     }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading]);
-
-    // Periodic snapshot recording (every 30 seconds for real-time tracking)
-    useEffect(() => {
-        if (!isLoaded || !cashLoaded) return;
-
-        const interval = setInterval(() => {
-            if (!pricesLoading) {
-                recordSnapshot(summary.totalMarketValue, cash);
-            }
-        }, 5000); // 5 seconds
-
-        return () => clearInterval(interval);
-    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, recordSnapshot]);
 
     const chartData = useMemo(() => {
         const totalValue = portfolio.reduce((sum, item) => {
