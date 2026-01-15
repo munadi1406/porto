@@ -19,14 +19,14 @@ interface PortfolioItemAttributes {
 interface PortfolioItemCreationAttributes extends Optional<PortfolioItemAttributes, 'id' | 'userId' | 'createdAt' | 'updatedAt'> { }
 
 export class PortfolioItem extends Model<PortfolioItemAttributes, PortfolioItemCreationAttributes> implements PortfolioItemAttributes {
-    public id!: string;
-    public userId!: string;
-    public ticker!: string;
-    public name!: string;
-    public lots!: number;
-    public averagePrice!: number;
-    public readonly createdAt!: Date;
-    public readonly updatedAt!: Date;
+    declare id: string;
+    declare userId: string;
+    declare ticker: string;
+    declare name: string;
+    declare lots: number;
+    declare averagePrice: number;
+    declare readonly createdAt: Date;
+    declare readonly updatedAt: Date;
 }
 
 PortfolioItem.init(
@@ -70,7 +70,8 @@ PortfolioItem.init(
         indexes: [
             {
                 unique: true,
-                fields: ['userId', 'ticker'], // Unique per user
+                fields: ['userId', 'ticker'],
+                name: 'portfolio_item_user_ticker_unique'
             },
         ],
     }
@@ -97,18 +98,18 @@ interface TransactionAttributes {
 interface TransactionCreationAttributes extends Optional<TransactionAttributes, 'id' | 'userId' | 'notes' | 'createdAt' | 'updatedAt'> { }
 
 export class Transaction extends Model<TransactionAttributes, TransactionCreationAttributes> implements TransactionAttributes {
-    public id!: string;
-    public userId!: string;
-    public type!: 'buy' | 'sell';
-    public ticker!: string;
-    public name!: string;
-    public lots!: number;
-    public pricePerShare!: number;
-    public totalAmount!: number;
-    public notes?: string;
-    public timestamp!: Date;
-    public readonly createdAt!: Date;
-    public readonly updatedAt!: Date;
+    declare id: string;
+    declare userId: string;
+    declare type: 'buy' | 'sell';
+    declare ticker: string;
+    declare name: string;
+    declare lots: number;
+    declare pricePerShare: number;
+    declare totalAmount: number;
+    declare notes?: string;
+    declare timestamp: Date;
+    declare readonly createdAt: Date;
+    declare readonly updatedAt: Date;
 }
 
 Transaction.init(
@@ -164,12 +165,15 @@ Transaction.init(
         indexes: [
             {
                 fields: ['userId'],
+                name: 'transaction_user_id_idx'
             },
             {
                 fields: ['ticker'],
+                name: 'transaction_ticker_idx'
             },
             {
                 fields: ['timestamp'],
+                name: 'transaction_timestamp_idx'
             },
         ],
     }
@@ -192,14 +196,14 @@ interface SnapshotAttributes {
 interface SnapshotCreationAttributes extends Optional<SnapshotAttributes, 'id' | 'userId' | 'createdAt' | 'updatedAt'> { }
 
 export class PortfolioSnapshot extends Model<SnapshotAttributes, SnapshotCreationAttributes> implements SnapshotAttributes {
-    public id!: string;
-    public userId!: string;
-    public timestamp!: number;
-    public totalValue!: number;
-    public stockValue!: number;
-    public cashValue!: number;
-    public readonly createdAt!: Date;
-    public readonly updatedAt!: Date;
+    declare id: string;
+    declare userId: string;
+    declare timestamp: number;
+    declare totalValue: number;
+    declare stockValue: number;
+    declare cashValue: number;
+    declare readonly createdAt: Date;
+    declare readonly updatedAt: Date;
 }
 
 PortfolioSnapshot.init(
@@ -257,9 +261,11 @@ PortfolioSnapshot.init(
         indexes: [
             {
                 fields: ['userId'],
+                name: 'snapshot_user_id_idx'
             },
             {
                 fields: ['timestamp'],
+                name: 'snapshot_timestamp_idx'
             },
         ],
     }
@@ -280,12 +286,12 @@ interface CashHoldingAttributes {
 interface CashHoldingCreationAttributes extends Optional<CashHoldingAttributes, 'id' | 'userId' | 'createdAt' | 'updatedAt'> { }
 
 export class CashHolding extends Model<CashHoldingAttributes, CashHoldingCreationAttributes> implements CashHoldingAttributes {
-    public id!: number;
-    public userId!: string;
-    public amount!: number;
-    public lastUpdated!: Date;
-    public readonly createdAt!: Date;
-    public readonly updatedAt!: Date;
+    declare id: number;
+    declare userId: string;
+    declare amount: number;
+    declare lastUpdated: Date;
+    declare readonly createdAt: Date;
+    declare readonly updatedAt: Date;
 }
 
 CashHolding.init(
@@ -299,7 +305,6 @@ CashHolding.init(
             type: DataTypes.STRING(50),
             allowNull: false,
             defaultValue: 'default',
-            unique: true, // One cash record per user
         },
         amount: {
             type: DataTypes.DECIMAL(15, 2),
@@ -316,33 +321,49 @@ CashHolding.init(
         sequelize,
         tableName: 'cash_holdings',
         timestamps: true,
+        indexes: [
+            {
+                unique: true,
+                fields: ['userId'],
+                name: 'cash_holding_user_id_unique'
+            }
+        ]
     }
 );
 
 // ============================================
 // Sync all models with database
 // ============================================
+let syncPromise: Promise<boolean> | null = null;
+
 export async function syncDatabase() {
-    try {
-        await sequelize.sync({ alter: true });
-        console.log('✅ All models synchronized successfully.');
+    if (syncPromise) return syncPromise;
 
-        // Ensure there's at least one cash holding record for default user
-        const cashCount = await CashHolding.count({ where: { userId: 'default' } });
-        if (cashCount === 0) {
-            await CashHolding.create({
-                userId: 'default',
-                amount: 0,
-                lastUpdated: new Date(),
-            });
-            console.log('✅ Initial cash holding created for default user.');
+    syncPromise = (async () => {
+        try {
+            await sequelize.sync({ alter: true });
+            console.log('✅ All models synchronized successfully.');
+
+            // Ensure there's at least one cash holding record for default user
+            const cashCount = await CashHolding.count({ where: { userId: 'default' } });
+            if (cashCount === 0) {
+                await CashHolding.create({
+                    userId: 'default',
+                    amount: 0,
+                    lastUpdated: new Date(),
+                });
+                console.log('✅ Initial cash holding created for default user.');
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ Error syncing database:', error);
+            syncPromise = null; // Allow retry on failure
+            return false;
         }
+    })();
 
-        return true;
-    } catch (error) {
-        console.error('❌ Error syncing database:', error);
-        return false;
-    }
+    return syncPromise;
 }
 
 export { sequelize };

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PortfolioItem } from "@/lib/types";
+import { toast } from 'sonner';
 
 // Fetch portfolio
 async function fetchPortfolio(): Promise<PortfolioItem[]> {
@@ -78,7 +79,11 @@ export function usePortfolio() {
         mutationFn: addStockAPI,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+            toast.success('Saham berhasil ditambahkan');
         },
+        onError: (error: any) => {
+            toast.error('Gagal menambahkan saham: ' + error.message);
+        }
     });
 
     // Update stock mutation
@@ -86,7 +91,11 @@ export function usePortfolio() {
         mutationFn: updateStockAPI,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+            toast.success('Saham berhasil diperbarui');
         },
+        onError: (error: any) => {
+            toast.error('Gagal memperbarui saham: ' + error.message);
+        }
     });
 
     // Delete stock mutation
@@ -94,7 +103,11 @@ export function usePortfolio() {
         mutationFn: deleteStockAPI,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+            toast.success('Saham berhasil dihapus');
         },
+        onError: (error: any) => {
+            toast.error('Gagal menghapus saham: ' + error.message);
+        }
     });
 
     // Execute transaction mutation
@@ -103,7 +116,11 @@ export function usePortfolio() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['portfolio'] });
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            toast.success('Transaksi berhasil dilaksanakan');
         },
+        onError: (error: any) => {
+            toast.error('Gagal melaksanakan transaksi: ' + error.message);
+        }
     });
 
     const addStock = async (item: Omit<PortfolioItem, "id">) => {

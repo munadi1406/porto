@@ -1,5 +1,6 @@
 import { MobileNav } from "@/components/MobileNav";
 import { QueryProvider } from "@/components/QueryProvider";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="id">
       <body className="bg-gray-50 dark:bg-gray-950">
         <QueryProvider>
+          <Toaster position="top-right" richColors />
           <MobileNav />
 
           {/* Desktop: with sidebar padding */}

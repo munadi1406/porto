@@ -7,8 +7,14 @@ const USER_ID = 'default';
 let dbInitialized = false;
 async function ensureDbInitialized() {
     if (!dbInitialized) {
-        await syncDatabase();
-        dbInitialized = true;
+        console.log('Initializing database for Cash API...');
+        const success = await syncDatabase();
+        if (success) {
+            dbInitialized = true;
+            console.log('Database initialized successfully.');
+        } else {
+            console.error('Database initialization failed!');
+        }
     }
 }
 
@@ -86,6 +92,8 @@ export async function POST(request: NextRequest) {
             default:
                 newAmount = amount;
         }
+
+        console.log(`Updating cash: ${currentAmount} -> ${newAmount} (Operation: ${operation}, Amount: ${amount})`);
 
         await cash.update({
             amount: newAmount,

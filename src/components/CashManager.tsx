@@ -11,15 +11,23 @@ interface CashManagerProps {
 
 export function CashManager({ cash, onUpdateCash }: CashManagerProps) {
     const [isEditing, setIsEditing] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [inputValue, setInputValue] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const amount = Number(inputValue);
         if (!isNaN(amount) && amount >= 0) {
-            onUpdateCash(amount);
-            setIsEditing(false);
-            setInputValue("");
+            setIsSubmitting(true);
+            try {
+                await onUpdateCash(amount);
+                setIsEditing(false);
+                setInputValue("");
+            } catch (error) {
+                console.error("Failed to update cash:", error);
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -73,10 +81,11 @@ export function CashManager({ cash, onUpdateCash }: CashManagerProps) {
                         <div className="flex gap-2">
                             <button
                                 type="submit"
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-emerald-700 bg-white hover:bg-gray-50 rounded-xl transition-colors shadow-sm"
+                                disabled={isSubmitting}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-emerald-700 bg-white hover:bg-gray-50 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Check className="w-4 h-4" />
-                                Simpan
+                                {isSubmitting ? "Menyimpan..." : "Simpan"}
                             </button>
                             <button
                                 type="button"

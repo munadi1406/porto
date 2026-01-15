@@ -3,12 +3,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from "react";
 import { PortfolioSnapshot, Transaction } from "@/lib/types";
+import { toast } from 'sonner';
 
 // API Functions
 async function fetchCash() {
     const response = await fetch('/api/cash');
     const result = await response.json();
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat mengambil data cash');
     return result.data.amount;
 }
 
@@ -19,21 +20,21 @@ async function updateCashAPI(data: { amount: number; operation: 'set' | 'add' | 
         body: JSON.stringify(data),
     });
     const result = await response.json();
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat memperbarui cash');
     return result.data.amount;
 }
 
 async function fetchTransactions(): Promise<Transaction[]> {
     const response = await fetch('/api/transactions');
     const result = await response.json();
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat mengambil data transaksi');
     return result.data;
 }
 
 async function fetchSnapshots(period: string = 'all') {
     const response = await fetch(`/api/snapshots?period=${period}`);
     const result = await response.json();
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat mengambil data snapshot');
     return result.data;
 }
 
@@ -52,7 +53,7 @@ async function clearHistoryAPI() {
         method: 'DELETE',
     });
     const result = await response.json();
-    if (!result.success) throw new Error(result.error);
+    if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat menghapus riwayat');
     return result;
 }
 
@@ -85,7 +86,11 @@ export function useCashAndHistory() {
         mutationFn: updateCashAPI,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cash'] });
+            toast.success('Cash berhasil diperbarui');
         },
+        onError: (error: any) => {
+            toast.error('Gagal memperbarui cash: ' + error.message);
+        }
     });
 
     // Record snapshot mutation
@@ -101,7 +106,11 @@ export function useCashAndHistory() {
         mutationFn: clearHistoryAPI,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+            toast.success('Riwayat berhasil dihapus');
         },
+        onError: (error: any) => {
+            toast.error('Gagal menghapus riwayat: ' + error.message);
+        }
     });
 
     const updateCash = async (amount: number) => {
@@ -117,7 +126,12 @@ export function useCashAndHistory() {
     };
 
     const recordTransaction = async (transaction: Omit<Transaction, "id" | "timestamp">) => {
-        console.log('Transaction recorded via API');
+        const amount = transaction.totalAmount;
+        if (transaction.type === 'buy') {
+            await subtractCash(amount);
+        } else if (transaction.type === 'sell') {
+            await addCash(amount);
+        }
     };
 
     const recordSnapshot = useCallback(async (stockValue: number, cashValue: number) => {

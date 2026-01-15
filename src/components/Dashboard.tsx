@@ -96,38 +96,46 @@ export default function Dashboard() {
     }, [portfolio, prices]);
 
     // Wrapper to add stock and record transaction
-    const handleAddStock = (data: { ticker: string; name: string; lots: number; averagePrice: number }) => {
-        addStock(data);
+    const handleAddStock = async (data: { ticker: string; name: string; lots: number; averagePrice: number }) => {
+        try {
+            await addStock(data);
 
-        // Record transaction
-        recordTransaction({
-            type: 'buy',
-            ticker: data.ticker,
-            name: data.name,
-            lots: data.lots,
-            pricePerShare: data.averagePrice,
-            totalAmount: data.lots * 100 * data.averagePrice,
-            notes: 'Initial purchase'
-        });
+            // Record transaction (updates cash)
+            await recordTransaction({
+                type: 'buy',
+                ticker: data.ticker,
+                name: data.name,
+                lots: data.lots,
+                pricePerShare: data.averagePrice,
+                totalAmount: data.lots * 100 * data.averagePrice,
+                notes: 'Initial purchase'
+            });
+        } catch (error) {
+            console.error('Error adding stock:', error);
+        }
     };
 
     // Wrapper to execute transaction (buy more / sell)
-    const handleExecuteTransaction = (id: string, type: 'buy' | 'sell', lots: number, price: number) => {
+    const handleExecuteTransaction = async (id: string, type: 'buy' | 'sell', lots: number, price: number) => {
         const item = portfolio.find(p => p.id === id);
         if (!item) return;
 
-        executeTransaction(id, type, lots, price);
+        try {
+            await executeTransaction(id, type, lots, price);
 
-        // Record transaction
-        recordTransaction({
-            type,
-            ticker: item.ticker,
-            name: item.name,
-            lots,
-            pricePerShare: price,
-            totalAmount: lots * 100 * price,
-            notes: type === 'buy' ? 'Buy more' : 'Partial sell'
-        });
+            // Record transaction (updates cash)
+            await recordTransaction({
+                type,
+                ticker: item.ticker,
+                name: item.name,
+                lots,
+                pricePerShare: price,
+                totalAmount: lots * 100 * price,
+                notes: type === 'buy' ? 'Buy more' : 'Partial sell'
+            });
+        } catch (error) {
+            console.error('Error executing transaction:', error);
+        }
     };
 
     if (!isLoaded) {
