@@ -49,13 +49,18 @@ export async function POST(request: NextRequest) {
         });
 
         if (existing) {
-            const totalCost = (existing.lots * parseFloat(existing.averagePrice.toString())) + (lots * averagePrice);
-            const totalLots = existing.lots + lots;
-            const newAverage = totalCost / totalLots;
+            const currentLots = Number(existing.lots) || 0;
+            const currentAvg = Number(existing.averagePrice) || 0;
+            const newLots = Number(lots) || 0;
+            const newAvg = Number(averagePrice) || 0;
+
+            const totalCost = (currentLots * currentAvg) + (newLots * newAvg);
+            const totalLots = currentLots + newLots;
+            const calculatedAverage = totalLots > 0 ? totalCost / totalLots : 0;
 
             await existing.update({
                 lots: totalLots,
-                averagePrice: Math.round(newAverage),
+                averagePrice: Math.round(calculatedAverage),
             });
 
             return NextResponse.json({

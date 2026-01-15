@@ -1,7 +1,7 @@
 // Database configuration using Sequelize
 import { Sequelize } from 'sequelize';
 
-import mysql2 from 'mysql2';
+import * as mysql2 from 'mysql2';
 
 // Database credentials (plaintext as requested)
 const sequelize = new Sequelize('dcryptmy_porto', 'dcryptmy_porto', 'I9jR^hLdjMa*I=2h', {
