@@ -57,6 +57,10 @@ PortfolioItem.init(
         averagePrice: {
             type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
+            get() {
+                const rawValue = this.getDataValue('averagePrice');
+                return rawValue ? Number(rawValue) : 0;
+            }
         },
     },
     {

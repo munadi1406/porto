@@ -49,19 +49,21 @@ export async function POST(request: NextRequest) {
         });
 
         if (existing) {
-            // Force conversion to number to avoid string concatenation or NaN
-            const currentLots = Number(existing.lots);
-            const currentAvg = Number(existing.averagePrice);
-            const addedLots = Number(lots);
-            const addedAvg = Number(averagePrice);
+            // Very defensive number conversion
+            const currentLots = parseFloat(existing.lots?.toString() || '0') || 0;
+            const currentAvg = parseFloat(existing.averagePrice?.toString() || '0') || 0;
+            const addedLots = parseFloat(lots?.toString() || '0') || 0;
+            const addedAvg = parseFloat(averagePrice?.toString() || '0') || 0;
 
-            const totalCost = (currentLots * currentAvg) + (addedLots * addedAvg);
-            const totalLots = currentLots + addedLots;
-            const newAverage = totalLots > 0 ? totalCost / totalLots : 0;
+            // Total shares = lots * 100. Since we divide by totalLots later, 
+            // the *100 cancels out, so we can just use lots for avg calculation.
+            const totalCostValue = (currentLots * currentAvg) + (addedLots * addedAvg);
+            const totalLotsCount = currentLots + addedLots;
+            const finalAverage = totalLotsCount > 0 ? totalCostValue / totalLotsCount : addedAvg;
 
             await existing.update({
-                lots: totalLots,
-                averagePrice: Math.round(newAverage),
+                lots: totalLotsCount,
+                averagePrice: finalAverage, // Use exact value, DB will handle Decimal precision
             });
 
             return NextResponse.json({

@@ -74,18 +74,19 @@ export async function POST(request: NextRequest) {
 
             if (item) {
                 if (type === 'buy') {
-                    const currentLots = Number(item.lots);
-                    const currentAvg = Number(item.averagePrice);
-                    const addedLots = Number(lots);
-                    const addedAvg = Number(pricePerShare);
+                    // Very defensive number conversion
+                    const currentLots = parseFloat(item.lots?.toString() || '0') || 0;
+                    const currentAvg = parseFloat(item.averagePrice?.toString() || '0') || 0;
+                    const addedLots = parseFloat(lots?.toString() || '0') || 0;
+                    const addedAvg = parseFloat(pricePerShare?.toString() || '0') || 0;
 
-                    const totalCost = (currentLots * currentAvg) + (addedLots * addedAvg);
-                    const totalLots = currentLots + addedLots;
-                    const newAverage = totalLots > 0 ? totalCost / totalLots : 0;
+                    const totalCostValue = (currentLots * currentAvg) + (addedLots * addedAvg);
+                    const totalLotsCount = currentLots + addedLots;
+                    const finalAverage = totalLotsCount > 0 ? totalCostValue / totalLotsCount : addedAvg;
 
                     await item.update({
-                        lots: totalLots,
-                        averagePrice: Math.round(newAverage),
+                        lots: totalLotsCount,
+                        averagePrice: finalAverage,
                     });
                 } else if (type === 'sell') {
                     const newLots = Math.max(0, item.lots - lots);
