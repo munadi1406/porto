@@ -49,18 +49,19 @@ export async function POST(request: NextRequest) {
         });
 
         if (existing) {
-            const currentLots = Number(existing.lots) || 0;
-            const currentAvg = Number(existing.averagePrice) || 0;
-            const newLots = Number(lots) || 0;
-            const newAvg = Number(averagePrice) || 0;
+            // Force conversion to number to avoid string concatenation or NaN
+            const currentLots = Number(existing.lots);
+            const currentAvg = Number(existing.averagePrice);
+            const addedLots = Number(lots);
+            const addedAvg = Number(averagePrice);
 
-            const totalCost = (currentLots * currentAvg) + (newLots * newAvg);
-            const totalLots = currentLots + newLots;
-            const calculatedAverage = totalLots > 0 ? totalCost / totalLots : 0;
+            const totalCost = (currentLots * currentAvg) + (addedLots * addedAvg);
+            const totalLots = currentLots + addedLots;
+            const newAverage = totalLots > 0 ? totalCost / totalLots : 0;
 
             await existing.update({
                 lots: totalLots,
-                averagePrice: Math.round(calculatedAverage),
+                averagePrice: Math.round(newAverage),
             });
 
             return NextResponse.json({
