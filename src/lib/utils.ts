@@ -25,3 +25,11 @@ export function formatPercentage(num: number): string {
         maximumFractionDigits: 2,
     }).format(num / 100);
 }
+
+export function formatCompactIDR(amount: number): string {
+    if (amount >= 1e15) return `Rp ${(amount / 1e15).toFixed(2)} Kua`;
+    if (amount >= 1e12) return `Rp ${(amount / 1e12).toFixed(2)} T`;
+    if (amount >= 1e9) return `Rp ${(amount / 1e9).toFixed(2)} M`;
+    if (amount >= 1e6) return `Rp ${(amount / 1e6).toFixed(2)} Juta`;
+    return formatIDR(amount);
+}

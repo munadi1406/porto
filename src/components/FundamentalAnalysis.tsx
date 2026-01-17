@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { cn, formatIDR } from "@/lib/utils";
+import { cn, formatIDR, formatCompactIDR } from "@/lib/utils";
 import { PortfolioItem } from "@/lib/types";
 import { useFundamentals } from "@/hooks/useFundamentals";
 
@@ -15,16 +15,16 @@ const analyzeFundamentals = (data: any) => {
     let score = 0;
     const insights: Array<{ category: string; status: "good" | "warning" | "bad"; message: string }> = [];
 
-    // 1. Valuasi (P/E Ratio)
+    // 1. Valuasi (Rasio P/E)
     if (data.peRatio !== null) {
         if (data.peRatio < 15) {
             score += 20;
-            insights.push({ category: "Valuasi", status: "good", message: `P/E Ratio ${data.peRatio.toFixed(1)} - Valuasi menarik, saham terlihat undervalued` });
+            insights.push({ category: "Valuasi", status: "good", message: `Rasio P/E ${data.peRatio.toFixed(1)} - Valuasi menarik, saham terlihat murah (undervalued)` });
         } else if (data.peRatio < 25) {
             score += 10;
-            insights.push({ category: "Valuasi", status: "warning", message: `P/E Ratio ${data.peRatio.toFixed(1)} - Valuasi wajar, harga cukup reasonable` });
+            insights.push({ category: "Valuasi", status: "warning", message: `Rasio P/E ${data.peRatio.toFixed(1)} - Valuasi wajar, harga cukup masuk akal` });
         } else {
-            insights.push({ category: "Valuasi", status: "bad", message: `P/E Ratio ${data.peRatio.toFixed(1)} - Valuasi tinggi, saham mungkin overvalued` });
+            insights.push({ category: "Valuasi", status: "bad", message: `Rasio P/E ${data.peRatio.toFixed(1)} - Valuasi tinggi, saham mungkin kemahalan (overvalued)` });
         }
     }
 
@@ -42,30 +42,30 @@ const analyzeFundamentals = (data: any) => {
         }
     }
 
-    // 3. Profit Margin
+    // 3. Margin Laba
     if (data.profitMargin !== null) {
         const marginPercent = data.profitMargin * 100;
         if (marginPercent > 15) {
             score += 15;
-            insights.push({ category: "Margin", status: "good", message: `Profit Margin ${marginPercent.toFixed(1)}% - Margin sangat sehat, bisnis efisien` });
+            insights.push({ category: "Margin", status: "good", message: `Margin Laba ${marginPercent.toFixed(1)}% - Margin sangat sehat, bisnis efisien` });
         } else if (marginPercent > 5) {
             score += 8;
-            insights.push({ category: "Margin", status: "warning", message: `Profit Margin ${marginPercent.toFixed(1)}% - Margin cukup baik` });
+            insights.push({ category: "Margin", status: "warning", message: `Margin Laba ${marginPercent.toFixed(1)}% - Margin cukup baik` });
         } else {
-            insights.push({ category: "Margin", status: "bad", message: `Profit Margin ${marginPercent.toFixed(1)}% - Margin tipis, kompetisi ketat` });
+            insights.push({ category: "Margin", status: "bad", message: `Margin Laba ${marginPercent.toFixed(1)}% - Margin tipis, kompetisi ketat` });
         }
     }
 
-    // 4. Kesehatan Keuangan (Current Ratio)
+    // 4. Kesehatan Keuangan (Rasio Lancar)
     if (data.currentRatio !== null) {
         if (data.currentRatio > 2) {
             score += 15;
-            insights.push({ category: "Likuiditas", status: "good", message: `Current Ratio ${data.currentRatio.toFixed(2)} - Likuiditas sangat baik, mampu bayar hutang jangka pendek` });
+            insights.push({ category: "Likuiditas", status: "good", message: `Rasio Lancar ${data.currentRatio.toFixed(2)} - Likuiditas sangat baik, mampu bayar hutang jangka pendek` });
         } else if (data.currentRatio > 1) {
             score += 8;
-            insights.push({ category: "Likuiditas", status: "warning", message: `Current Ratio ${data.currentRatio.toFixed(2)} - Likuiditas cukup` });
+            insights.push({ category: "Likuiditas", status: "warning", message: `Rasio Lancar ${data.currentRatio.toFixed(2)} - Likuiditas cukup` });
         } else {
-            insights.push({ category: "Likuiditas", status: "bad", message: `Current Ratio ${data.currentRatio.toFixed(2)} - Likuiditas rendah, risiko kesulitan bayar hutang` });
+            insights.push({ category: "Likuiditas", status: "bad", message: `Rasio Lancar ${data.currentRatio.toFixed(2)} - Likuiditas rendah, risiko kesulitan bayar hutang` });
         }
     }
 
@@ -87,12 +87,12 @@ const analyzeFundamentals = (data: any) => {
         const growthPercent = data.revenueGrowth * 100;
         if (growthPercent > 10) {
             score += 15;
-            insights.push({ category: "Pertumbuhan", status: "good", message: `Revenue Growth ${growthPercent.toFixed(1)}% - Pertumbuhan kuat, bisnis ekspansif` });
+            insights.push({ category: "Pertumbuhan", status: "good", message: `Pertumbuhan Pendapatan ${growthPercent.toFixed(1)}% - Pertumbuhan kuat, bisnis ekspansif` });
         } else if (growthPercent > 0) {
             score += 8;
-            insights.push({ category: "Pertumbuhan", status: "warning", message: `Revenue Growth ${growthPercent.toFixed(1)}% - Pertumbuhan positif tapi lambat` });
+            insights.push({ category: "Pertumbuhan", status: "warning", message: `Pertumbuhan Pendapatan ${growthPercent.toFixed(1)}% - Pertumbuhan positif tapi lambat` });
         } else {
-            insights.push({ category: "Pertumbuhan", status: "bad", message: `Revenue Growth ${growthPercent.toFixed(1)}% - Pendapatan menurun, perlu waspada` });
+            insights.push({ category: "Pertumbuhan", status: "bad", message: `Pertumbuhan Pendapatan ${growthPercent.toFixed(1)}% - Pendapatan menurun, perlu waspada` });
         }
     }
 
@@ -213,21 +213,21 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
 
                         {data.profitMargin !== null && (
                             <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                                <p className="text-xs text-indigo-700 dark:text-indigo-400 font-semibold mb-1">Profit Margin</p>
+                                <p className="text-xs text-indigo-700 dark:text-indigo-400 font-semibold mb-1">Margin Laba</p>
                                 <p className="text-lg font-bold text-indigo-600 dark:text-indigo-500">{(data.profitMargin * 100).toFixed(1)}%</p>
                             </div>
                         )}
 
                         {data.currentRatio !== null && (
                             <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                                <p className="text-xs text-teal-700 dark:text-teal-400 font-semibold mb-1">Current Ratio</p>
+                                <p className="text-xs text-teal-700 dark:text-teal-400 font-semibold mb-1">Rasio Lancar</p>
                                 <p className="text-lg font-bold text-teal-600 dark:text-teal-500">{data.currentRatio.toFixed(2)}</p>
                             </div>
                         )}
 
                         {data.debtToEquity !== null && (
                             <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                                <p className="text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">Debt/Equity</p>
+                                <p className="text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">Hutang/Modal</p>
                                 <p className="text-lg font-bold text-orange-600 dark:text-orange-500">{data.debtToEquity.toFixed(2)}</p>
                             </div>
                         )}

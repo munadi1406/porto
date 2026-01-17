@@ -45,6 +45,7 @@ export function useMarketData(tickers: string[]) {
                         change: data.change,
                         changePercent: data.changePercent,
                         name: data.name,
+                        high52w: data.high52w,
                         lastUpdated: Date.now(),
                     };
                 }

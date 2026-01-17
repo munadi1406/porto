@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef } from "react";
 import { PortfolioItem, StockPrice } from "@/lib/types";
 import { formatIDR, formatNumber, formatPercentage, cn } from "@/lib/utils";
-import { Trash2, Edit2, TrendingUp, TrendingDown, Minus, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, ShieldOff } from "lucide-react";
+import { Trash2, Edit2, TrendingUp, TrendingDown, Minus, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, ShieldOff, Target } from "lucide-react";
 import { StockForm } from "./StockForm";
 import { TransactionForm } from "./TransactionForm";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -22,6 +22,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
     const [transactionId, setTransactionId] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; ticker: string; name: string } | null>(null);
     const [exportTarget, setExportTarget] = useState<PortfolioItem | null>(null);
+    const [projectionTarget, setProjectionTarget] = useState<PortfolioItem | null>(null);
     const [isSummarySelected, setIsSummarySelected] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -153,8 +154,8 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         const mask = (val: string) => hideValues ? '••••••••' : val;
 
         const exportEl = document.createElement('div');
-        exportEl.style.width = '600px';
-        exportEl.style.padding = '64px';
+        exportEl.style.width = '500px';
+        exportEl.style.padding = '48px';
         exportEl.style.fontFamily = "'Inter', system-ui, -apple-system, sans-serif";
         exportEl.style.background = '#0f172a';
         exportEl.style.color = '#ffffff';
@@ -166,7 +167,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                 <div style="font-size: 12px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 40px;">Portfolio Summary</div>
                 
                 <div style="margin-bottom: 56px; padding: 20px 10px; display: flex; flex-direction: column; align-items: center; gap: 24px;">
-                    <div style="font-size: 84px; font-weight: 950; letter-spacing: -4px; line-height: 1.1; color: ${isProfit ? '#10b981' : '#f87171'};">
+                    <div style="font-size: 72px; font-weight: 950; letter-spacing: -3px; line-height: 1.1; color: ${isProfit ? '#10b981' : '#f87171'};">
                         ${isProfit ? '+' : ''}${formatPercentage(totalReturn)}
                     </div>
                     <div style="font-size: 13px; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 3px;">Overall Portfolio Return</div>
@@ -202,7 +203,13 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                         <div style="display: flex; align-items: center; gap: 12px;">
                                             <div style="width: 4px; height: 32px; background: ${isItemProfit ? '#10b981' : '#ef4444'}; border-radius: 2px;"></div>
                                             <div>
-                                                <div style="font-weight: 900; font-size: 15px; letter-spacing: -0.5px; color: #ffffff; line-height: 1.2;">${item.ticker}</div>
+                                                <div style="font-weight: 900; font-size: 15px; letter-spacing: -0.5px; color: #ffffff; line-height: 1.2;">
+                                                    ${item.ticker}
+                                                    <span style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-left: 8px;">
+                                                        ${mask(`${formatNumber(item.lots)} Lot`)}
+                                                        <span style="color: #cbd5e1; margin-left: 4px; opacity: 0.6;">(${mask(`${formatNumber(item.lots * 100)} Lbr`)})</span>
+                                                    </span>
+                                                </div>
                                                 <div style="font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">${item.name}</div>
                                             </div>
                                         </div>
@@ -253,10 +260,11 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                 <button
                     disabled={isExporting}
                     onClick={() => setIsSummarySelected(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] md:text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 whitespace-nowrap"
                 >
                     <ImageIcon className="w-4 h-4" />
-                    <span>Share Portfolio Return</span>
+                    <span className="hidden xs:inline">Share Portfolio Return</span>
+                    <span className="xs:hidden">Share</span>
                 </button>
             </div>
 
@@ -485,7 +493,8 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center justify-center gap-1">
-                                            <button onClick={() => setExportTarget(item)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all" title="Export PDF/Image"><Download className="w-4 h-4" /></button>
+                                            <button onClick={() => setProjectionTarget(item)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all" title="Proyeksi Harga"><Target className="w-4 h-4" /></button>
+                                            <button onClick={() => setExportTarget(item)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Export PDF/Image"><Download className="w-4 h-4" /></button>
                                             <button onClick={() => setTransactionId(item.id)} className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all" title="Beli/Jual"><ArrowRightLeft className="w-4 h-4" /></button>
                                             <button onClick={() => setEditingId(item.id)} className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-all" title="Edit"><Edit2 className="w-4 h-4" /></button>
                                             <button onClick={() => setDeleteConfirm({ id: item.id, ticker: item.ticker, name: item.name })} className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all" title="Hapus"><Trash2 className="w-4 h-4" /></button>
@@ -496,6 +505,103 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                         })}
                     </tbody>
                 </table>
+
+                {/* Modal Proyeksi Harga */}
+                {projectionTarget && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
+                        <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl w-full max-w-md shadow-2xl border border-white/20 dark:border-gray-700 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
+
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Price Projection</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 font-medium">{projectionTarget.ticker} — {marketData[projectionTarget.ticker]?.name || projectionTarget.name}</p>
+                                </div>
+                                <button onClick={() => setProjectionTarget(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                                    <Minus className="w-5 h-5 text-gray-400" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Avg Price</div>
+                                        <div className="text-lg font-black dark:text-white">{formatIDR(projectionTarget.averagePrice)}</div>
+                                    </div>
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Current Price</div>
+                                        <div className="text-lg font-black dark:text-white">{formatIDR(marketData[projectionTarget.ticker]?.price || 0)}</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">Target Projections</div>
+                                    <div className="grid gap-3">
+                                        {(() => {
+                                            const current = marketData[projectionTarget.ticker]?.price || 0;
+                                            const high52 = marketData[projectionTarget.ticker]?.high52w || 0;
+
+                                            const targetPoints = [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 10000];
+                                            const targets = new Set<number>();
+
+                                            if (high52 > current) targets.add(high52);
+
+                                            // Add percentage based targets
+                                            [0.1, 0.25, 0.5, 1, 2].forEach(p => {
+                                                const pt = Math.round(current * (1 + p));
+                                                targets.add(pt);
+                                            });
+
+                                            // Add nearest round numbers from targetPoints
+                                            targetPoints.forEach(tp => {
+                                                if (tp > current && tp < current * 5) targets.add(tp);
+                                            });
+
+                                            return Array.from(targets).sort((a, b) => a - b).slice(0, 8).map(target => {
+                                                const gain = (target - projectionTarget.averagePrice) / projectionTarget.averagePrice * 100;
+                                                const profitValue = (target - projectionTarget.averagePrice) * (projectionTarget.lots * 100);
+                                                const isHigh52 = Math.abs(target - high52) < 0.01;
+
+                                                return (
+                                                    <div key={target} className={cn(
+                                                        "flex items-center justify-between p-4 rounded-2xl border transition-all",
+                                                        isHigh52 ? "bg-amber-500/5 border-amber-500/20" : "bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-800"
+                                                    )}>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn("w-1.5 h-10 rounded-full", gain >= 0 ? "bg-emerald-500" : "bg-rose-500")} />
+                                                            <div>
+                                                                <div className="text-lg font-black dark:text-white flex items-center gap-2">
+                                                                    {formatIDR(target)}
+                                                                    {isHigh52 && <span className="text-[9px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full uppercase tracking-widest font-bold border border-amber-500/20">52W High</span>}
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Target Price</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className={cn("text-lg font-black leading-tight", gain >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                                {gain >= 0 ? "+" : ""}{formatPercentage(gain)}
+                                                            </div>
+                                                            <div className={cn("text-[11px] font-bold mt-0.5", gain >= 0 ? "text-emerald-600/80 dark:text-emerald-400/80" : "text-rose-600/80 dark:text-rose-400/80")}>
+                                                                {gain >= 0 ? "+" : ""}{formatIDR(profitValue)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setProjectionTarget(null)}
+                                className="w-full mt-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:opacity-90 transition-all active:scale-[0.98]"
+                            >
+                                Tutup Proyeksi
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Modal Konfirmasi Hapus */}
                 <ConfirmDialog

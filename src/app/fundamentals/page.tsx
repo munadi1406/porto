@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, ArrowLeft } from "lucide-react";
-import { cn, formatIDR } from "@/lib/utils";
+import { cn, formatIDR, formatCompactIDR } from "@/lib/utils";
 import { useFundamentals } from "@/hooks/useFundamentals";
 import Link from "next/link";
 
@@ -83,12 +83,12 @@ const analyzeFundamentals = (data: any) => {
         const growthPercent = data.revenueGrowth * 100;
         if (growthPercent > 10) {
             score += 15;
-            insights.push({ category: "Pertumbuhan", status: "good", message: `Revenue Growth ${growthPercent.toFixed(1)}% - Pertumbuhan kuat, bisnis ekspansif` });
+            insights.push({ category: "Pertumbuhan", status: "good", message: `Pertumbuhan Pendapatan ${growthPercent.toFixed(1)}% - Pertumbuhan kuat, bisnis ekspansif` });
         } else if (growthPercent > 0) {
             score += 8;
-            insights.push({ category: "Pertumbuhan", status: "warning", message: `Revenue Growth ${growthPercent.toFixed(1)}% - Pertumbuhan positif tapi lambat` });
+            insights.push({ category: "Pertumbuhan", status: "warning", message: `Pertumbuhan Pendapatan ${growthPercent.toFixed(1)}% - Pertumbuhan positif tapi lambat` });
         } else {
-            insights.push({ category: "Pertumbuhan", status: "bad", message: `Revenue Growth ${growthPercent.toFixed(1)}% - Pendapatan menurun, perlu waspada` });
+            insights.push({ category: "Pertumbuhan", status: "bad", message: `Pertumbuhan Pendapatan ${growthPercent.toFixed(1)}% - Pendapatan menurun, perlu waspada` });
         }
     }
 
@@ -249,23 +249,31 @@ export default function FundamentalsPage() {
                     <div className="space-y-6">
                         {/* Company Info */}
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                            <div className="flex items-start justify-between mb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{selectedTicker}</h2>
+                                    <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight mb-2 uppercase">{selectedTicker}</h2>
                                     {data.sector && (
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            {data.sector} {data.industry && `• ${data.industry}`}
-                                        </p>
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                                                {data.sector}
+                                            </p>
+                                            <p className="text-xs text-gray-500 font-medium">
+                                                {data.industry || '- Regional'}
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
                                 {data.marketCap && (
-                                    <div className="text-right">
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Market Cap</p>
-                                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 flex flex-col items-start sm:items-end min-w-[200px]">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Kapitalisasi Pasar</p>
+                                        <p className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
                                             {isIndonesianStock
-                                                ? formatIDR(data.marketCap * 15000)
+                                                ? formatCompactIDR(data.marketCap)
                                                 : `$${(data.marketCap / 1e9).toFixed(2)}B`
                                             }
+                                        </p>
+                                        <p className="text-[8px] text-gray-400 mt-1 leading-none font-medium text-left sm:text-right">
+                                            {isIndonesianStock ? formatIDR(data.marketCap) : ''}
                                         </p>
                                     </div>
                                 )}
@@ -273,19 +281,19 @@ export default function FundamentalsPage() {
 
                             {/* Price Range */}
                             {(data.fiftyTwoWeekHigh || data.fiftyTwoWeekLow) && (
-                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <div className="grid grid-cols-2 gap-3 sm:gap-6 pt-6 border-t border-gray-100 dark:border-gray-700">
                                     {data.fiftyTwoWeekLow && (
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">52-Week Low</p>
-                                            <p className="text-lg font-bold text-red-600 dark:text-red-500">
+                                        <div className="p-3 sm:p-4 bg-red-50/50 dark:bg-red-500/5 rounded-2xl border border-red-100 dark:border-red-500/10">
+                                            <p className="text-[10px] text-red-700/60 dark:text-red-400/60 mb-1 font-bold uppercase tracking-wider">Terendah 52-Mgu</p>
+                                            <p className="text-sm sm:text-xl font-black text-red-600 dark:text-red-500 tracking-tight">
                                                 {isIndonesianStock ? formatIDR(data.fiftyTwoWeekLow) : `$${data.fiftyTwoWeekLow.toFixed(2)}`}
                                             </p>
                                         </div>
                                     )}
                                     {data.fiftyTwoWeekHigh && (
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">52-Week High</p>
-                                            <p className="text-lg font-bold text-green-600 dark:text-green-500">
+                                        <div className="p-3 sm:p-4 bg-green-50/50 dark:bg-green-500/5 rounded-2xl border border-green-100 dark:border-green-500/10 text-right">
+                                            <p className="text-[10px] text-green-700/60 dark:text-green-400/60 mb-1 font-bold uppercase tracking-wider">Tertinggi 52-Mgu</p>
+                                            <p className="text-sm sm:text-xl font-black text-green-600 dark:text-green-500 tracking-tight">
                                                 {isIndonesianStock ? formatIDR(data.fiftyTwoWeekHigh) : `$${data.fiftyTwoWeekHigh.toFixed(2)}`}
                                             </p>
                                         </div>
@@ -452,10 +460,10 @@ export default function FundamentalsPage() {
 
                                 {data.totalCash !== null && (
                                     <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                                        <p className="text-xs text-green-700 dark:text-green-400 font-semibold mb-1">Total Cash</p>
+                                        <p className="text-xs text-green-700 dark:text-green-400 font-semibold mb-1">Total Kas</p>
                                         <p className="text-lg font-bold text-green-600 dark:text-green-500">
                                             {isIndonesianStock
-                                                ? formatIDR(data.totalCash * 15000)
+                                                ? formatCompactIDR(data.totalCash)
                                                 : `$${(data.totalCash / 1e9).toFixed(2)}B`
                                             }
                                         </p>
@@ -465,14 +473,14 @@ export default function FundamentalsPage() {
 
                                 {data.totalDebt !== null && (
                                     <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl">
-                                        <p className="text-xs text-red-700 dark:text-red-400 font-semibold mb-1">Total Debt</p>
+                                        <p className="text-xs text-red-700 dark:text-red-400 font-semibold mb-1">Total Hutang</p>
                                         <p className="text-lg font-bold text-red-600 dark:text-red-500">
                                             {isIndonesianStock
-                                                ? formatIDR(data.totalDebt * 15000)
+                                                ? formatCompactIDR(data.totalDebt)
                                                 : `$${(data.totalDebt / 1e9).toFixed(2)}B`
                                             }
                                         </p>
-                                        <p className="text-xs text-gray-500 mt-1">Total Hutang</p>
+                                        <p className="text-xs text-gray-500 mt-1">Total Kewajiban</p>
                                     </div>
                                 )}
                             </div>
@@ -490,27 +498,27 @@ export default function FundamentalsPage() {
                                     <div className="space-y-4">
                                         {data.revenueGrowth !== null && (
                                             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-                                                <p className="text-xs text-purple-700 dark:text-purple-400 font-semibold mb-1">Revenue Growth</p>
+                                                <p className="text-xs text-purple-700 dark:text-purple-400 font-semibold mb-1">Pertumbuhan Pendapatan</p>
                                                 <p className={cn(
                                                     "text-2xl font-bold",
                                                     data.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"
                                                 )}>
                                                     {data.revenueGrowth >= 0 ? "+" : ""}{(data.revenueGrowth * 100).toFixed(1)}%
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">YoY Revenue</p>
+                                                <p className="text-xs text-gray-500 mt-1">YoY Pendapatan</p>
                                             </div>
                                         )}
 
                                         {data.earningsGrowth !== null && (
                                             <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-                                                <p className="text-xs text-indigo-700 dark:text-indigo-400 font-semibold mb-1">Earnings Growth</p>
+                                                <p className="text-xs text-indigo-700 dark:text-indigo-400 font-semibold mb-1">Pertumbuhan Laba</p>
                                                 <p className={cn(
                                                     "text-2xl font-bold",
                                                     data.earningsGrowth >= 0 ? "text-green-600" : "text-red-600"
                                                 )}>
                                                     {data.earningsGrowth >= 0 ? "+" : ""}{(data.earningsGrowth * 100).toFixed(1)}%
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">YoY Earnings</p>
+                                                <p className="text-xs text-gray-500 mt-1">YoY Laba Bersih</p>
                                             </div>
                                         )}
                                     </div>
@@ -527,34 +535,34 @@ export default function FundamentalsPage() {
                                     <div className="space-y-4">
                                         {data.dividendYield !== null && (
                                             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                                                <p className="text-xs text-green-700 dark:text-green-400 font-semibold mb-1">Dividend Yield</p>
+                                                <p className="text-xs text-green-700 dark:text-green-400 font-semibold mb-1">Yield Dividen</p>
                                                 <p className="text-2xl font-bold text-green-600 dark:text-green-500">
                                                     {(data.dividendYield * 100).toFixed(2)}%
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">Annual Yield</p>
+                                                <p className="text-xs text-gray-500 mt-1">Imbal Hasil Tahunan</p>
                                             </div>
                                         )}
 
                                         {data.dividendRate !== null && (
                                             <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
-                                                <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold mb-1">Dividend Rate</p>
+                                                <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold mb-1">Nilai Dividen</p>
                                                 <p className="text-lg font-bold text-emerald-600 dark:text-emerald-500">
                                                     {isIndonesianStock
-                                                        ? formatIDR(data.dividendRate)
+                                                        ? formatCompactIDR(data.dividendRate)
                                                         : `$${data.dividendRate.toFixed(2)}`
                                                     }
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">Per Share</p>
+                                                <p className="text-xs text-gray-500 mt-1">Per Saham</p>
                                             </div>
                                         )}
 
                                         {data.payoutRatio !== null && (
                                             <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl">
-                                                <p className="text-xs text-teal-700 dark:text-teal-400 font-semibold mb-1">Payout Ratio</p>
+                                                <p className="text-xs text-teal-700 dark:text-teal-400 font-semibold mb-1">Rasio Pembayaran</p>
                                                 <p className="text-2xl font-bold text-teal-600 dark:text-teal-500">
                                                     {(data.payoutRatio * 100).toFixed(1)}%
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">Earnings Paid</p>
+                                                <p className="text-xs text-gray-500 mt-1">Laba Dibagikan</p>
                                             </div>
                                         )}
                                     </div>

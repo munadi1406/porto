@@ -12,6 +12,7 @@ export interface StockPrice {
     change: number;
     changePercent: number;
     name?: string;
+    high52w?: number;
     lastUpdated: number;
 }
 

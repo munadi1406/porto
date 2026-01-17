@@ -97,26 +97,25 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div ref={dashboardRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
+            <p className="text-[10px] md:text-sm text-gray-500 font-medium uppercase tracking-wider">
               {lastUpdated ? `Update: ${lastUpdated.toLocaleTimeString('id-ID')}` : 'Real-time data'}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                // Trigger summary export
                 const event = new CustomEvent('export-portfolio-summary');
                 window.dispatchEvent(event);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-sm font-black rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95 uppercase tracking-widest"
             >
               <Activity className="w-4 h-4" />
-              <span>Share Return</span>
+              <span className="inline-block">Share Return</span>
             </button>
-            <ExportPDFButton onClick={handleExportPDF} size="md" />
+            <ExportPDFButton onClick={handleExportPDF} size="sm" className="flex-1 sm:flex-none" />
           </div>
         </div>
 

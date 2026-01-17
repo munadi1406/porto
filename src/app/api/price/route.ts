@@ -43,6 +43,7 @@ export async function GET(request: Request) {
         const change = quote.regularMarketChange || 0;
         const changePercent = quote.regularMarketChangePercent || 0;
         const name = quote.shortName || quote.longName || ticker;
+        const high52w = quote.fiftyTwoWeekHigh || 0;
 
         // Update cache
         cache[ticker] = {
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
             change,
             changePercent,
             name,
+            high52w,
             source: 'live'
         });
 

@@ -122,30 +122,30 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
     }, [chartData]);
 
     return (
-        <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl shadow-2xl border border-gray-800/50 overflow-hidden p-6">
+        <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl shadow-2xl border border-gray-800/50 overflow-hidden p-4 md:p-6">
             {/* Header */}
             <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-400 mb-2">Total Equity</h3>
-                <div className="text-3xl font-bold text-white">
+                <h3 className="text-[10px] md:text-sm font-bold text-gray-400 mb-1 uppercase tracking-wider">Total Equity</h3>
+                <div className="text-xl md:text-3xl font-black text-white tracking-tight">
                     {formatIDR(currentEquity)}
                 </div>
             </div>
 
             {/* Chart */}
-            <div className="mb-4">
+            <div className="mb-6">
                 {chartData.length > 0 ? (
-                    <div className="h-[240px]">
+                    <div className="h-[200px] md:h-[280px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart
                                 data={chartData}
-                                margin={{ top: 5, right: 50, left: 0, bottom: 5 }}
+                                margin={{ top: 5, right: 0, left: 0, bottom: 5 }}
                             >
                                 <defs>
                                     <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop
                                             offset="5%"
                                             stopColor="#10b981"
-                                            stopOpacity={0.5}
+                                            stopOpacity={0.3}
                                         />
                                         <stop
                                             offset="95%"
@@ -156,31 +156,32 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                                 </defs>
                                 <XAxis
                                     dataKey="time"
-                                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
                                     axisLine={false}
                                     tickLine={false}
                                     dy={10}
-                                    interval={tickInterval}
+                                    minTickGap={30}
+                                    interval="preserveStartEnd"
                                 />
                                 <YAxis
                                     orientation="right"
                                     domain={[minValue, maxValue]}
-                                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={formatYAxis}
-                                    dx={10}
+                                    width={45}
                                 />
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#334155', strokeWidth: 1 }} />
                                 <Area
                                     type="monotone"
                                     dataKey="value"
                                     stroke="#10b981"
-                                    strokeWidth={2.5}
+                                    strokeWidth={3}
                                     fill="url(#equityGradient)"
                                     dot={false}
                                     activeDot={{
-                                        r: 5,
+                                        r: 6,
                                         fill: "#10b981",
                                         stroke: "#fff",
                                         strokeWidth: 2
@@ -190,22 +191,22 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                         </ResponsiveContainer>
                     </div>
                 ) : (
-                    <div className="h-[240px] flex items-center justify-center text-gray-500">
+                    <div className="h-[200px] md:h-[280px] flex items-center justify-center text-gray-500">
                         <p className="text-sm">Belum ada data history</p>
                     </div>
                 )}
             </div>
 
             {/* Period Selector */}
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-1 md:gap-2">
                 {periods.map((period) => (
                     <button
                         key={period.key}
                         onClick={() => setSelectedPeriod(period.key)}
                         className={cn(
-                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                            "px-3 md:px-4 py-1.5 text-[10px] md:text-sm font-bold rounded-xl transition-all duration-200",
                             selectedPeriod === period.key
-                                ? "text-emerald-400 bg-emerald-500/10"
+                                ? "text-white bg-emerald-500 shadow-lg shadow-emerald-500/20"
                                 : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
                         )}
                     >

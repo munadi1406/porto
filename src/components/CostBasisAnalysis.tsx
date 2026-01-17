@@ -89,24 +89,24 @@ export function CostBasisAnalysis({ portfolio, prices }: CostBasisAnalysisProps)
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={chartData}
-                        layout="horizontal"
-                        margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                        layout="vertical"
+                        margin={{ top: 10, right: 30, left: 10, bottom: 5 }}
                     >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
                         <XAxis
                             type="number"
-                            tick={{ fontSize: 11, fill: '#9ca3af' }}
+                            tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
                             axisLine={false}
                             tickLine={false}
-                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                            tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value.toString()}
                         />
                         <YAxis
                             type="category"
                             dataKey="ticker"
-                            tick={{ fontSize: 11, fill: '#9ca3af' }}
+                            tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }}
                             axisLine={false}
                             tickLine={false}
-                            width={60}
+                            width={70}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         <Bar

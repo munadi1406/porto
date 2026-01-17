@@ -34,19 +34,20 @@ export function AllocationChart({ data }: AllocationChartProps) {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Alokasi Aset</h3>
-            <div className="flex-1 min-h-[300px]">
+        <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col">
+            <h3 className="text-sm md:text-lg font-bold text-gray-900 dark:text-gray-100 mb-4 uppercase tracking-wider opacity-60">Alokasi Aset</h3>
+            <div className="flex-1 min-h-[260px] md:min-h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={data}
                             cx="50%"
                             cy="50%"
-                            innerRadius={60}
-                            outerRadius={100}
-                            paddingAngle={2}
+                            innerRadius={50}
+                            outerRadius={window.innerWidth < 768 ? 80 : 100}
+                            paddingAngle={4}
                             dataKey="value"
+                            stroke="none"
                         >
                             {data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -54,9 +55,27 @@ export function AllocationChart({ data }: AllocationChartProps) {
                         </Pie>
                         <Tooltip
                             formatter={(value: any) => formatIDR(Number(value))}
-                            contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            contentStyle={{
+                                backgroundColor: 'rgba(31, 41, 55, 0.95)',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(75, 85, 99, 0.2)',
+                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                color: '#fff'
+                            }}
+                            itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
                         />
-                        <Legend />
+                        <Legend
+                            layout="horizontal"
+                            verticalAlign="bottom"
+                            align="center"
+                            iconType="circle"
+                            wrapperStyle={{
+                                paddingTop: '20px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                textTransform: 'uppercase'
+                            }}
+                        />
                     </PieChart>
                 </ResponsiveContainer>
             </div>
