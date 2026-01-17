@@ -12,11 +12,21 @@ import { DiversificationScore } from "@/components/DiversificationScore";
 import { CostBasisAnalysis } from "@/components/CostBasisAnalysis";
 import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
 import { EquityReturnTable } from "@/components/EquityReturnTable";
+import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
 import { GrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/components/Skeleton";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
-    const { cash, recordSnapshot, getGrowth, getHistoryForPeriod, clearHistory, transactions, isLoaded: cashLoaded } = useCashAndHistory();
+    const {
+        cash,
+        recordSnapshot,
+        getGrowth,
+        getHistoryForPeriod,
+        clearHistory,
+        transactions,
+        history,
+        isLoaded: cashLoaded
+    } = useCashAndHistory();
 
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const { prices, loading: pricesLoading } = useMarketData(tickers);
@@ -136,6 +146,11 @@ export default function AnalyticsPage() {
                 {/* Performance Metrics - Full Width */}
                 <div className="mb-6">
                     <PerformanceMetrics portfolio={portfolio} prices={prices} />
+                </div>
+
+                {/* Monthly Performance Heatmap - New Pro Feature */}
+                <div className="mb-6">
+                    <MonthlyPerformanceHeatmap history={history} />
                 </div>
 
                 {/* Allocation Tabs (Stock & Sector) - Full Width */}

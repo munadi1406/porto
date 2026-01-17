@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
@@ -10,7 +10,8 @@ import { GainLossChart } from "@/components/GainLossChart";
 import { CashManager } from "@/components/CashManager";
 import { EquityGrowthChart } from "@/components/EquityGrowthChart";
 import { DashboardTabs } from "@/components/DashboardTabs";
-import { Briefcase, DollarSign, TrendingUp, Activity } from "lucide-react";
+import { Briefcase, DollarSign, TrendingUp, Activity, Calendar } from "lucide-react";
+import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
 import { formatIDR, formatPercentage } from "@/lib/utils";
 import Link from "next/link";
 import { DashboardSkeleton } from "@/components/Skeleton";
@@ -19,7 +20,14 @@ import { exportToPDF } from "@/lib/exportPDF";
 
 export default function HomePage() {
   const { portfolio, isLoaded } = usePortfolio();
-  const { cash, updateCash, getHistoryForPeriod } = useCashAndHistory();
+  const {
+    cash,
+    updateCash,
+    getHistoryForPeriod,
+    recordSnapshot,
+    history,
+    isLoaded: cashLoaded
+  } = useCashAndHistory();
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
@@ -61,6 +69,13 @@ export default function HomePage() {
       cash,
     };
   }, [portfolio, prices, cash]);
+
+  // Record snapshot when prices or cash update
+  useEffect(() => {
+    if (isLoaded && cashLoaded && !pricesLoading && portfolio.length > 0) {
+      recordSnapshot(summary.totalMarketValue, cash);
+    }
+  }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, portfolio.length, recordSnapshot]);
 
   const chartData = useMemo(() => {
     return portfolio.map((item) => ({
@@ -158,6 +173,7 @@ export default function HomePage() {
             { id: "growth", label: "Portfolio Growth", icon: <TrendingUp className="w-5 h-5" /> },
             { id: "allocation", label: "Allocation", icon: <Briefcase className="w-5 h-5" /> },
             { id: "gainloss", label: "Gain/Loss", icon: <DollarSign className="w-5 h-5" /> },
+            { id: "heatmap", label: "History", icon: <Calendar className="w-5 h-5" /> },
           ]}
         >
           {(activeTab) => (
@@ -180,6 +196,12 @@ export default function HomePage() {
               {activeTab === "gainloss" && (
                 <div className="grid grid-cols-1 gap-6">
                   <GainLossChart data={gainLossData} />
+                </div>
+              )}
+
+              {activeTab === "heatmap" && (
+                <div className="space-y-6">
+                  <MonthlyPerformanceHeatmap history={history} />
                 </div>
               )}
             </>
