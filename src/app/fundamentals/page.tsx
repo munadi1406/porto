@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, ArrowLeft } from "lucide-react";
-import { cn, formatIDR, formatCompactIDR } from "@/lib/utils";
+import { useState, useMemo } from "react";
+import { Search, Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, ArrowLeft, Target, Wallet, Zap, Activity, Scale } from "lucide-react";
+import { cn, formatIDR, formatCompactIDR, formatNumber } from "@/lib/utils";
 import { useFundamentals } from "@/hooks/useFundamentals";
 import Link from "next/link";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell } from "recharts";
 
 // Fungsi untuk analisa fundamental
 const analyzeFundamentals = (data: any) => {
@@ -122,6 +123,91 @@ export default function FundamentalsPage() {
     const { data, loading, error } = useFundamentals(selectedTicker);
 
     const analysis = data ? analyzeFundamentals(data) : null;
+
+    const smartMoney = useMemo(() => {
+        if (!data || data.volume === null || data.averageVolume === null || data.priceChangePercent === null) {
+            return {
+                power: 'N/A',
+                signal: 'Normal / Sideways',
+                message: 'Data perdagangan hari ini belum tersedia untuk dianalisa.',
+                colorClass: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+            };
+        }
+
+        const volPower = (data.volume / data.averageVolume) * 100;
+        const isHighVolume = data.volume > data.averageVolume * 1.2;
+        const isPriceUp = data.priceChangePercent >= 0;
+
+        let signal = 'Normal / Sideways';
+        let message = 'Volume perdagangan masih di bawah rata-rata, belum ada pergerakan signifikan.';
+        let colorClass = 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
+
+        if (isHighVolume) {
+            if (isPriceUp) {
+                signal = 'Akumulasi Kuat';
+                message = 'Smart money terdeteksi masuk dalam jumlah besar seiring kenaikan harga.';
+                colorClass = 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
+            } else {
+                signal = 'Distribusi Masif';
+                message = 'Tekanan jual sangat tinggi, kemungkinan distribusi oleh institusi.';
+                colorClass = 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+            }
+        }
+
+        return {
+            power: volPower.toFixed(0) + '%',
+            signal,
+            message,
+            colorClass
+        };
+    }, [data]);
+
+    const valAnalysis = useMemo(() => {
+        if (!data || data.currentPrice === null || data.trailingEps === null || data.bookValue === null) {
+            return null;
+        }
+
+        // 1. Graham Number = sqrt(22.5 * EPS * BVPS)
+        let grahamNumber = null;
+        if (data.trailingEps > 0 && data.bookValue > 0) {
+            grahamNumber = Math.sqrt(22.5 * data.trailingEps * data.bookValue);
+        }
+
+        // 2. Intrinsic Value (Simplified Benjamin Graham)
+        // EPS * (8.5 + 2g), g max 15% to be conservative
+        const growth = Math.min(Math.max((data.earningsGrowth || 0) * 100, 0), 15);
+        const intrinsicValue = data.trailingEps * (8.5 + 2 * growth);
+
+        // Average Fair Value
+        let fairValue = intrinsicValue;
+        if (grahamNumber) {
+            fairValue = (intrinsicValue + grahamNumber) / 2;
+        }
+
+        const marginOfSafety = ((fairValue - data.currentPrice) / fairValue) * 100;
+        const status = data.currentPrice < fairValue * 0.8 ? 'Undervalued' :
+            data.currentPrice < fairValue * 1.2 ? 'Fair Value' : 'Overvalued';
+
+        const statusIndo = status === 'Undervalued' ? 'Di Bawah Harga Wajar' :
+            status === 'Fair Value' ? 'Harga Wajar' : 'Di Atas Harga Wajar';
+
+        const colorClass = status === 'Undervalued' ? 'text-green-600 dark:text-green-400' :
+            status === 'Fair Value' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400';
+
+        const bgClass = status === 'Undervalued' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
+            status === 'Fair Value' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' :
+                'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+
+        return {
+            grahamNumber,
+            intrinsicValue,
+            fairValue,
+            marginOfSafety,
+            status: statusIndo,
+            colorClass,
+            bgClass
+        };
+    }, [data]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -568,9 +654,270 @@ export default function FundamentalsPage() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Fair Value Calculator (Intrinsic Value) */}
+                            {valAnalysis && (
+                                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xl shadow-indigo-500/5 border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] dark:opacity-[0.05] group-hover:scale-110 transition-transform duration-700 pointer-events-none">
+                                        <Scale className="w-32 h-32 text-indigo-600" />
+                                    </div>
+
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
+                                            <Scale className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                        </div>
+                                        Fair Value (Nilai Intrinsik)
+                                    </h3>
+
+                                    <div className="space-y-6">
+                                        {/* Hero Calculation */}
+                                        <div className={cn(
+                                            "p-8 rounded-[2rem] border-2 flex flex-col items-center text-center gap-3 relative transition-all",
+                                            valAnalysis.bgClass
+                                        )}>
+                                            <div className="flex flex-col gap-1">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Estimasi Harga Wajar</p>
+                                                <p className="text-4xl md:text-5xl font-black tracking-tight text-gray-900 dark:text-white">
+                                                    {isIndonesianStock ? formatIDR(valAnalysis.fairValue) : `$${valAnalysis.fairValue.toFixed(2)}`}
+                                                </p>
+                                            </div>
+                                            <div className={cn(
+                                                "px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-white/80 dark:bg-black/40 shadow-sm border border-black/5 dark:border-white/5",
+                                                valAnalysis.colorClass
+                                            )}>
+                                                {valAnalysis.status}
+                                            </div>
+                                        </div>
+
+                                        {/* Margin of Safety & Progress */}
+                                        <div className="p-6 bg-gray-50/50 dark:bg-gray-900/40 rounded-3xl border border-gray-100 dark:border-gray-800 space-y-4">
+                                            <div className="flex justify-between items-end">
+                                                <div>
+                                                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider mb-1">Margin of Safety (MoS)</p>
+                                                    <p className={cn(
+                                                        "text-2xl font-black leading-none",
+                                                        valAnalysis.marginOfSafety >= 20 ? "text-green-600" : (valAnalysis.marginOfSafety < 0 ? "text-red-600" : "text-gray-900 dark:text-gray-100")
+                                                    )}>
+                                                        {valAnalysis.marginOfSafety.toFixed(1)}%
+                                                    </p>
+                                                </div>
+                                                <p className="text-[10px] text-gray-400 font-medium max-w-[150px] text-right leading-tight">
+                                                    MoS {valAnalysis.marginOfSafety >= 0 ? 'Diskon' : 'Premi'} harga pasar vs intrinsik.
+                                                </p>
+                                            </div>
+
+                                            <div className="w-full bg-gray-200 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden flex">
+                                                <div
+                                                    className={cn(
+                                                        "h-full transition-all duration-1000",
+                                                        valAnalysis.marginOfSafety >= 20 ? "bg-green-500" : (valAnalysis.marginOfSafety < 0 ? "bg-red-500" : "bg-indigo-500")
+                                                    )}
+                                                    style={{ width: `${Math.min(Math.max(valAnalysis.marginOfSafety, 0), 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Breakdown Grid */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-4 bg-gray-50/50 dark:bg-gray-900/20 rounded-2xl border border-gray-100 dark:border-gray-800/50">
+                                                <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1.5">Graham Number</p>
+                                                <p className="text-sm font-black text-gray-800 dark:text-gray-200">
+                                                    {valAnalysis.grahamNumber ? (isIndonesianStock ? formatIDR(valAnalysis.grahamNumber) : `$${valAnalysis.grahamNumber.toFixed(2)}`) : 'N/A'}
+                                                </p>
+                                            </div>
+                                            <div className="p-4 bg-gray-50/50 dark:bg-gray-900/20 rounded-2xl border border-gray-100 dark:border-gray-800/50">
+                                                <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1.5">Graham Formula</p>
+                                                <p className="text-sm font-black text-gray-800 dark:text-gray-200">
+                                                    {isIndonesianStock ? formatIDR(valAnalysis.intrinsicValue) : `$${valAnalysis.intrinsicValue.toFixed(2)}`}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Detailed Methodology Footer with Calculations */}
+                                        <div className="p-5 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100/50 dark:border-indigo-800/20">
+                                            <div className="flex flex-col gap-4">
+                                                <div className="flex items-center gap-2 pb-3 border-b border-indigo-100/30 dark:border-indigo-800/20">
+                                                    <AlertCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                    <p className="text-[10px] text-indigo-900 dark:text-indigo-300 font-black uppercase tracking-widest">Detail Perhitungan Matematis</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    {/* Graham Number Details */}
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <p className="text-[10px] text-gray-900 dark:text-gray-100 font-black">1. Graham Number (Aset)</p>
+                                                            <span className="text-[9px] px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 rounded-md font-bold">Konservatif</span>
+                                                        </div>
+                                                        <p className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 bg-white/50 dark:bg-black/20 p-2 rounded-lg border border-indigo-100/20">
+                                                            √ (22.5 × EPS × BVPS)
+                                                        </p>
+                                                        <div className="space-y-1 text-[9px] text-gray-500 font-medium italic">
+                                                            <p>• EPS: {isIndonesianStock ? formatNumber(data.trailingEps || 0) : `$${(data.trailingEps || 0).toFixed(2)}`}</p>
+                                                            <p>• BVPS: {isIndonesianStock ? formatNumber(data.bookValue || 0) : `$${(data.bookValue || 0).toFixed(2)}`}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Graham Formula Details */}
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <p className="text-[10px] text-gray-900 dark:text-gray-100 font-black">2. Graham Formula (Growth)</p>
+                                                            <span className="text-[9px] px-2 py-0.5 bg-green-100 dark:bg-green-900/40 text-green-600 rounded-md font-bold">Potensi Laba</span>
+                                                        </div>
+                                                        <p className="text-[10px] font-mono text-green-600 dark:text-green-400 bg-white/50 dark:bg-black/20 p-2 rounded-lg border border-green-100/20">
+                                                            EPS × (8.5 + 2g)
+                                                        </p>
+                                                        <div className="space-y-1 text-[9px] text-gray-500 font-medium italic">
+                                                            <p>• g (Pertumbuhan): {((data.earningsGrowth || 0) * 100).toFixed(1)}% {data.earningsGrowth && data.earningsGrowth > 0.15 ? '(Dibatasi 15%)' : ''}</p>
+                                                            <p>• Base P/E: 8.5 (Tanpa Pertumbuhan)</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="pt-3 border-t border-indigo-100/30 dark:border-indigo-800/20">
+                                                    <p className="text-[9px] text-gray-400 text-center font-medium">
+                                                        * Harga wajar akhir adalah rata-rata dari kedua metode di atas untuk hasil yang lebih seimbang.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
 
-                        {/* Detailed Insights */}
+                        {/* Recommendation & Smart Money Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Strategy Card */}
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <Target className="w-5 h-5 text-red-600" />
+                                    Strategi Rekomendasi
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800/30">
+                                        <div className="flex items-center gap-2 mb-2 text-red-700 dark:text-red-400">
+                                            <Wallet className="w-4 h-4" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Area Beli (Buy Area)</span>
+                                        </div>
+                                        <p className="text-lg font-black text-red-600 dark:text-red-500">
+                                            {data.fiftyTwoWeekLow && (
+                                                isIndonesianStock
+                                                    ? `${formatIDR(data.fiftyTwoWeekLow)} - ${formatIDR(data.fiftyTwoWeekLow * 1.15)}`
+                                                    : `$${data.fiftyTwoWeekLow.toFixed(2)} - $${(data.fiftyTwoWeekLow * 1.15).toFixed(2)}`
+                                            )}
+                                        </p>
+                                        <p className="text-[10px] text-gray-500 mt-1 italic">Rentang 0-15% di atas harga terendah 52-minggu</p>
+                                    </div>
+
+                                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-800/30">
+                                        <div className="flex items-center gap-2 mb-2 text-green-700 dark:text-green-400">
+                                            <Target className="w-4 h-4" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Target Jual (Take Profit)</span>
+                                        </div>
+                                        <p className="text-lg font-black text-green-600 dark:text-green-500">
+                                            {data.currentPrice && (
+                                                isIndonesianStock
+                                                    ? formatIDR(data.currentPrice * 1.25)
+                                                    : `$${(data.currentPrice * 1.25).toFixed(2)}`
+                                            )}
+                                        </p>
+                                        <p className="text-[10px] text-gray-500 mt-1 italic">Target konservatif 25% dari harga saat ini</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Smart Money / Volume Card */}
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <Zap className="w-5 h-5 text-amber-500" />
+                                    Analisa "Smart Money"
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="p-4 flex-1 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Kekuatan Volume</p>
+                                            <div className="flex items-end gap-2">
+                                                <p className="text-xl font-black text-gray-900 dark:text-white">
+                                                    {smartMoney.power}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mb-1 font-medium italic">vs Rata-rata</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Signal Status */}
+                                    <div className={cn("p-4 rounded-xl border flex flex-col gap-2", smartMoney.colorClass)}>
+                                        <div className="flex items-center gap-2">
+                                            <Activity className="w-4 h-4" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Status Akumulasi</span>
+                                        </div>
+                                        <p className="text-xl font-black uppercase tracking-tight">
+                                            {smartMoney.signal}
+                                        </p>
+                                        <p className="text-[10px] opacity-70 leading-tight">
+                                            {smartMoney.message}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Analyst Consensus Chart */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                                <BarChart3 className="w-5 h-5 text-blue-600" />
+                                Konsensus Analis Profesional
+                            </h3>
+                            <div className="h-[250px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={[
+                                            { name: 'Strong Buy', value: data.strongBuy, color: '#10b981' },
+                                            { name: 'Buy', value: data.buy, color: '#34d399' },
+                                            { name: 'Hold', value: data.hold, color: '#94a3b8' },
+                                            { name: 'Sell', value: data.sell, color: '#f87171' },
+                                            { name: 'Strong Sell', value: data.strongSell, color: '#ef4444' },
+                                        ].filter(d => d.value > 0)}
+                                        layout="vertical"
+                                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                                    >
+                                        <XAxis type="number" hide />
+                                        <YAxis
+                                            dataKey="name"
+                                            type="category"
+                                            tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            width={80}
+                                        />
+                                        <RechartsTooltip
+                                            cursor={{ fill: 'transparent' }}
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                                borderRadius: '12px',
+                                                border: 'none',
+                                                color: '#fff'
+                                            }}
+                                        />
+                                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                                            {[
+                                                { name: 'Strong Buy', value: data.strongBuy, color: '#10b981' },
+                                                { name: 'Buy', value: data.buy, color: '#34d399' },
+                                                { name: 'Hold', value: data.hold, color: '#94a3b8' },
+                                                { name: 'Sell', value: data.sell, color: '#f87171' },
+                                                { name: 'Strong Sell', value: data.strongSell, color: '#ef4444' },
+                                            ].filter(d => d.value > 0).map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <p className="text-[10px] text-center text-gray-500 mt-4 italic">
+                                * Berdasarkan data konsensus analis terbaru dari berbagai sekuritas/institusi finansial global.
+                            </p>
+                        </div>
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Analisa Detail</h3>
                             <div className="space-y-3">
@@ -605,6 +952,6 @@ export default function FundamentalsPage() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

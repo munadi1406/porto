@@ -255,16 +255,18 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Daftar Aset</h2>
+            <div className="flex items-center justify-between gap-4 mb-4">
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Daftar Aset</h2>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Monitoring performa per aset</p>
+                </div>
                 <button
                     disabled={isExporting}
                     onClick={() => setIsSummarySelected(true)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] md:text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 whitespace-nowrap"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap"
                 >
-                    <ImageIcon className="w-4 h-4" />
-                    <span className="hidden xs:inline">Share Portfolio Return</span>
-                    <span className="xs:hidden">Share</span>
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Share Return</span>
                 </button>
             </div>
 
@@ -431,14 +433,14 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                 <table className="w-full">
                     <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800">
                         <tr>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saham</th>
-                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Lot</th>
-                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Avg Price</th>
-                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current</th>
-                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
-                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unrealized P/L</th>
-                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Return</th>
-                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
+                            <th className="px-4 md:px-6 py-4 text-left text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Saham</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Lot</th>
+                            <th className="hidden lg:table-cell px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Avg Price</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Current</th>
+                            <th className="hidden sm:table-cell px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Value</th>
+                            <th className="hidden md:table-cell px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Unrealized P/L</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Return</th>
+                            <th className="px-4 md:px-6 py-4 text-center text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Aksi</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -453,24 +455,24 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             const isLoss = gainLoss < 0;
 
                             return (
-                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-gray-900 dark:text-white leading-none mb-1">{item.ticker}</div>
-                                        <div className="text-[10px] text-gray-500 uppercase font-medium">{quote?.name || item.name}</div>
+                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors group">
+                                    <td className="px-4 md:px-6 py-4">
+                                        <div className="font-bold text-gray-900 dark:text-white leading-none mb-1 text-sm md:text-base">{item.ticker}</div>
+                                        <div className="text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-tight line-clamp-1">{quote?.name || item.name}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-medium text-gray-700 dark:text-gray-300">
+                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300 text-sm">
                                         {formatNumber(item.lots)}
                                     </td>
-                                    <td className="px-6 py-4 text-right text-gray-600 dark:text-gray-400 text-sm">
+                                    <td className="hidden lg:table-cell px-4 md:px-6 py-4 text-right text-gray-500 dark:text-gray-400 text-xs font-medium">
                                         {formatIDR(item.averagePrice)}
                                     </td>
-                                    <td className="px-6 py-4 text-right font-medium text-gray-900 dark:text-white">
+                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-900 dark:text-white text-sm">
                                         {currentPrice > 0 ? formatIDR(currentPrice) : '...'}
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
+                                    <td className="hidden sm:table-cell px-4 md:px-6 py-4 text-right font-bold text-gray-900 dark:text-white text-sm">
                                         {formatIDR(marketValue)}
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="hidden md:table-cell px-4 md:px-6 py-4 text-right">
                                         <div className={cn(
                                             "font-bold text-sm",
                                             isProfit && "text-emerald-500",
@@ -480,18 +482,16 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                             {gainLoss > 0 ? "+" : ""}{formatIDR(gainLoss)}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 md:px-6 py-4 text-right">
                                         <div className={cn(
-                                            "inline-flex items-center gap-1 font-bold text-sm px-2 py-1 rounded-lg",
+                                            "inline-flex items-center gap-1 font-black text-[10px] md:text-xs px-2 py-1 rounded-lg",
                                             isProfit && "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
                                             isLoss && "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
                                         )}>
-                                            {isProfit && <TrendingUp className="w-3 h-3" />}
-                                            {isLoss && <TrendingDown className="w-3 h-3" />}
                                             {formatPercentage(gainLossPercent)}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 md:px-6 py-4">
                                         <div className="flex items-center justify-center gap-1">
                                             <button onClick={() => setProjectionTarget(item)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all" title="Proyeksi Harga"><Target className="w-4 h-4" /></button>
                                             <button onClick={() => setExportTarget(item)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Export PDF/Image"><Download className="w-4 h-4" /></button>

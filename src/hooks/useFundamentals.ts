@@ -24,10 +24,16 @@ interface FundamentalData {
     dividendYield: number | null;
     dividendRate: number | null;
     payoutRatio: number | null;
+    trailingEps: number | null;
+    bookValue: number | null;
     marketCap: number | null;
     beta: number | null;
     fiftyTwoWeekHigh: number | null;
     fiftyTwoWeekLow: number | null;
+    currentPrice: number | null;
+    priceChangePercent: number | null;
+    volume: number | null;
+    averageVolume: number | null;
     sector: string | null;
     industry: string | null;
     strongBuy: number;

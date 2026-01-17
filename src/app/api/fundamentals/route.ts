@@ -79,11 +79,19 @@ export async function GET(request: Request) {
             dividendRate: summaryDetail.dividendRate || null,
             payoutRatio: keyStats.payoutRatio || null,
 
+            // Per Share Data (New for Fair Value)
+            trailingEps: keyStats.trailingEps || null,
+            bookValue: keyStats.bookValue || null,
+
             // Market Data
             marketCap: summaryDetail.marketCap || null,
             beta: keyStats.beta || null,
             fiftyTwoWeekHigh: summaryDetail.fiftyTwoWeekHigh || null,
             fiftyTwoWeekLow: summaryDetail.fiftyTwoWeekLow || null,
+            currentPrice: financialData.currentPrice || summaryDetail.regularMarketPreviousClose || null,
+            priceChangePercent: summaryDetail.regularMarketChangePercent || null,
+            volume: summaryDetail.regularMarketVolume || null,
+            averageVolume: summaryDetail.averageVolume || summaryDetail.averageVolume10Days || null,
 
             // Company Info
             sector: profile.sector || null,

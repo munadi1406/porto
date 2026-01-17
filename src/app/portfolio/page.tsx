@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
@@ -27,8 +27,11 @@ export default function PortfolioPage() {
         }
     };
 
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
     const handleAddStock = (data: { ticker: string; name: string; lots: number; averagePrice: number }) => {
         addStock(data);
+        setIsAddModalOpen(false); // Close modal after success
 
         recordTransaction({
             type: 'buy',
@@ -76,29 +79,49 @@ export default function PortfolioPage() {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 {/* Header */}
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portfolio</h1>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Kelola saham Anda • {portfolio.length} holdings
-                        </p>
+                <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tight">Portfolio</h1>
+                        <div className="flex items-center gap-2">
+                            <ExportPDFButton onClick={handleExportPDF} size="md" />
+                        </div>
                     </div>
-                    <ExportPDFButton onClick={handleExportPDF} size="md" />
+                    <p className="text-xs md:text-sm text-gray-500 font-medium uppercase tracking-wider">
+                        Kelola aset investasi • {portfolio.length} holdings
+                    </p>
                 </div>
 
-                {/* Add Stock Form */}
-                <div className="mb-6 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                            <Plus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Tambah Saham</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Beli saham baru</p>
+                {/* Quick Add Action Button */}
+                <div className="mb-8">
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-gray-900/10 dark:shadow-white/5"
+                    >
+                        <Plus className="w-5 h-5" />
+                        Tambah Saham Baru
+                    </button>
+                </div>
+
+                {/* Add Stock Modal */}
+                {isAddModalOpen && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                        <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-[2rem] w-full max-w-lg shadow-2xl border border-white/20 dark:border-gray-700 animate-in zoom-in-95 duration-200">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="p-3 bg-blue-100 dark:bg-blue-500/20 rounded-2xl">
+                                    <Plus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">Tambah Saham</h3>
+                                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Beli aset baru ke portfolio</p>
+                                </div>
+                            </div>
+                            <StockForm
+                                onSubmit={handleAddStock}
+                                onCancel={() => setIsAddModalOpen(false)}
+                            />
                         </div>
                     </div>
-                    <StockForm onSubmit={handleAddStock} />
-                </div>
+                )}
 
                 {/* Portfolio Table */}
                 <div ref={portfolioRef}>
