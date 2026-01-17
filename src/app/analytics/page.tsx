@@ -11,6 +11,8 @@ import { PerformanceMetrics } from "@/components/PerformanceMetrics";
 import { DiversificationScore } from "@/components/DiversificationScore";
 import { CostBasisAnalysis } from "@/components/CostBasisAnalysis";
 import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
+import { EquityReturnTable } from "@/components/EquityReturnTable";
+import { GrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/components/Skeleton";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
@@ -91,10 +93,21 @@ export default function AnalyticsPage() {
 
     if (!isLoaded) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Memuat data...</p>
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                    <div className="mb-6 space-y-2">
+                        <div className="h-8 w-32 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                        <div className="h-4 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                    </div>
+                    <div className="space-y-6">
+                        <GrowthChartSkeleton />
+                        <ChartSkeleton />
+                        <ChartSkeleton />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <CardSkeleton />
+                            <CardSkeleton />
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -144,6 +157,11 @@ export default function AnalyticsPage() {
                 {/* Holding Period Analysis - Full Width */}
                 <div className="mb-6">
                     <HoldingPeriodAnalysis portfolio={portfolio} transactions={transactions} prices={prices} />
+                </div>
+
+                {/* Equity Return Table - Full Width */}
+                <div className="mb-6">
+                    <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
                 </div>
             </div>
         </div>

@@ -14,6 +14,7 @@ import { TransactionHistory } from "./TransactionHistory";
 import { GainLossChart } from "./GainLossChart";
 import { Briefcase, DollarSign, TrendingUp, Activity, Plus } from "lucide-react";
 import { formatIDR, formatPercentage } from "@/lib/utils";
+import { DashboardSkeleton } from "./Skeleton";
 
 export default function Dashboard() {
     const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
@@ -139,7 +140,7 @@ export default function Dashboard() {
     };
 
     if (!isLoaded) {
-        return <div className="p-8 flex justify-center text-gray-400">Memuat portofolio...</div>;
+        return <DashboardSkeleton />;
     }
 
     return (

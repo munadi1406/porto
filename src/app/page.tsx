@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
@@ -8,16 +8,30 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { AllocationChart } from "@/components/AllocationChart";
 import { GainLossChart } from "@/components/GainLossChart";
 import { CashManager } from "@/components/CashManager";
+import { EquityGrowthChart } from "@/components/EquityGrowthChart";
+import { DashboardTabs } from "@/components/DashboardTabs";
 import { Briefcase, DollarSign, TrendingUp, Activity } from "lucide-react";
 import { formatIDR, formatPercentage } from "@/lib/utils";
 import Link from "next/link";
+import { DashboardSkeleton } from "@/components/Skeleton";
+import { ExportPDFButton } from "@/components/ExportPDFButton";
+import { exportToPDF } from "@/lib/exportPDF";
 
 export default function HomePage() {
   const { portfolio, isLoaded } = usePortfolio();
-  const { cash, updateCash } = useCashAndHistory();
+  const { cash, updateCash, getHistoryForPeriod } = useCashAndHistory();
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
   const { prices, loading: pricesLoading, lastUpdated } = useMarketData(tickers);
+
+  const handleExportPDF = () => {
+    if (dashboardRef.current) {
+      exportToPDF(dashboardRef.current, {
+        title: 'Portfolio Dashboard',
+      });
+    }
+  };
 
   const summary = useMemo(() => {
     let totalInvested = 0;
@@ -26,16 +40,27 @@ export default function HomePage() {
     portfolio.forEach((item) => {
       const livePrice = prices[item.ticker]?.price || 0;
       const marketPrice = livePrice > 0 ? livePrice : 0;
+      const shares = item.lots * 100;
+      const invested = item.averagePrice * shares;
+      const marketValue = marketPrice * shares;
 
-      totalInvested += item.lots * 100 * item.averagePrice;
-      totalMarketValue += item.lots * 100 * marketPrice;
+      totalInvested += invested;
+      totalMarketValue += marketValue;
     });
 
-    const totalPL = totalMarketValue - totalInvested;
-    const returnPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
+    const totalEquity = totalMarketValue + cash;
+    const totalGainLoss = totalMarketValue - totalInvested;
+    const totalReturn = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
 
-    return { totalInvested, totalMarketValue, totalPL, returnPercent };
-  }, [portfolio, prices]);
+    return {
+      totalInvested,
+      totalMarketValue,
+      totalEquity,
+      totalGainLoss,
+      totalReturn,
+      cash,
+    };
+  }, [portfolio, prices, cash]);
 
   const chartData = useMemo(() => {
     return portfolio.map((item) => ({
@@ -44,25 +69,19 @@ export default function HomePage() {
     })).filter(d => d.value > 0);
   }, [portfolio, prices]);
 
-  const gainLossChartData = useMemo(() => {
-    const totalGainLoss = portfolio.reduce((sum, item) => {
-      const livePrice = prices[item.ticker]?.price || 0;
-      if (livePrice === 0) return sum;
-
-      const marketValue = item.lots * 100 * livePrice;
-      const initialValue = item.lots * 100 * item.averagePrice;
-      return sum + Math.abs(marketValue - initialValue);
-    }, 0);
-
+  const gainLossData = useMemo(() => {
     return portfolio.map((item) => {
       const livePrice = prices[item.ticker]?.price || 0;
-      const marketValue = item.lots * 100 * livePrice;
-      const initialValue = item.lots * 100 * item.averagePrice;
-      const gainLoss = marketValue - initialValue;
-      const percentage = totalGainLoss > 0 ? (Math.abs(gainLoss) / totalGainLoss) * 100 : 0;
+      const marketPrice = livePrice > 0 ? livePrice : 0;
+      const shares = item.lots * 100;
+      const invested = item.averagePrice * shares;
+      const marketValue = marketPrice * shares;
+      const gainLoss = marketValue - invested;
+      const percentage = invested > 0 ? (gainLoss / invested) * 100 : 0;
 
       return {
-        name: item.ticker,
+        ticker: item.ticker,
+        name: item.name,
         value: Math.abs(gainLoss),
         gainLoss: gainLoss,
         percentage: percentage,
@@ -71,28 +90,37 @@ export default function HomePage() {
   }, [portfolio, prices]);
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Memuat data...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Mobile Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {lastUpdated ? `Update: ${lastUpdated.toLocaleTimeString('id-ID')}` : 'Real-time data'}
-          </p>
+      <div ref={dashboardRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {lastUpdated ? `Update: ${lastUpdated.toLocaleTimeString('id-ID')}` : 'Real-time data'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Trigger summary export
+                const event = new CustomEvent('export-portfolio-summary');
+                window.dispatchEvent(event);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+            >
+              <Activity className="w-4 h-4" />
+              <span>Share Return</span>
+            </button>
+            <ExportPDFButton onClick={handleExportPDF} size="md" />
+          </div>
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary Cards - Always Visible */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <SummaryCard
             title="Total Modal"
@@ -101,42 +129,66 @@ export default function HomePage() {
           />
           <SummaryCard
             title="Total Portfolio"
-            value={formatIDR(summary.totalMarketValue + cash)}
+            value={formatIDR(summary.totalEquity)}
             subValue={pricesLoading ? "..." : "Live"}
             icon={Activity}
             trend="neutral"
           />
           <SummaryCard
             title="Unrealized P/L"
-            value={summary.totalPL > 0 ? `+${formatIDR(summary.totalPL)}` : formatIDR(summary.totalPL)}
+            value={summary.totalGainLoss > 0 ? `+${formatIDR(summary.totalGainLoss)}` : formatIDR(summary.totalGainLoss)}
             icon={DollarSign}
-            trend={summary.totalPL >= 0 ? "up" : "down"}
+            trend={summary.totalGainLoss >= 0 ? "up" : "down"}
           />
           <SummaryCard
             title="Return"
-            value={formatPercentage(summary.returnPercent)}
+            value={formatPercentage(summary.totalReturn)}
             icon={TrendingUp}
-            trend={summary.returnPercent >= 0 ? "up" : "down"}
+            trend={summary.totalReturn >= 0 ? "up" : "down"}
           />
         </div>
 
-        {/* Cash Manager - Mobile Full Width */}
+        {/* Cash Manager */}
         <div className="mb-6">
           <CashManager cash={cash} onUpdateCash={updateCash} />
         </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="min-h-[450px]">
-            <AllocationChart data={chartData} />
-          </div>
-          <div className="min-h-[450px]">
-            <GainLossChart data={gainLossChartData} />
-          </div>
-        </div>
+        {/* Tabs for Charts */}
+        <DashboardTabs
+          tabs={[
+            { id: "growth", label: "Portfolio Growth", icon: <TrendingUp className="w-5 h-5" /> },
+            { id: "allocation", label: "Allocation", icon: <Briefcase className="w-5 h-5" /> },
+            { id: "gainloss", label: "Gain/Loss", icon: <DollarSign className="w-5 h-5" /> },
+          ]}
+        >
+          {(activeTab) => (
+            <>
+              {activeTab === "growth" && (
+                <div className="space-y-6">
+                  <EquityGrowthChart
+                    getHistoryForPeriod={getHistoryForPeriod}
+                    currentEquity={summary.totalEquity}
+                  />
+                </div>
+              )}
+
+              {activeTab === "allocation" && (
+                <div className="grid grid-cols-1 gap-6">
+                  <AllocationChart data={chartData} />
+                </div>
+              )}
+
+              {activeTab === "gainloss" && (
+                <div className="grid grid-cols-1 gap-6">
+                  <GainLossChart data={gainLossData} />
+                </div>
+              )}
+            </>
+          )}
+        </DashboardTabs>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="mt-8 grid grid-cols-2 gap-4">
           <Link
             href="/portfolio"
             className="p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow text-center"

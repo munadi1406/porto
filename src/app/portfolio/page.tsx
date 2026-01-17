@@ -1,19 +1,31 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { StockForm } from "@/components/StockForm";
 import { Plus } from "lucide-react";
+import { PortfolioTableSkeleton } from "@/components/Skeleton";
+import { ExportPDFButton } from "@/components/ExportPDFButton";
+import { exportToPDF } from "@/lib/exportPDF";
 
 export default function PortfolioPage() {
     const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
     const { recordTransaction } = useCashAndHistory();
+    const portfolioRef = useRef<HTMLDivElement>(null);
 
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const { prices } = useMarketData(tickers);
+
+    const handleExportPDF = () => {
+        if (portfolioRef.current) {
+            exportToPDF(portfolioRef.current, {
+                title: 'Portfolio Holdings',
+            });
+        }
+    };
 
     const handleAddStock = (data: { ticker: string; name: string; lots: number; averagePrice: number }) => {
         addStock(data);
@@ -48,10 +60,13 @@ export default function PortfolioPage() {
 
     if (!isLoaded) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Memuat data...</p>
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                    <div className="mb-6 space-y-2">
+                        <div className="h-8 w-32 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                        <div className="h-4 w-48 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
+                    </div>
+                    <PortfolioTableSkeleton />
                 </div>
             </div>
         );
@@ -61,11 +76,14 @@ export default function PortfolioPage() {
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portfolio</h1>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Kelola saham Anda • {portfolio.length} holdings
-                    </p>
+                <div className="mb-6 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portfolio</h1>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Kelola saham Anda • {portfolio.length} holdings
+                        </p>
+                    </div>
+                    <ExportPDFButton onClick={handleExportPDF} size="md" />
                 </div>
 
                 {/* Add Stock Form */}
@@ -83,7 +101,7 @@ export default function PortfolioPage() {
                 </div>
 
                 {/* Portfolio Table */}
-                <div>
+                <div ref={portfolioRef}>
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Holdings</h2>
                     <PortfolioTable
                         portfolio={portfolio}

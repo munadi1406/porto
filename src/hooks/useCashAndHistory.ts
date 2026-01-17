@@ -142,7 +142,7 @@ export function useCashAndHistory() {
         }
     }, [recordSnapshotMutation]);
 
-    const getGrowth = useCallback((period: "today" | "day" | "week" | "month" | "year" | "all") => {
+    const getGrowth = useCallback((period: "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all") => {
         if (history.length === 0) return { value: 0, percent: 0 };
         if (history.length === 1) return { value: 0, percent: 0 };
 
@@ -161,6 +161,12 @@ export function useCashAndHistory() {
                 break;
             case "month":
                 startTime = now - 30 * 24 * 60 * 60 * 1000;
+                break;
+            case "3month":
+                startTime = now - 90 * 24 * 60 * 60 * 1000;
+                break;
+            case "ytd":
+                startTime = new Date(new Date().getFullYear(), 0, 1).getTime();
                 break;
             case "year":
                 startTime = now - 365 * 24 * 60 * 60 * 1000;
@@ -191,7 +197,7 @@ export function useCashAndHistory() {
         return { value: growthValue, percent: growthPercent };
     }, [history]);
 
-    const getHistoryForPeriod = useCallback((period: "today" | "day" | "week" | "month" | "year" | "all") => {
+    const getHistoryForPeriod = useCallback((period: "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all") => {
         const now = Date.now();
         let startTime: number;
 
@@ -207,6 +213,12 @@ export function useCashAndHistory() {
                 break;
             case "month":
                 startTime = now - 30 * 24 * 60 * 60 * 1000;
+                break;
+            case "3month":
+                startTime = now - 90 * 24 * 60 * 60 * 1000;
+                break;
+            case "ytd":
+                startTime = new Date(new Date().getFullYear(), 0, 1).getTime();
                 break;
             case "year":
                 startTime = now - 365 * 24 * 60 * 60 * 1000;
