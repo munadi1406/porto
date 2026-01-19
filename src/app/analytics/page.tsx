@@ -4,7 +4,7 @@ import { useMemo, useEffect } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
-import { GrowthChart } from "@/components/GrowthChart";
+import { EquityGrowthChart } from "@/components/EquityGrowthChart";
 import { AllocationTabs } from "@/components/AllocationTabs";
 import { GainLossChart } from "@/components/GainLossChart";
 import { PerformanceMetrics } from "@/components/PerformanceMetrics";
@@ -13,7 +13,9 @@ import { CostBasisAnalysis } from "@/components/CostBasisAnalysis";
 import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
 import { EquityReturnTable } from "@/components/EquityReturnTable";
 import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
-import { GrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/components/Skeleton";
+import { EquityGrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/components/Skeleton";
+import { DashboardTabs } from "@/components/DashboardTabs";
+import { TrendingUp, LayoutList } from "lucide-react";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
@@ -110,7 +112,7 @@ export default function AnalyticsPage() {
                         <div className="h-4 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
                     </div>
                     <div className="space-y-6">
-                        <GrowthChartSkeleton />
+                        <EquityGrowthChartSkeleton />
                         <ChartSkeleton />
                         <ChartSkeleton />
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -134,23 +136,34 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                {/* Growth Chart - Full Width */}
-                <div className="mb-6">
-                    <GrowthChart
-                        getGrowth={getGrowth}
-                        getHistoryForPeriod={getHistoryForPeriod}
-                        onResetHistory={clearHistory}
-                    />
-                </div>
-
-                {/* Performance Metrics - Full Width */}
-                <div className="mb-6">
-                    <PerformanceMetrics portfolio={portfolio} prices={prices} />
-                </div>
-
-                {/* Monthly Performance Heatmap - New Pro Feature */}
-                <div className="mb-6">
-                    <MonthlyPerformanceHeatmap history={history} />
+                {/* Main Performance Tabs */}
+                <div className="mb-8">
+                    <DashboardTabs
+                        tabs={[
+                            { id: "chart", label: "Growth Chart", icon: <TrendingUp className="w-4 h-4" /> },
+                            { id: "table", label: "Return Table", icon: <LayoutList className="w-4 h-4" /> },
+                        ]}
+                    >
+                        {(activeTab) => (
+                            <div className="space-y-6">
+                                {activeTab === "chart" && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <EquityGrowthChart
+                                            getHistoryForPeriod={getHistoryForPeriod}
+                                            currentEquity={summary.totalMarketValue + cash}
+                                        />
+                                        <PerformanceMetrics portfolio={portfolio} prices={prices} />
+                                    </div>
+                                )}
+                                {activeTab === "table" && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
+                                        <MonthlyPerformanceHeatmap history={history} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </DashboardTabs>
                 </div>
 
                 {/* Allocation Tabs (Stock & Sector) - Full Width */}
@@ -174,10 +187,6 @@ export default function AnalyticsPage() {
                     <HoldingPeriodAnalysis portfolio={portfolio} transactions={transactions} prices={prices} />
                 </div>
 
-                {/* Equity Return Table - Full Width */}
-                <div className="mb-6">
-                    <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
-                </div>
             </div>
         </div>
     );

@@ -150,25 +150,20 @@ export function TransactionHistorySkeleton() {
     );
 }
 
-// Growth Chart Skeleton
-export function GrowthChartSkeleton() {
+// Equity Growth Chart Skeleton (Pro Version)
+export function EquityGrowthChartSkeleton() {
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-xl" />
-                    <div className="space-y-2">
-                        <Skeleton className="h-6 w-48" />
-                        <Skeleton className="h-3 w-32" />
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <Skeleton className="h-8 w-16 rounded-lg" />
-                    <Skeleton className="h-8 w-16 rounded-lg" />
-                    <Skeleton className="h-8 w-16 rounded-lg" />
-                </div>
+        <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl p-6 space-y-6 border border-gray-800/50">
+            <div className="space-y-2">
+                <Skeleton className="h-3 w-20 bg-gray-800" />
+                <Skeleton className="h-10 w-56 bg-gray-800" />
             </div>
-            <Skeleton className="h-[300px] w-full rounded-lg" />
+            <Skeleton className="h-[280px] w-full bg-gray-800" />
+            <div className="flex justify-center gap-2">
+                {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-12 rounded-xl bg-gray-800" />
+                ))}
+            </div>
         </div>
     );
 }

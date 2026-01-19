@@ -76,7 +76,7 @@ export function useCashAndHistory() {
     const { data: snapshotsData } = useQuery({
         queryKey: ['snapshots', 'all'],
         queryFn: () => fetchSnapshots('all'),
-        refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+        refetchInterval: 60000, // Poll every 1 minute instead of 5 seconds
     });
 
     const history: PortfolioSnapshot[] = snapshotsData?.snapshots || [];
@@ -231,10 +231,10 @@ export function useCashAndHistory() {
         }
 
         const filtered = history
-            .filter((s) => s.timestamp >= startTime && s.totalValue > 0)
+            .filter((s) => s.timestamp >= startTime && s.totalValue > 1000)
             .sort((a, b) => a.timestamp - b.timestamp);
 
-        // For today and day periods, aggregate into OHLC per hour (candlestick style)
+        // For today and day periods, aggregate into OHLC per hour
         if (period === 'today' || period === 'day') {
             const hourlyMap = new Map<number, any>();
 
@@ -242,9 +242,8 @@ export function useCashAndHistory() {
                 const hourKey = Math.floor(snapshot.timestamp / (60 * 60 * 1000)); // Group by hour
 
                 if (!hourlyMap.has(hourKey)) {
-                    // First snapshot in this hour
                     hourlyMap.set(hourKey, {
-                        timestamp: hourKey * 60 * 60 * 1000, // Hour start timestamp
+                        timestamp: hourKey * 60 * 60 * 1000,
                         totalValue: snapshot.totalValue,
                         open: snapshot.totalValue,
                         high: snapshot.totalValue,
@@ -254,12 +253,11 @@ export function useCashAndHistory() {
                         cashValue: snapshot.cashValue,
                     });
                 } else {
-                    // Update OHLC for this hour
                     const hourData = hourlyMap.get(hourKey)!;
                     hourData.high = Math.max(hourData.high, snapshot.totalValue);
                     hourData.low = Math.min(hourData.low, snapshot.totalValue);
-                    hourData.close = snapshot.totalValue; // Latest value
-                    hourData.totalValue = snapshot.totalValue; // Use close as totalValue
+                    hourData.close = snapshot.totalValue;
+                    hourData.totalValue = snapshot.totalValue;
                     hourData.stockValue = snapshot.stockValue;
                     hourData.cashValue = snapshot.cashValue;
                 }
@@ -268,7 +266,27 @@ export function useCashAndHistory() {
             return Array.from(hourlyMap.values()).sort((a, b) => a.timestamp - b.timestamp);
         }
 
-        return filtered;
+        // For other periods, aggregate into daily snapshots (latest of day)
+        const dailyMap = new Map<string, any>();
+        filtered.forEach(snapshot => {
+            const date = new Date(snapshot.timestamp);
+            const dateKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+
+            if (!dailyMap.has(dateKey)) {
+                dailyMap.set(dateKey, {
+                    ...snapshot,
+                    // Store original snapshot for this day
+                });
+            } else {
+                // Update with latest snapshot for this day
+                const existing = dailyMap.get(dateKey)!;
+                if (snapshot.timestamp > existing.timestamp) {
+                    dailyMap.set(dateKey, snapshot);
+                }
+            }
+        });
+
+        return Array.from(dailyMap.values()).sort((a, b) => a.timestamp - b.timestamp);
     }, [history]);
 
     const clearHistory = async () => {

@@ -6,16 +6,18 @@ import { formatIDR, cn } from "@/lib/utils";
 import { PortfolioSnapshot } from "@/lib/types";
 
 interface EquityGrowthChartProps {
-    getHistoryForPeriod: (period: "week" | "month" | "3month" | "ytd" | "year" | "all") => PortfolioSnapshot[];
+    getHistoryForPeriod: (period: "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all") => PortfolioSnapshot[];
     currentEquity: number;
 }
 
-type Period = "week" | "month" | "3month" | "ytd" | "year" | "all";
+type Period = "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all";
 
 export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: EquityGrowthChartProps) {
     const [selectedPeriod, setSelectedPeriod] = useState<Period>("ytd");
 
     const periods: { key: Period; label: string }[] = [
+        { key: "today", label: "Hi" },
+        { key: "day", label: "24J" },
         { key: "week", label: "1W" },
         { key: "month", label: "1M" },
         { key: "3month", label: "3M" },
@@ -70,7 +72,9 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
         const max = Math.max(...values);
 
         // Add padding
-        const padding = (max - min) * 0.1;
+        let padding = (max - min) * 0.1;
+        if (padding === 0) padding = max * 0.05; // 5% padding if flat
+
         return {
             minValue: Math.floor((min - padding) / 10000) * 10000,
             maxValue: Math.ceil((max + padding) / 10000) * 10000,
@@ -121,13 +125,43 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
         return Math.floor(dataLength / 8); // Show ~8 ticks for larger datasets
     }, [chartData]);
 
+    // Calculate performance metrics for the selected period
+    const performance = useMemo(() => {
+        if (chartData.length < 2) return { nominal: 0, percent: 0 };
+        const first = chartData[0].value;
+        const last = chartData[chartData.length - 1].value;
+        const nominal = last - first;
+        const percent = first > 0 ? (nominal / first) * 100 : 0;
+        return { nominal, percent };
+    }, [chartData]);
+
+    const chartColor = performance.nominal >= 0 ? "#10b981" : "#ef4444";
+
     return (
         <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl shadow-2xl border border-gray-800/50 overflow-hidden p-4 md:p-6">
             {/* Header */}
             <div className="mb-6">
-                <h3 className="text-[10px] md:text-sm font-bold text-gray-400 mb-1 uppercase tracking-wider">Total Equity</h3>
-                <div className="text-xl md:text-3xl font-black text-white tracking-tight">
-                    {formatIDR(currentEquity)}
+                <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-[10px] md:text-sm font-bold text-gray-400 uppercase tracking-wider">Total Equity</h3>
+                    <div className={cn(
+                        "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wider",
+                        performance.nominal >= 0
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : "bg-red-500/10 text-red-400 border border-red-500/20"
+                    )}>
+                        {performance.nominal >= 0 ? "+" : ""}{performance.percent.toFixed(2)}%
+                    </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                    <div className="text-xl md:text-3xl font-black text-white tracking-tight">
+                        {formatIDR(currentEquity)}
+                    </div>
+                    <div className={cn(
+                        "text-[10px] md:text-xs font-bold",
+                        performance.nominal >= 0 ? "text-emerald-500/70" : "text-red-500/70"
+                    )}>
+                        {performance.nominal >= 0 ? "+" : ""}{formatIDR(performance.nominal)}
+                    </div>
                 </div>
             </div>
 
@@ -144,12 +178,12 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                                     <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop
                                             offset="5%"
-                                            stopColor="#10b981"
+                                            stopColor={chartColor}
                                             stopOpacity={0.3}
                                         />
                                         <stop
                                             offset="95%"
-                                            stopColor="#10b981"
+                                            stopColor={chartColor}
                                             stopOpacity={0}
                                         />
                                     </linearGradient>
@@ -161,7 +195,7 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                                     tickLine={false}
                                     dy={10}
                                     minTickGap={30}
-                                    interval="preserveStartEnd"
+                                    interval={tickInterval}
                                 />
                                 <YAxis
                                     orientation="right"
@@ -176,13 +210,13 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                                 <Area
                                     type="monotone"
                                     dataKey="value"
-                                    stroke="#10b981"
+                                    stroke={chartColor}
                                     strokeWidth={3}
                                     fill="url(#equityGradient)"
                                     dot={false}
                                     activeDot={{
                                         r: 6,
-                                        fill: "#10b981",
+                                        fill: chartColor,
                                         stroke: "#fff",
                                         strokeWidth: 2
                                     }}

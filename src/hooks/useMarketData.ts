@@ -9,7 +9,7 @@ interface MarketDataMap {
 
 export function useMarketData(tickers: string[]) {
     const [prices, setPrices] = useState<MarketDataMap>({});
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(tickers.length > 0);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const fetchPrices = useCallback(async () => {
@@ -65,11 +65,11 @@ export function useMarketData(tickers: string[]) {
         fetchPrices();
     }, [fetchPrices]);
 
-    // Auto refresh interval (10 seconds for near real-time)
+    // Auto refresh interval (60 seconds to avoid Yahoo Finance rate limiting/timeouts)
     useEffect(() => {
         const interval = setInterval(() => {
             fetchPrices();
-        }, 10000);
+        }, 60000);
 
         return () => clearInterval(interval);
     }, [fetchPrices]);

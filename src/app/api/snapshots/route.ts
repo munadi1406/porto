@@ -116,6 +116,15 @@ export async function POST(request: NextRequest) {
 
         // Round to integers for BIGINT storage
         const totalValue = Math.round(Number(stockValue) + Number(cashValue));
+
+        // Skip recording if value is suspiciously low (could be loading error)
+        if (totalValue <= 0) {
+            return NextResponse.json({
+                success: true,
+                message: 'Snapshot skipped (zero or negative value)',
+                data: null,
+            });
+        }
         const stockVal = Math.round(Number(stockValue));
         const cashVal = Math.round(Number(cashValue));
 

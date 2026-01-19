@@ -70,12 +70,27 @@ export default function HomePage() {
     };
   }, [portfolio, prices, cash]);
 
+  const lastRecordTimeRef = useRef<number>(0);
+
   // Record snapshot when prices or cash update
   useEffect(() => {
-    if (isLoaded && cashLoaded && !pricesLoading && portfolio.length > 0) {
+    // Only record if:
+    // 1. Portfolio and cash are loaded
+    // 2. Prices are not loading AND have been updated at least once
+    // 3. If portfolio is not empty, totalMarketValue must be > 0 (wait for real prices)
+    // 4. Throttle: only record every 5 minutes
+    const hasPortfolio = portfolio.length > 0;
+    const hasPrices = lastUpdated !== null;
+    const isValidValue = !hasPortfolio || summary.totalMarketValue > 0;
+
+    const now = Date.now();
+    const isThrottleExpired = now - lastRecordTimeRef.current > 5 * 60 * 1000; // 5 minutes
+
+    if (isLoaded && cashLoaded && !pricesLoading && hasPrices && isValidValue && isThrottleExpired) {
       recordSnapshot(summary.totalMarketValue, cash);
+      lastRecordTimeRef.current = now;
     }
-  }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, portfolio.length, recordSnapshot]);
+  }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, lastUpdated, portfolio.length, recordSnapshot]);
 
   const chartData = useMemo(() => {
     return portfolio.map((item) => ({

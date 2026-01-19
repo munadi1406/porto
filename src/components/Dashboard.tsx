@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
@@ -9,7 +9,7 @@ import { SummaryCard } from "./SummaryCard";
 import { AllocationChart } from "./AllocationChart";
 import { StockForm } from "./StockForm";
 import { CashManager } from "./CashManager";
-import { GrowthChart } from "./GrowthChart";
+import { EquityGrowthChart } from "./EquityGrowthChart";
 import { TransactionHistory } from "./TransactionHistory";
 import { GainLossChart } from "./GainLossChart";
 import { Briefcase, DollarSign, TrendingUp, Activity, Plus } from "lucide-react";
@@ -54,12 +54,18 @@ export default function Dashboard() {
         };
     }, [portfolio, prices]);
 
+    const lastRecordTimeRef = useRef<number>(0);
+
     // Record snapshot when prices update (for growth tracking)
     useEffect(() => {
-        if (isLoaded && cashLoaded && !pricesLoading && portfolio.length > 0) {
+        const now = Date.now();
+        const isThrottleExpired = now - lastRecordTimeRef.current > 5 * 60 * 1000; // 5 minutes
+
+        if (isLoaded && cashLoaded && !pricesLoading && portfolio.length > 0 && isThrottleExpired) {
             recordSnapshot(summary.totalMarketValue, cash);
+            lastRecordTimeRef.current = now;
         }
-    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded]);
+    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, portfolio.length, recordSnapshot]);
 
     // Data for Pie Chart
     const chartData = useMemo(() => {
@@ -181,10 +187,9 @@ export default function Dashboard() {
                         <AllocationChart data={chartData} />
                         <GainLossChart data={gainLossChartData} />
                     </div>
-                    <GrowthChart
-                        getGrowth={getGrowth}
+                    <EquityGrowthChart
                         getHistoryForPeriod={getHistoryForPeriod}
-                        onResetHistory={clearHistory}
+                        currentEquity={summary.totalMarketValue + cash}
                     />
                 </div>
 
