@@ -11,7 +11,7 @@ interface EquityReturnTableProps {
     getHistoryForPeriod: (period: "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all") => PortfolioSnapshot[];
 }
 
-type ViewMode = "daily" | "monthly";
+type ViewMode = "hourly" | "daily" | "monthly";
 type PeriodFilter = "1month" | "3month" | "6month" | "1year" | "all";
 
 export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProps) {
@@ -53,10 +53,13 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                 break;
         }
 
-        return allHistory.filter(s => s.timestamp >= startTime);
+        return allHistory.filter(s => {
+            const ts = typeof s.timestamp === 'string' ? new Date(s.timestamp).getTime() : s.timestamp;
+            return ts >= startTime;
+        });
     }, [allHistory, periodFilter]);
 
-    // Group data by day or month
+    // Group data by hour, day or month
     const groupedData = useMemo(() => {
         if (filteredHistory.length === 0) return [];
 
@@ -64,17 +67,32 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
 
         filteredHistory.forEach(snapshot => {
             const date = new Date(snapshot.timestamp);
-            const key = viewMode === "daily"
-                ? date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })
-                : date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
 
-            if (!grouped.has(key)) {
-                grouped.set(key, []);
+            if (viewMode === "hourly") {
+                // Only show today's snapshots for hourly view
+                const now = new Date();
+                if (date.toDateString() !== now.toDateString()) return;
+
+                // Market hours focus (09:00 - 16:00)
+                const hour = date.getHours();
+                if (hour < 9 || hour > 16) return;
+
+                const key = `${hour.toString().padStart(2, '0')}:00`;
+                if (!grouped.has(key)) grouped.set(key, []);
+                grouped.get(key)!.push(snapshot);
+            } else {
+                const key = viewMode === "daily"
+                    ? date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })
+                    : date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
+
+                if (!grouped.has(key)) {
+                    grouped.set(key, []);
+                }
+                grouped.get(key)!.push(snapshot);
             }
-            grouped.get(key)!.push(snapshot);
         });
 
-        // Convert to array and calculate daily/monthly stats
+        // Convert to array and calculate stats
         const result = Array.from(grouped.entries()).map(([dateKey, snapshots]) => {
             // Sort snapshots by timestamp
             const sorted = snapshots.sort((a, b) => a.timestamp - b.timestamp);
@@ -83,7 +101,7 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
 
             return {
                 date: dateKey,
-                timestamp: lastSnapshot.timestamp,
+                timestamp: typeof lastSnapshot.timestamp === 'string' ? new Date(lastSnapshot.timestamp).getTime() : lastSnapshot.timestamp,
                 equity,
                 snapshots: sorted,
             };
@@ -147,6 +165,17 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                 <div className="flex items-center gap-4 mb-4">
                     <div className="inline-flex items-center gap-1 p-1 bg-gray-800/50 rounded-lg">
                         <button
+                            onClick={() => setViewMode("hourly")}
+                            className={cn(
+                                "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                viewMode === "hourly"
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : "text-gray-400 hover:text-gray-200"
+                            )}
+                        >
+                            Hourly
+                        </button>
+                        <button
                             onClick={() => setViewMode("daily")}
                             className={cn(
                                 "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
@@ -170,18 +199,20 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                         </button>
                     </div>
 
-                    {/* Period Filter Dropdown */}
-                    <select
-                        value={periodFilter}
-                        onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
-                        className="px-4 py-1.5 text-sm font-medium bg-gray-800/50 text-gray-300 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                    >
-                        {periodOptions.map(option => (
-                            <option key={option.key} value={option.key}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
+                    {/* Period Filter Dropdown - Only show for Daily/Monthly */}
+                    {viewMode !== "hourly" && (
+                        <select
+                            value={periodFilter}
+                            onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
+                            className="px-4 py-1.5 text-sm font-medium bg-gray-800/50 text-gray-300 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        >
+                            {periodOptions.map(option => (
+                                <option key={option.key} value={option.key}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
             </div>
 
@@ -192,7 +223,7 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                         <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                    Date
+                                    {viewMode === "hourly" ? "Time" : "Date"}
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                     Equity

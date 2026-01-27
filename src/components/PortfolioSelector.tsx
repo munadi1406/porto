@@ -55,18 +55,18 @@ export function PortfolioSelector() {
             {/* Active Selection Button */}
             <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl transition-all"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all"
             >
-                <div className="flex items-center gap-3 overflow-hidden">
+                <div className="flex items-center gap-2 overflow-hidden">
                     <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }}
                     />
-                    <span className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">
-                        {currentPortfolio?.name || "Pilih Portofolio"}
+                    <span className="font-bold text-[10px] text-gray-900 dark:text-gray-100 truncate uppercase tracking-tighter">
+                        {currentPortfolio?.name || "Pilih"}
                     </span>
                 </div>
-                <Settings2 className="w-4 h-4 text-gray-400" />
+                <Settings2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             </button>
 
             {/* Dropdown Menu */}

@@ -4,15 +4,17 @@ import { useState, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { formatIDR, cn } from "@/lib/utils";
 import { PortfolioSnapshot } from "@/lib/types";
+import { TrendingUp } from "lucide-react";
 
 interface EquityGrowthChartProps {
     getHistoryForPeriod: (period: "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all") => PortfolioSnapshot[];
     currentEquity: number;
+    totalReturnPercent?: number;
 }
 
 type Period = "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all";
 
-export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: EquityGrowthChartProps) {
+export function EquityGrowthChart({ getHistoryForPeriod, currentEquity, totalReturnPercent }: EquityGrowthChartProps) {
     const [selectedPeriod, setSelectedPeriod] = useState<Period>("ytd");
 
     const periods: { key: Period; label: string }[] = [
@@ -43,17 +45,15 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
         return historyData.map((snapshot: any) => {
             const date = new Date(snapshot.timestamp);
 
-            // If all data is from same day, show time (HH:MM)
-            // Otherwise show date (DD MMM)
+            // If all data is from same day, show time (HH.MM)
+            // Otherwise show date (D MMM)
             const timeLabel = isSameDay
                 ? date.toLocaleTimeString('id-ID', {
                     hour: '2-digit',
                     minute: '2-digit',
-                })
-                : date.toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'short',
-                });
+                    hour12: false
+                }).replace(':', '.')
+                : `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'short' })}`;
 
             return {
                 time: timeLabel,
@@ -127,70 +127,57 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
 
     // Calculate performance metrics for the selected period
     const performance = useMemo(() => {
+        // Prioritize actual portfolio performance if provided
+        if (totalReturnPercent !== undefined) {
+            return { nominal: 0, percent: totalReturnPercent };
+        }
+
         if (chartData.length < 2) return { nominal: 0, percent: 0 };
         const first = chartData[0].value;
         const last = chartData[chartData.length - 1].value;
         const nominal = last - first;
         const percent = first > 0 ? (nominal / first) * 100 : 0;
         return { nominal, percent };
-    }, [chartData]);
+    }, [chartData, totalReturnPercent]);
 
-    const chartColor = performance.nominal >= 0 ? "#10b981" : "#ef4444";
+    const chartColor = performance.percent >= 0 ? "#19d57a" : "#ff5d5d"; // Stockbit Green / Stockbit Red
 
     return (
-        <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl shadow-2xl border border-gray-800/50 overflow-hidden p-4 md:p-6">
+        <div className="bg-white dark:bg-[#12151c] rounded-[1.5rem] md:rounded-[2rem] border border-gray-200 dark:border-[#1e232d] overflow-hidden p-4 sm:p-6 md:p-10 shadow-sm">
             {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-[10px] md:text-sm font-bold text-gray-400 uppercase tracking-wider">Total Equity</h3>
-                    <div className={cn(
-                        "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wider",
-                        performance.nominal >= 0
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
-                    )}>
-                        {performance.nominal >= 0 ? "+" : ""}{performance.percent.toFixed(2)}%
-                    </div>
-                </div>
-                <div className="flex items-baseline gap-2">
-                    <div className="text-xl md:text-3xl font-black text-white tracking-tight">
+            <div className="mb-6 md:mb-8">
+                <h3 className="text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 md:mb-2 uppercase tracking-wider">Total Equity</h3>
+                <div className="flex flex-wrap items-baseline gap-2 md:gap-3">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
                         {formatIDR(currentEquity)}
-                    </div>
+                    </h2>
                     <div className={cn(
-                        "text-[10px] md:text-xs font-bold",
-                        performance.nominal >= 0 ? "text-emerald-500/70" : "text-red-500/70"
+                        "text-xs md:text-sm font-semibold",
+                        performance.percent >= 0 ? "text-[#19d57a]" : "text-[#ff5d5d]"
                     )}>
-                        {performance.nominal >= 0 ? "+" : ""}{formatIDR(performance.nominal)}
+                        {performance.percent >= 0 ? "+" : ""}{performance.percent.toFixed(2)}%
                     </div>
                 </div>
             </div>
 
-            {/* Chart */}
-            <div className="mb-6">
+            {/* Chart Section */}
+            <div className="relative">
                 {chartData.length > 0 ? (
-                    <div className="h-[200px] md:h-[280px]">
+                    <div className="h-[220px] sm:h-[280px] md:h-[320px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart
                                 data={chartData}
-                                margin={{ top: 5, right: 0, left: 0, bottom: 5 }}
+                                margin={{ top: 10, right: 0, left: -25, bottom: 0 }}
                             >
                                 <defs>
                                     <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop
-                                            offset="5%"
-                                            stopColor={chartColor}
-                                            stopOpacity={0.3}
-                                        />
-                                        <stop
-                                            offset="95%"
-                                            stopColor={chartColor}
-                                            stopOpacity={0}
-                                        />
+                                        <stop offset="0%" stopColor={chartColor} stopOpacity={0.3} />
+                                        <stop offset="100%" stopColor={chartColor} stopOpacity={0.05} />
                                     </linearGradient>
                                 </defs>
                                 <XAxis
                                     dataKey="time"
-                                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
+                                    tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 500 }}
                                     axisLine={false}
                                     tickLine={false}
                                     dy={10}
@@ -200,13 +187,16 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                                 <YAxis
                                     orientation="right"
                                     domain={[minValue, maxValue]}
-                                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
+                                    tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 500 }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={formatYAxis}
                                     width={45}
                                 />
-                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#334155', strokeWidth: 1 }} />
+                                <Tooltip
+                                    content={<CustomTooltip />}
+                                    cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '4 4' }}
+                                />
                                 <Area
                                     type="monotone"
                                     dataKey="value"
@@ -215,7 +205,7 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                                     fill="url(#equityGradient)"
                                     dot={false}
                                     activeDot={{
-                                        r: 6,
+                                        r: 4,
                                         fill: chartColor,
                                         stroke: "#fff",
                                         strokeWidth: 2
@@ -225,26 +215,35 @@ export function EquityGrowthChart({ getHistoryForPeriod, currentEquity }: Equity
                         </ResponsiveContainer>
                     </div>
                 ) : (
-                    <div className="h-[200px] md:h-[280px] flex items-center justify-center text-gray-500">
-                        <p className="text-sm">Belum ada data history</p>
+                    <div className="h-[220px] sm:h-[280px] md:h-[320px] flex flex-col items-center justify-center text-gray-400 gap-4 opacity-40">
+                        <TrendingUp className="w-10 h-10 md:w-12 md:h-12" />
+                        <p className="text-[10px] md:text-xs font-medium">No performance data available</p>
                     </div>
                 )}
             </div>
 
-            {/* Period Selector */}
-            <div className="flex items-center justify-center gap-1 md:gap-2">
+            {/* Period Selector Below Chart - Tab Style matching Stockbit */}
+            <div className="flex items-center justify-center gap-1 md:gap-4 mt-6 md:mt-8 border-t border-gray-100 dark:border-[#3d4451] pt-4 md:pt-6">
                 {periods.map((period) => (
                     <button
                         key={period.key}
+                        type="button"
                         onClick={() => setSelectedPeriod(period.key)}
-                        className={cn(
-                            "px-3 md:px-4 py-1.5 text-[10px] md:text-sm font-bold rounded-xl transition-all duration-200",
-                            selectedPeriod === period.key
-                                ? "text-white bg-emerald-500 shadow-lg shadow-emerald-500/20"
-                                : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
-                        )}
+                        className="relative px-3 md:px-4 py-2 group overflow-visible"
                     >
-                        {period.label}
+                        <span className={cn(
+                            "text-xs md:text-sm font-bold transition-all duration-300",
+                            selectedPeriod === period.key
+                                ? "text-[#19d57a]"
+                                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                        )}>
+                            {period.label}
+                        </span>
+
+                        {/* Active Underline Indicator */}
+                        {selectedPeriod === period.key && (
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#19d57a] rounded-full" />
+                        )}
                     </button>
                 ))}
             </div>

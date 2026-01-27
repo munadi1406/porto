@@ -1,263 +1,348 @@
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
-import { usePortfolio } from "@/hooks/usePortfolio";
-import { useMarketData } from "@/hooks/useMarketData";
-import { useCashAndHistory } from "@/hooks/useCashAndHistory";
+import { useAggregatePortfolio } from "@/hooks/useAggregatePortfolio";
+import { useAggregateHistory } from "@/hooks/useAggregateHistory";
 import { SummaryCard } from "@/components/SummaryCard";
-import { AllocationChart } from "@/components/AllocationChart";
-import { GainLossChart } from "@/components/GainLossChart";
-import { CashManager } from "@/components/CashManager";
-import { EquityGrowthChart } from "@/components/EquityGrowthChart";
+import { formatIDR, formatPercentage, formatCompactIDR } from "@/lib/utils";
+import { Briefcase, DollarSign, TrendingUp, Activity, PieChart, Wallet, Layers } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { DashboardTabs } from "@/components/DashboardTabs";
-import { Briefcase, DollarSign, TrendingUp, Activity, Calendar } from "lucide-react";
-import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
-import { formatIDR, formatPercentage } from "@/lib/utils";
+import { EquityGrowthChart } from "@/components/EquityGrowthChart";
+import { EquityReturnTable } from "@/components/EquityReturnTable";
 import Link from "next/link";
-import { DashboardSkeleton } from "@/components/Skeleton";
-import { ExportPDFButton } from "@/components/ExportPDFButton";
-import { exportToPDF } from "@/lib/exportPDF";
-import { DecisionAdvisor } from "@/components/DecisionAdvisor";
 
 export default function HomePage() {
-  const { portfolio, isLoaded } = usePortfolio();
-  const {
-    cash,
-    updateCash,
-    getHistoryForPeriod,
-    recordSnapshot,
-    history,
-    isLoaded: cashLoaded
-  } = useCashAndHistory();
-  const dashboardRef = useRef<HTMLDivElement>(null);
+  const { data, loading } = useAggregatePortfolio();
+  const { getHistoryForPeriod, loading: historyLoading } = useAggregateHistory();
 
-  const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
-  const { prices, loading: pricesLoading, lastUpdated } = useMarketData(tickers);
-
-  const handleExportPDF = () => {
-    if (dashboardRef.current) {
-      exportToPDF(dashboardRef.current, {
-        title: 'Portfolio Dashboard',
-      });
-    }
-  };
-
-  const summary = useMemo(() => {
-    let totalInvested = 0;
-    let totalMarketValue = 0;
-
-    portfolio.forEach((item) => {
-      const livePrice = prices[item.ticker]?.price || 0;
-      const marketPrice = livePrice > 0 ? livePrice : 0;
-      const shares = item.lots * 100;
-      const invested = item.averagePrice * shares;
-      const marketValue = marketPrice * shares;
-
-      totalInvested += invested;
-      totalMarketValue += marketValue;
-    });
-
-    const totalEquity = totalMarketValue + cash;
-    const totalGainLoss = totalMarketValue - totalInvested;
-    const totalReturn = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
-
-    return {
-      totalInvested,
-      totalMarketValue,
-      totalEquity,
-      totalGainLoss,
-      totalReturn,
-      cash,
-    };
-  }, [portfolio, prices, cash]);
-
-  const lastRecordTimeRef = useRef<number>(0);
-
-  // Record snapshot when prices or cash update
-  useEffect(() => {
-    // Only record if:
-    // 1. Portfolio and cash are loaded
-    // 2. Prices are not loading AND have been updated at least once
-    // 3. If portfolio is not empty, totalMarketValue must be > 0 (wait for real prices)
-    // 4. Throttle: only record every 5 minutes
-    const hasPortfolio = portfolio.length > 0;
-    const hasPrices = lastUpdated !== null;
-    const isValidValue = !hasPortfolio || summary.totalMarketValue > 0;
-
-    const now = Date.now();
-    const isThrottleExpired = now - lastRecordTimeRef.current > 5 * 60 * 1000; // 5 minutes
-
-    if (isLoaded && cashLoaded && !pricesLoading && hasPrices && isValidValue && isThrottleExpired) {
-      recordSnapshot(summary.totalMarketValue, cash);
-      lastRecordTimeRef.current = now;
-    }
-  }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, lastUpdated, portfolio.length, recordSnapshot]);
-
-  const chartData = useMemo(() => {
-    return portfolio.map((item) => ({
-      name: item.ticker,
-      value: item.lots * 100 * (prices[item.ticker]?.price || item.averagePrice),
-    })).filter(d => d.value > 0);
-  }, [portfolio, prices]);
-
-  const gainLossData = useMemo(() => {
-    return portfolio.map((item) => {
-      const livePrice = prices[item.ticker]?.price || 0;
-      const marketPrice = livePrice > 0 ? livePrice : 0;
-      const shares = item.lots * 100;
-      const invested = item.averagePrice * shares;
-      const marketValue = marketPrice * shares;
-      const gainLoss = marketValue - invested;
-      const percentage = invested > 0 ? (gainLoss / invested) * 100 : 0;
-
-      return {
-        ticker: item.ticker,
-        name: item.name,
-        value: Math.abs(gainLoss),
-        gainLoss: gainLoss,
-        percentage: percentage,
-      };
-    }).filter(d => d.gainLoss !== 0);
-  }, [portfolio, prices]);
-
-  if (!isLoaded) {
-    return <DashboardSkeleton />;
+  if (loading || !data) {
+    return (
+      <div className="p-8 space-y-6">
+        <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-32 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-2xl" />
+          ))}
+        </div>
+        <div className="h-[400px] bg-gray-200 dark:bg-gray-800 animate-pulse rounded-3xl" />
+      </div>
+    );
   }
 
+  const { portfolios, totals, consolidatedItems } = data;
+
+  // Prepare chart data
+  const chartData = portfolios.map((p: any) => ({
+    name: p.name,
+    value: p.totalValue,
+    color: p.color
+  })).filter((d: any) => d.value > 0);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div ref={dashboardRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
-            <p className="text-[10px] md:text-sm text-gray-500 font-medium uppercase tracking-wider">
-              {lastUpdated ? `Update: ${lastUpdated.toLocaleTimeString('id-ID')}` : 'Real-time data'}
-            </p>
+    <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-3 border border-blue-100 dark:border-blue-800">
+            <Layers className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">Executive View</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const event = new CustomEvent('export-portfolio-summary');
-                window.dispatchEvent(event);
-              }}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-sm font-black rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95 uppercase tracking-widest"
-            >
-              <Activity className="w-4 h-4" />
-              <span className="inline-block">Share Return</span>
-            </button>
-            <ExportPDFButton onClick={handleExportPDF} size="sm" className="flex-1 sm:flex-none" />
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight mb-2">
+            Main Dashboard
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-normal">
+            Konsolidasi dari <span className="text-gray-900 dark:text-white font-semibold">{portfolios.length} portofolio</span> aktif hari ini.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4 bg-white dark:bg-[#23272f] p-3 rounded-xl border border-gray-200 dark:border-[#2d3139] shadow-sm">
+            <div className="px-4 border-r border-gray-200 dark:border-[#2d3139]">
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Total Equity</p>
+              <p className="text-xl font-semibold text-blue-600">{formatIDR(totals.grandTotal)}</p>
+            </div>
+            <div className="px-4">
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Today's P/L</p>
+              <p className={cn(
+                "text-xl font-semibold",
+                totals.dayChange >= 0 ? "text-[#19d57a]" : "text-[#ff5d5d]"
+              )}>
+                {totals.dayChange >= 0 ? "+" : ""}{formatIDR(totals.dayChange)}
+              </p>
+            </div>
           </div>
         </div>
+      </header>
 
-        {/* Summary Cards - Always Visible */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <SummaryCard
-            title="Total Modal"
-            value={formatIDR(summary.totalInvested)}
-            icon={Briefcase}
-          />
-          <SummaryCard
-            title="Total Portfolio"
-            value={formatIDR(summary.totalEquity)}
-            subValue={pricesLoading ? "..." : "Live"}
-            icon={Activity}
-            trend="neutral"
-          />
-          <SummaryCard
-            title="Unrealized P/L"
-            value={summary.totalGainLoss > 0 ? `+${formatIDR(summary.totalGainLoss)}` : formatIDR(summary.totalGainLoss)}
-            icon={DollarSign}
-            trend={summary.totalGainLoss >= 0 ? "up" : "down"}
-          />
-          <SummaryCard
-            title="Return"
-            value={formatPercentage(summary.totalReturn)}
-            icon={TrendingUp}
-            trend={summary.totalReturn >= 0 ? "up" : "down"}
-          />
-        </div>
-
-        {/* Smart Advisor */}
-        <div className="mb-6">
-          <DecisionAdvisor
-            portfolio={portfolio}
-            cash={cash}
-            prices={prices}
-          />
-        </div>
-
-        {/* Cash Manager */}
-        <div className="mb-6">
-          <CashManager cash={cash} onUpdateCash={updateCash} />
-        </div>
-
-        {/* Tabs for Charts */}
-        <DashboardTabs
-          tabs={[
-            { id: "growth", label: "Portfolio Growth", icon: <TrendingUp className="w-5 h-5" /> },
-            { id: "allocation", label: "Allocation", icon: <Briefcase className="w-5 h-5" /> },
-            { id: "gainloss", label: "Gain/Loss", icon: <DollarSign className="w-5 h-5" /> },
-            { id: "heatmap", label: "History", icon: <Calendar className="w-5 h-5" /> },
-          ]}
-        >
-          {(activeTab) => (
-            <>
-              {activeTab === "growth" && (
-                <div className="space-y-6">
-                  <EquityGrowthChart
-                    getHistoryForPeriod={getHistoryForPeriod}
-                    currentEquity={summary.totalEquity}
-                  />
-                </div>
-              )}
-
-              {activeTab === "allocation" && (
-                <div className="grid grid-cols-1 gap-6">
-                  <AllocationChart data={chartData} />
-                </div>
-              )}
-
-              {activeTab === "gainloss" && (
-                <div className="grid grid-cols-1 gap-6">
-                  <GainLossChart data={gainLossData} />
-                </div>
-              )}
-
-              {activeTab === "heatmap" && (
-                <div className="space-y-6">
-                  <MonthlyPerformanceHeatmap history={history} />
-                </div>
-              )}
-            </>
-          )}
-        </DashboardTabs>
-
-        {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-2 gap-4">
-          <Link
-            href="/portfolio"
-            className="p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow text-center"
-          >
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-3">
-              <Briefcase className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Portfolio</h3>
-            <p className="text-xs text-gray-500">{portfolio.length} saham</p>
-          </Link>
-
-          <Link
-            href="/analytics"
-            className="p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow text-center"
-          >
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mx-auto mb-3">
-              <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Analytics</h3>
-            <p className="text-xs text-gray-500">Lihat growth</p>
-          </Link>
-        </div>
+      {/* Global Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
+        <SummaryCard
+          title="Modal Total"
+          value={formatIDR(totals.invested)}
+          icon={Briefcase}
+        />
+        <SummaryCard
+          title="Total Cash"
+          value={formatIDR(totals.cash)}
+          icon={Wallet}
+          trend="neutral"
+        />
+        <SummaryCard
+          title="Cuan/Rugi"
+          value={totals.profitLoss >= 0 ? `+${formatIDR(totals.profitLoss)}` : formatIDR(totals.profitLoss)}
+          subValue={formatPercentage(totals.returnPercent)}
+          icon={TrendingUp}
+          trend={totals.profitLoss >= 0 ? "up" : "down"}
+        />
+        <SummaryCard
+          title="Day Change"
+          value={totals.dayChange >= 0 ? `+${formatIDR(totals.dayChange)}` : formatIDR(totals.dayChange)}
+          subValue={(totals.dayChange >= 0 ? "+" : "") + formatPercentage(totals.dayChangePercent)}
+          icon={Activity}
+          trend={totals.dayChange >= 0 ? "up" : "down"}
+        />
+        <SummaryCard
+          title="Top Asset"
+          value={portfolios.sort((a: any, b: any) => b.marketValue - a.marketValue)[0]?.name || "-"}
+          subValue="Leading Portfolio"
+          icon={PieChart}
+          trend="up"
+        />
       </div>
+
+      <DashboardTabs
+        tabs={[
+          { id: "overview", label: "Perbandingan Porto", icon: <Layers className="w-4 h-4" /> },
+          { id: "growth", label: "Performa Gabungan", icon: <TrendingUp className="w-4 h-4" /> },
+          { id: "holdings", label: "Konsolidasi Saham", icon: <Briefcase className="w-4 h-4" /> },
+        ]}
+      >
+        {(activeTab) => (
+          <div className="space-y-6 sm:space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {activeTab === "overview" && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+                <div className="lg:col-span-8 bg-white dark:bg-[#23272f] backdrop-blur-xl rounded-[2.5rem] border border-gray-100 dark:border-[#2d3139] overflow-hidden shadow-sm">
+                  <div className="p-6 sm:p-8 border-b border-gray-50 dark:border-[#2d3139]/50 flex items-center justify-between bg-gray-50/30 dark:bg-[#1a1d23]/40">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
+                        <Layers className="w-5 h-5 text-[#3498db]" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">
+                          Perbandingan Portofolio
+                        </h2>
+                        <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">Performance Matrix</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto scrollbar-hide">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50/50 dark:bg-[#1a1d23]/50 border-b border-gray-100 dark:border-[#2d3139]">
+                          <th className="px-6 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">Portofolio</th>
+                          <th className="px-6 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">Total Aset</th>
+                          <th className="px-6 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] text-right">Perubahan Hari Ini</th>
+                          <th className="px-6 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] text-right">Total Return</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-[#2d3139]">
+                        {portfolios.map((p: any) => (
+                          <tr key={p.id} className="group hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-all duration-300">
+                            <td className="px-6 py-6">
+                              <div className="flex items-center gap-4">
+                                <div className="w-4 h-4 rounded-full shadow-lg ring-2 ring-white dark:ring-[#23272f]" style={{ backgroundColor: p.color }} />
+                                <div className="flex flex-col">
+                                  <span className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-sm group-hover:text-[#3498db] transition-colors">{p.name}</span>
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-0.5">{p.tickerCount} Saham Aktif</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-6">
+                              <div className="font-black text-gray-900 dark:text-white text-sm tracking-tight">{formatIDR(p.totalValue)}</div>
+                              <div className="text-[10px] text-gray-500 font-medium whitespace-nowrap">Dana: {formatIDR(p.cashValue)}</div>
+                            </td>
+                            <td className="px-6 py-6 text-right">
+                              <div className={cn("font-black text-sm tracking-tight", p.dayChange >= 0 ? "text-[#19d57a]" : "text-[#ff5d5d]")}>
+                                {p.dayChange >= 0 ? "+" : ""}{formatIDR(p.dayChange)}
+                              </div>
+                              <div className={cn("text-[10px] font-bold mt-0.5", p.dayChange >= 0 ? "text-[#19d57a]/70" : "text-[#ff5d5d]/70")}>
+                                {p.dayChange >= 0 ? "+" : ""}{formatPercentage(p.dayChangePercent)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-6 text-right">
+                              <div className={cn("font-black text-xl tracking-tighter", p.profitLoss >= 0 ? "text-[#19d57a]" : "text-[#ff5d5d]")}>
+                                {formatPercentage(p.returnPercent)}
+                              </div>
+                              <div className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-tighter">
+                                {p.profitLoss >= 0 ? "Untung" : "Rugi"} {formatIDR(p.profitLoss)}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-4 bg-white dark:bg-[#23272f] backdrop-blur-xl rounded-[2.5rem] border border-gray-100 dark:border-[#2d3139] shadow-sm p-8 overflow-hidden relative">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2.5 bg-purple-50 dark:bg-purple-900/20 rounded-2xl">
+                      <PieChart className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Distribusi Aset</h3>
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">Weight Allocation</p>
+                    </div>
+                  </div>
+
+                  <div className="h-[280px] w-full relative mb-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={chartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={75}
+                          outerRadius={110}
+                          paddingAngle={8}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {chartData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} className="hover:opacity-80 transition-opacity cursor-pointer" />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          contentStyle={{
+                            borderRadius: '24px',
+                            border: 'none',
+                            boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)',
+                            backgroundColor: '#23272f',
+                            backdropFilter: 'blur(10px)',
+                            padding: '12px 16px'
+                          }}
+                          itemStyle={{ fontWeight: '900', color: '#fff' }}
+                          formatter={(value: any) => formatIDR(Number(value || 0))}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Total</p>
+                      <p className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">{formatCompactIDR(totals.grandTotal)}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {chartData.map((d: any, i: number) => (
+                      <div key={i} className="group flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-all border border-transparent hover:border-gray-100 dark:hover:border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.1)]" style={{ backgroundColor: d.color }} />
+                          <span className="text-xs font-black text-gray-600 dark:text-gray-400 uppercase tracking-tight group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{d.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-xs font-black text-gray-900 dark:text-white transition-transform group-hover:scale-110">
+                              {((d.value / totals.grandTotal) * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-12">
+                  <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "growth" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                <EquityGrowthChart
+                  getHistoryForPeriod={getHistoryForPeriod}
+                  currentEquity={totals.grandTotal}
+                  totalReturnPercent={totals.returnPercent}
+                />
+                <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
+              </div>
+            )}
+
+            {activeTab === "holdings" && (
+              <div className="bg-white dark:bg-[#23272f] backdrop-blur-xl rounded-[2.5rem] border border-gray-100 dark:border-[#2d3139] overflow-hidden shadow-sm">
+                <div className="p-8 border-b border-gray-50 dark:border-[#2d3139]/50 flex items-center justify-between bg-gray-50/30 dark:bg-[#1a1d23]/40">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl">
+                      <Briefcase className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Konsolidasi Kepemilikan Saham</h3>
+                      <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">Aggregated Asset View</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="overflow-x-auto scrollbar-hide">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 dark:bg-[#1a1d23]/50 border-b border-gray-100 dark:border-[#2d3139]">
+                        <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">Saham (Ticker)</th>
+                        <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">Total Kepemilikan</th>
+                        <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">Harga Rata-rata / Saat Ini</th>
+                        <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">Market Value</th>
+                        <th className="px-8 py-5 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] text-right">Return Gabungan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-[#2d3139]">
+                      {consolidatedItems.map((item: any) => (
+                        <tr key={item.ticker} className="group hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-all duration-300">
+                          <td className="px-8 py-6">
+                            <div className="text-sm font-black text-indigo-600 dark:text-[#3498db] uppercase tracking-tight mb-1">{item.ticker}</div>
+                            <div className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{item.name}</div>
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                              {item.portfolios.map((pName: string) => (
+                                <span key={pName} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-md text-[9px] font-black text-gray-400 uppercase tracking-tighter border border-transparent group-hover:border-gray-200 dark:group-hover:border-[#2d3139] transition-colors">
+                                  {pName}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="text-sm font-black text-gray-900 dark:text-white tracking-tighter">{item.totalLots} <span className="text-[10px] text-gray-400 font-bold uppercase ml-1">Lot</span></div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Avg: {formatIDR(item.avgPrice)}</div>
+                            <div className="text-xs font-black text-gray-900 dark:text-white">Cur: {formatIDR(item.currentPrice)}</div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="text-sm font-black text-gray-900 dark:text-white tracking-tight">{formatIDR(item.marketValue)}</div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className={cn("text-xl font-black tracking-tighter", item.profitLoss >= 0 ? "text-[#19d57a]" : "text-[#ff5d5d]")}>
+                              {formatPercentage(item.returnPercent)}
+                            </div>
+                            <div className={cn("text-[10px] font-bold mt-1 uppercase", item.profitLoss >= 0 ? "text-[#19d57a]/70" : "text-[#ff5d5d]/70")}>
+                              {item.profitLoss >= 0 ? "+" : ""}{formatIDR(item.profitLoss)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {consolidatedItems.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-8 py-20 text-center">
+                            <div className="flex flex-col items-center gap-4 opacity-30">
+                              <Briefcase className="w-12 h-12 text-gray-400" />
+                              <p className="font-black uppercase text-sm tracking-widest text-gray-400">Belum ada kepemilikan saham</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </DashboardTabs>
     </div>
   );
 }

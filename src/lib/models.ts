@@ -439,4 +439,54 @@ export async function syncDatabase() {
     return syncPromise;
 }
 
+// ============================================
+// Get Aggregate Portfolio History
+// ============================================
+export async function getAggregateHistory() {
+    try {
+        // Get all portfolios
+        const portfolios = await Portfolio.findAll();
+
+        if (portfolios.length === 0) {
+            return [];
+        }
+
+        // Get all snapshots from all portfolios, ordered by time
+        const allSnapshots = await PortfolioSnapshot.findAll({
+            where: {
+                portfolioId: portfolios.map(p => p.id)
+            },
+            order: [['timestamp', 'ASC']]
+        });
+
+        if (allSnapshots.length === 0) {
+            return [];
+        }
+
+        // Create a map to track the latest totalValue for each portfolio
+        const latestValues = new Map<string, number>();
+        const aggregatedHistory: { timestamp: string, totalValue: number }[] = [];
+
+        // Iterate through all snapshots in chronological order
+        allSnapshots.forEach(snapshot => {
+            // Update the latest value for this specific portfolio
+            latestValues.set(snapshot.portfolioId, Number(snapshot.totalValue || 0));
+
+            // Calculate current aggregate total by summing all known portfolio values
+            let aggregateTotal = 0;
+            latestValues.forEach(val => aggregateTotal += val);
+
+            aggregatedHistory.push({
+                timestamp: new Date(snapshot.timestamp).toISOString(),
+                totalValue: aggregateTotal
+            });
+        });
+
+        return aggregatedHistory;
+    } catch (error) {
+        console.error('Error fetching aggregate history:', error);
+        return [];
+    }
+}
+
 export { sequelize };

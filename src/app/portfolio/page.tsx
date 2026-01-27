@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
+import { usePortfolios } from "@/hooks/usePortfolios";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
 import { PortfolioTable } from "@/components/PortfolioTable";
@@ -17,6 +18,7 @@ import { Target, Layers } from "lucide-react";
 
 export default function PortfolioPage() {
     const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded, selectedPortfolioId } = usePortfolio();
+    const { currentPortfolio } = usePortfolios();
     const { cash, recordTransaction } = useCashAndHistory();
     const portfolioRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +89,13 @@ export default function PortfolioPage() {
                 {/* Header */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                        <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tight">Portfolio</h1>
+                        <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                            <div
+                                className="w-5 h-5 rounded-full"
+                                style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }}
+                            />
+                            {currentPortfolio?.name || "Portfolio"}
+                        </h1>
                         <div className="flex items-center gap-2">
                             <ExportPDFButton onClick={handleExportPDF} size="md" />
                         </div>

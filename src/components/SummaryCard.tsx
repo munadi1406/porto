@@ -10,53 +10,42 @@ interface SummaryCardProps {
     trend?: "up" | "down" | "neutral";
 }
 
-export function SummaryCard({ title, value, subValue, subLabel, icon: Icon, trend }: SummaryCardProps) {
+export function SummaryCard({ title, value, subValue, subLabel, icon: Icon, trend = "neutral" }: SummaryCardProps) {
     return (
-        <div className="group relative bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-300">
-            {/* Gradient overlay on hover */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-900/5 dark:to-purple-900/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-            <div className="relative">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide truncate pr-2">
+        <div className="group relative bg-white dark:bg-[#12151c] p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 dark:border-[#1e232d] hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between min-h-[110px] sm:min-h-[130px]">
+            <div className="relative w-full">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <h3 className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate flex-1 pr-2">
                         {title}
                     </h3>
                     <div className={cn(
-                        "p-2.5 rounded-xl transition-all duration-300",
-                        "bg-gradient-to-br shadow-sm",
-                        trend === "up" && "from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 group-hover:shadow-green-200/50",
-                        trend === "down" && "from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 group-hover:shadow-red-200/50",
-                        (!trend || trend === "neutral") && "from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 group-hover:shadow-blue-200/50"
+                        "p-1.5 rounded-lg transition-all duration-300 flex-shrink-0",
+                        trend === "up" ? "bg-emerald-50 dark:bg-[#19d57a]/10 text-emerald-600 dark:text-[#19d57a]" :
+                            trend === "down" ? "bg-rose-50 dark:bg-[#ff5d5d]/10 text-rose-600 dark:text-[#ff5d5d]" :
+                                "bg-blue-50 dark:bg-[#3498db]/10 text-[#3498db]"
                     )}>
-                        <Icon className={cn(
-                            "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 group-hover:scale-110 flex-shrink-0",
-                            trend === "up" && "text-green-600 dark:text-green-400",
-                            trend === "down" && "text-red-600 dark:text-red-400",
-                            (!trend || trend === "neutral") && "text-blue-600 dark:text-blue-400"
-                        )} />
+                        <Icon className="w-3.5 h-3.5" />
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900 dark:text-white tracking-tight break-all leading-tight">
+                <div className="space-y-1 sm:space-y-1.5">
+                    <p className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight leading-none whitespace-nowrap overflow-hidden text-ellipsis">
                         {value}
                     </p>
                     {(subValue || subLabel) && (
-                        <div className="flex items-center gap-2 text-xs sm:text-sm flex-wrap">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
                             {subValue && (
-                                <span
-                                    className={cn(
-                                        "font-semibold px-2 py-0.5 rounded-md whitespace-nowrap",
-                                        trend === "up" && "text-green-700 dark:text-green-400 bg-green-100/50 dark:bg-green-900/20",
-                                        trend === "down" && "text-red-700 dark:text-red-400 bg-red-100/50 dark:bg-red-900/20",
-                                        (!trend || trend === "neutral") && "text-gray-600 dark:text-gray-400 bg-gray-100/50 dark:bg-gray-800/50"
-                                    )}
-                                >
+                                <span className={cn(
+                                    "text-xs font-semibold whitespace-nowrap",
+                                    trend === "up" ? "text-[#19d57a]" :
+                                        trend === "down" ? "text-[#ff5d5d]" :
+                                            "text-[#3498db]"
+                                )}>
                                     {subValue}
                                 </span>
                             )}
                             {subLabel && (
-                                <span className="text-gray-500 dark:text-gray-500 text-xs truncate">
+                                <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide truncate">
                                     {subLabel}
                                 </span>
                             )}
