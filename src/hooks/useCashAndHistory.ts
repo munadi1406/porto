@@ -6,8 +6,9 @@ import { PortfolioSnapshot, Transaction } from "@/lib/types";
 import { toast } from 'sonner';
 
 // API Functions
-async function fetchCash() {
-    const response = await fetch('/api/cash');
+async function fetchCash(portfolioId: string | null) {
+    if (!portfolioId) return 0;
+    const response = await fetch(`/api/cash?portfolioId=${portfolioId}`);
     const result = await response.json();
     if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat mengambil data cash');
     return result.data.amount;
@@ -24,21 +25,23 @@ async function updateCashAPI(data: { amount: number; operation: 'set' | 'add' | 
     return result.data.amount;
 }
 
-async function fetchTransactions(): Promise<Transaction[]> {
-    const response = await fetch('/api/transactions');
+async function fetchTransactions(portfolioId: string | null): Promise<Transaction[]> {
+    if (!portfolioId) return [];
+    const response = await fetch(`/api/transactions?portfolioId=${portfolioId}`);
     const result = await response.json();
     if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat mengambil data transaksi');
     return result.data;
 }
 
-async function fetchSnapshots(period: string = 'all') {
-    const response = await fetch(`/api/snapshots?period=${period}`);
+async function fetchSnapshots(portfolioId: string | null, period: string = 'all') {
+    if (!portfolioId) return { snapshots: [], growth: { value: 0, percent: 0 } };
+    const response = await fetch(`/api/snapshots?portfolioId=${portfolioId}&period=${period}`);
     const result = await response.json();
     if (!result.success) throw new Error(result.error || 'Terjadi kesalahan saat mengambil data snapshot');
     return result.data;
 }
 
-async function recordSnapshotAPI(data: { stockValue: number; cashValue: number }) {
+async function recordSnapshotAPI(data: { portfolioId: string; stockValue: number; cashValue: number }) {
     const response = await fetch('/api/snapshots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,8 +51,9 @@ async function recordSnapshotAPI(data: { stockValue: number; cashValue: number }
     return result;
 }
 
-async function clearHistoryAPI() {
-    const response = await fetch('/api/snapshots', {
+async function clearHistoryAPI(portfolioId: string | null) {
+    if (!portfolioId) return;
+    const response = await fetch(`/api/snapshots?portfolioId=${portfolioId}`, {
         method: 'DELETE',
     });
     const result = await response.json();
@@ -57,26 +61,32 @@ async function clearHistoryAPI() {
     return result;
 }
 
+import { usePortfolioStore } from './usePortfolios';
+
 export function useCashAndHistory() {
     const queryClient = useQueryClient();
+    const { selectedPortfolioId } = usePortfolioStore();
 
     // Fetch cash
     const { data: cash = 0, isLoading: cashLoading } = useQuery({
-        queryKey: ['cash'],
-        queryFn: fetchCash,
+        queryKey: ['cash', selectedPortfolioId],
+        queryFn: () => fetchCash(selectedPortfolioId),
+        enabled: !!selectedPortfolioId,
     });
 
     // Fetch transactions
     const { data: transactions = [] } = useQuery<Transaction[]>({
-        queryKey: ['transactions'],
-        queryFn: fetchTransactions,
+        queryKey: ['transactions', selectedPortfolioId],
+        queryFn: () => fetchTransactions(selectedPortfolioId),
+        enabled: !!selectedPortfolioId,
     });
 
     // Fetch snapshots
     const { data: snapshotsData } = useQuery({
-        queryKey: ['snapshots', 'all'],
-        queryFn: () => fetchSnapshots('all'),
-        refetchInterval: 60000, // Poll every 1 minute instead of 5 seconds
+        queryKey: ['snapshots', 'all', selectedPortfolioId],
+        queryFn: () => fetchSnapshots(selectedPortfolioId, 'all'),
+        enabled: !!selectedPortfolioId,
+        refetchInterval: 60000,
     });
 
     const history: PortfolioSnapshot[] = snapshotsData?.snapshots || [];
@@ -103,9 +113,9 @@ export function useCashAndHistory() {
 
     // Clear history mutation
     const clearHistoryMutation = useMutation({
-        mutationFn: clearHistoryAPI,
+        mutationFn: () => clearHistoryAPI(selectedPortfolioId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+            queryClient.invalidateQueries({ queryKey: ['snapshots', 'all', selectedPortfolioId] });
             toast.success('Riwayat berhasil dihapus');
         },
         onError: (error: any) => {
@@ -114,15 +124,18 @@ export function useCashAndHistory() {
     });
 
     const updateCash = async (amount: number) => {
-        await updateCashMutation.mutateAsync({ amount, operation: 'set' });
+        if (!selectedPortfolioId) return;
+        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'set' } as any);
     };
 
     const addCash = async (amount: number) => {
-        await updateCashMutation.mutateAsync({ amount, operation: 'add' });
+        if (!selectedPortfolioId) return;
+        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'add' } as any);
     };
 
     const subtractCash = async (amount: number) => {
-        await updateCashMutation.mutateAsync({ amount, operation: 'subtract' });
+        if (!selectedPortfolioId) return;
+        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'subtract' } as any);
     };
 
     const recordTransaction = async (transaction: Omit<Transaction, "id" | "timestamp">) => {
@@ -135,12 +148,13 @@ export function useCashAndHistory() {
     };
 
     const recordSnapshot = useCallback(async (stockValue: number, cashValue: number) => {
+        if (!selectedPortfolioId) return;
         try {
-            await recordSnapshotMutation.mutateAsync({ stockValue, cashValue });
+            await recordSnapshotMutation.mutateAsync({ portfolioId: selectedPortfolioId, stockValue, cashValue });
         } catch (error) {
             console.error('Error recording snapshot:', error);
         }
-    }, [recordSnapshotMutation]);
+    }, [selectedPortfolioId, recordSnapshotMutation]);
 
     const getGrowth = useCallback((period: "today" | "day" | "week" | "month" | "3month" | "ytd" | "year" | "all") => {
         if (history.length === 0) return { value: 0, percent: 0 };

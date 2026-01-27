@@ -1,17 +1,24 @@
 // API Route: Portfolio CRUD Operations (Simplified)
 import { NextRequest, NextResponse } from 'next/server';
 
-const USER_ID = 'default';
-
-// GET: Fetch all portfolio items
-export async function GET() {
+// GET: Fetch all portfolio items for a specific portfolio
+export async function GET(request: NextRequest) {
     try {
-        // Dynamic import to avoid build issues
         const { PortfolioItem, syncDatabase } = await import('@/lib/models');
         await syncDatabase();
 
+        const { searchParams } = new URL(request.url);
+        const portfolioId = searchParams.get('portfolioId');
+
+        if (!portfolioId) {
+            return NextResponse.json(
+                { success: false, error: 'portfolioId is required' },
+                { status: 400 }
+            );
+        }
+
         const items = await PortfolioItem.findAll({
-            where: { userId: USER_ID },
+            where: { portfolioId },
             order: [['createdAt', 'DESC']],
         });
 
@@ -22,7 +29,7 @@ export async function GET() {
     } catch (error: any) {
         console.error('Error fetching portfolio:', error);
         return NextResponse.json(
-            { success: false, error: error.message, stack: error.stack },
+            { success: false, error: error.message },
             { status: 500 }
         );
     }
@@ -35,9 +42,9 @@ export async function POST(request: NextRequest) {
         await syncDatabase();
 
         const body = await request.json();
-        const { ticker, name, lots, averagePrice } = body;
+        const { portfolioId, ticker, name, lots, averagePrice, targetPercentage } = body;
 
-        if (!ticker || !name || lots === undefined || averagePrice === undefined) {
+        if (!portfolioId || !ticker || !name || lots === undefined || averagePrice === undefined) {
             return NextResponse.json(
                 { success: false, error: 'Missing required fields' },
                 { status: 400 }
@@ -45,25 +52,23 @@ export async function POST(request: NextRequest) {
         }
 
         const existing = await PortfolioItem.findOne({
-            where: { userId: USER_ID, ticker }
+            where: { portfolioId, ticker }
         });
 
         if (existing) {
-            // Very defensive number conversion
             const currentLots = parseFloat(existing.lots?.toString() || '0') || 0;
             const currentAvg = parseFloat(existing.averagePrice?.toString() || '0') || 0;
             const addedLots = parseFloat(lots?.toString() || '0') || 0;
             const addedAvg = parseFloat(averagePrice?.toString() || '0') || 0;
 
-            // Total shares = lots * 100. Since we divide by totalLots later, 
-            // the *100 cancels out, so we can just use lots for avg calculation.
             const totalCostValue = (currentLots * currentAvg) + (addedLots * addedAvg);
             const totalLotsCount = currentLots + addedLots;
             const finalAverage = totalLotsCount > 0 ? totalCostValue / totalLotsCount : addedAvg;
 
             await existing.update({
                 lots: totalLotsCount,
-                averagePrice: finalAverage, // Use exact value, DB will handle Decimal precision
+                averagePrice: finalAverage,
+                targetPercentage: targetPercentage !== undefined ? targetPercentage : existing.targetPercentage,
             });
 
             return NextResponse.json({
@@ -73,11 +78,12 @@ export async function POST(request: NextRequest) {
             });
         } else {
             const newItem = await PortfolioItem.create({
-                userId: USER_ID,
+                portfolioId,
                 ticker,
                 name,
                 lots,
                 averagePrice,
+                targetPercentage: targetPercentage || 0,
             });
 
             return NextResponse.json({
@@ -87,9 +93,8 @@ export async function POST(request: NextRequest) {
             }, { status: 201 });
         }
     } catch (error: any) {
-        console.error('Error adding/updating stock:', error);
         return NextResponse.json(
-            { success: false, error: error.message, stack: error.stack },
+            { success: false, error: error.message },
             { status: 500 }
         );
     }
@@ -102,17 +107,17 @@ export async function PUT(request: NextRequest) {
         await syncDatabase();
 
         const body = await request.json();
-        const { id, ticker, name, lots, averagePrice } = body;
+        const { id, portfolioId, ticker, name, lots, averagePrice, targetPercentage } = body;
 
-        if (!id) {
+        if (!id || !portfolioId) {
             return NextResponse.json(
-                { success: false, error: 'ID is required' },
+                { success: false, error: 'ID and portfolioId are required' },
                 { status: 400 }
             );
         }
 
         const item = await PortfolioItem.findOne({
-            where: { id, userId: USER_ID }
+            where: { id, portfolioId }
         });
 
         if (!item) {
@@ -127,6 +132,7 @@ export async function PUT(request: NextRequest) {
             name: name || item.name,
             lots: lots !== undefined ? lots : item.lots,
             averagePrice: averagePrice !== undefined ? averagePrice : item.averagePrice,
+            targetPercentage: targetPercentage !== undefined ? targetPercentage : item.targetPercentage,
         });
 
         return NextResponse.json({
@@ -135,9 +141,8 @@ export async function PUT(request: NextRequest) {
             message: 'Stock updated successfully',
         });
     } catch (error: any) {
-        console.error('Error updating stock:', error);
         return NextResponse.json(
-            { success: false, error: error.message, stack: error.stack },
+            { success: false, error: error.message },
             { status: 500 }
         );
     }
@@ -151,16 +156,17 @@ export async function DELETE(request: NextRequest) {
 
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const portfolioId = searchParams.get('portfolioId');
 
-        if (!id) {
+        if (!id || !portfolioId) {
             return NextResponse.json(
-                { success: false, error: 'ID is required' },
+                { success: false, error: 'ID and portfolioId are required' },
                 { status: 400 }
             );
         }
 
         const item = await PortfolioItem.findOne({
-            where: { id, userId: USER_ID }
+            where: { id, portfolioId }
         });
 
         if (!item) {
@@ -177,9 +183,8 @@ export async function DELETE(request: NextRequest) {
             message: 'Stock deleted successfully',
         });
     } catch (error: any) {
-        console.error('Error deleting stock:', error);
         return NextResponse.json(
-            { success: false, error: error.message, stack: error.stack },
+            { success: false, error: error.message },
             { status: 500 }
         );
     }

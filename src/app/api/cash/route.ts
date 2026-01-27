@@ -1,35 +1,45 @@
 // API Route: Cash Management (with userId support)
 import { NextRequest, NextResponse } from 'next/server';
-import { CashHolding, syncDatabase } from '@/lib/models';
-
-const USER_ID = 'default';
+import { CashHolding, Portfolio, syncDatabase } from '@/lib/models';
 
 let dbInitialized = false;
 async function ensureDbInitialized() {
     if (!dbInitialized) {
-        console.log('Initializing database for Cash API...');
         const success = await syncDatabase();
-        if (success) {
-            dbInitialized = true;
-            console.log('Database initialized successfully.');
-        } else {
-            console.error('Database initialization failed!');
-        }
+        if (success) dbInitialized = true;
     }
 }
 
-// GET: Fetch current cash balance for current user
-export async function GET() {
+// GET: Fetch current cash balance for a specific portfolio
+export async function GET(request: NextRequest) {
     try {
         await ensureDbInitialized();
+        const { searchParams } = new URL(request.url);
+        const portfolioId = searchParams.get('portfolioId');
+
+        if (!portfolioId) {
+            return NextResponse.json(
+                { success: false, error: 'portfolioId is required' },
+                { status: 400 }
+            );
+        }
 
         let cash = await CashHolding.findOne({
-            where: { userId: USER_ID }
+            where: { portfolioId }
         });
 
         if (!cash) {
+            // Validate portfolio exists before creating cash child record
+            const portfolioExists = await Portfolio.findByPk(portfolioId);
+            if (!portfolioExists) {
+                return NextResponse.json({
+                    success: true,
+                    data: { amount: 0, lastUpdated: new Date() },
+                });
+            }
+
             cash = await CashHolding.create({
-                userId: USER_ID,
+                portfolioId,
                 amount: 0,
                 lastUpdated: new Date(),
             });
@@ -57,7 +67,14 @@ export async function POST(request: NextRequest) {
         await ensureDbInitialized();
 
         const body = await request.json();
-        const { amount, operation } = body;
+        const { portfolioId, amount, operation } = body;
+
+        if (!portfolioId) {
+            return NextResponse.json(
+                { success: false, error: 'portfolioId is required' },
+                { status: 400 }
+            );
+        }
 
         if (amount === undefined) {
             return NextResponse.json(
@@ -67,12 +84,20 @@ export async function POST(request: NextRequest) {
         }
 
         let cash = await CashHolding.findOne({
-            where: { userId: USER_ID }
+            where: { portfolioId }
         });
 
         if (!cash) {
+            const portfolioExists = await Portfolio.findByPk(portfolioId);
+            if (!portfolioExists) {
+                return NextResponse.json(
+                    { success: false, error: 'Portfolio not found' },
+                    { status: 404 }
+                );
+            }
+
             cash = await CashHolding.create({
-                userId: USER_ID,
+                portfolioId,
                 amount: 0,
                 lastUpdated: new Date(),
             });
@@ -92,8 +117,6 @@ export async function POST(request: NextRequest) {
             default:
                 newAmount = amount;
         }
-
-        console.log(`Updating cash: ${currentAmount} -> ${newAmount} (Operation: ${operation}, Amount: ${amount})`);
 
         await cash.update({
             amount: newAmount,

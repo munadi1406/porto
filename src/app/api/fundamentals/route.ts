@@ -97,12 +97,15 @@ export async function GET(request: Request) {
             sector: profile.sector || null,
             industry: profile.industry || null,
 
-            // Analyst Recommendations
+            // Analyst Recommendations & Targets
             strongBuy: recommendations.strongBuy || 0,
             buy: recommendations.buy || 0,
             hold: recommendations.hold || 0,
             sell: recommendations.sell || 0,
             strongSell: recommendations.strongSell || 0,
+            targetMeanPrice: financialData.targetMeanPrice || null,
+            targetHighPrice: financialData.targetHighPrice || null,
+            targetLowPrice: financialData.targetLowPrice || null,
         };
 
         // Update cache

@@ -22,10 +22,9 @@ export default function RootLayout({
           <Toaster position="top-right" richColors />
           <MobileNav />
 
-          {/* Desktop: with sidebar padding */}
+          {/* Desktop: with sidebar padding. Mobile: with top and bottom nav padding */}
           <div className="md:pl-64">
-            {/* Mobile: with bottom nav padding */}
-            <div className="pb-16 md:pb-0">
+            <div className="pt-20 pb-16 md:pt-0 md:pb-0">
               {children}
             </div>
           </div>

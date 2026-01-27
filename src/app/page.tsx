@@ -17,6 +17,7 @@ import Link from "next/link";
 import { DashboardSkeleton } from "@/components/Skeleton";
 import { ExportPDFButton } from "@/components/ExportPDFButton";
 import { exportToPDF } from "@/lib/exportPDF";
+import { DecisionAdvisor } from "@/components/DecisionAdvisor";
 
 export default function HomePage() {
   const { portfolio, isLoaded } = usePortfolio();
@@ -174,6 +175,15 @@ export default function HomePage() {
             value={formatPercentage(summary.totalReturn)}
             icon={TrendingUp}
             trend={summary.totalReturn >= 0 ? "up" : "down"}
+          />
+        </div>
+
+        {/* Smart Advisor */}
+        <div className="mb-6">
+          <DecisionAdvisor
+            portfolio={portfolio}
+            cash={cash}
+            prices={prices}
           />
         </div>
 

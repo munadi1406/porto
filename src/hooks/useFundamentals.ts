@@ -41,6 +41,9 @@ interface FundamentalData {
     hold: number;
     sell: number;
     strongSell: number;
+    targetMeanPrice: number | null;
+    targetHighPrice: number | null;
+    targetLowPrice: number | null;
 }
 
 export function useFundamentals(ticker: string) {

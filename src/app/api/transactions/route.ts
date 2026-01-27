@@ -2,8 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Transaction, PortfolioItem, syncDatabase } from '@/lib/models';
 
-const USER_ID = 'default';
-
 let dbInitialized = false;
 async function ensureDbInitialized() {
     if (!dbInitialized) {
@@ -12,13 +10,22 @@ async function ensureDbInitialized() {
     }
 }
 
-// GET: Fetch all transactions for current user
-export async function GET() {
+// GET: Fetch all transactions for a specific portfolio
+export async function GET(request: NextRequest) {
     try {
         await ensureDbInitialized();
+        const { searchParams } = new URL(request.url);
+        const portfolioId = searchParams.get('portfolioId');
+
+        if (!portfolioId) {
+            return NextResponse.json(
+                { success: false, error: 'portfolioId is required' },
+                { status: 400 }
+            );
+        }
 
         const transactions = await Transaction.findAll({
-            where: { userId: USER_ID },
+            where: { portfolioId },
             order: [['timestamp', 'DESC']],
             limit: 100,
         });
@@ -42,9 +49,9 @@ export async function POST(request: NextRequest) {
         await ensureDbInitialized();
 
         const body = await request.json();
-        const { id, type, ticker, name, lots, pricePerShare, notes } = body;
+        const { portfolioId, id, type, ticker, name, lots, pricePerShare, notes } = body;
 
-        if (!type || !ticker || !name || lots === undefined || pricePerShare === undefined) {
+        if (!portfolioId || !type || !ticker || !name || lots === undefined || pricePerShare === undefined) {
             return NextResponse.json(
                 { success: false, error: 'Missing required fields' },
                 { status: 400 }
@@ -55,7 +62,7 @@ export async function POST(request: NextRequest) {
 
         // Create transaction record
         const transaction = await Transaction.create({
-            userId: USER_ID,
+            portfolioId,
             type,
             ticker,
             name,
@@ -69,12 +76,11 @@ export async function POST(request: NextRequest) {
         // Update portfolio item if ID provided
         if (id) {
             const item = await PortfolioItem.findOne({
-                where: { id, userId: USER_ID }
+                where: { id, portfolioId }
             });
 
             if (item) {
                 if (type === 'buy') {
-                    // Very defensive number conversion
                     const currentLots = parseFloat(item.lots?.toString() || '0') || 0;
                     const currentAvg = parseFloat(item.averagePrice?.toString() || '0') || 0;
                     const addedLots = parseFloat(lots?.toString() || '0') || 0;
@@ -90,7 +96,6 @@ export async function POST(request: NextRequest) {
                     });
                 } else if (type === 'sell') {
                     const newLots = Math.max(0, item.lots - lots);
-
                     if (newLots === 0) {
                         await item.destroy();
                     } else {
@@ -106,7 +111,6 @@ export async function POST(request: NextRequest) {
             message: `${type === 'buy' ? 'Purchase' : 'Sale'} recorded successfully`,
         }, { status: 201 });
     } catch (error: any) {
-        console.error('Error executing transaction:', error);
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 500 }

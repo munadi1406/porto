@@ -869,50 +869,98 @@ export default function FundamentalsPage() {
                                 <BarChart3 className="w-5 h-5 text-blue-600" />
                                 Konsensus Analis Profesional
                             </h3>
-                            <div className="h-[250px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={[
-                                            { name: 'Strong Buy', value: data.strongBuy, color: '#10b981' },
-                                            { name: 'Buy', value: data.buy, color: '#34d399' },
-                                            { name: 'Hold', value: data.hold, color: '#94a3b8' },
-                                            { name: 'Sell', value: data.sell, color: '#f87171' },
-                                            { name: 'Strong Sell', value: data.strongSell, color: '#ef4444' },
-                                        ].filter(d => d.value > 0)}
-                                        layout="vertical"
-                                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                                    >
-                                        <XAxis type="number" hide />
-                                        <YAxis
-                                            dataKey="name"
-                                            type="category"
-                                            tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            width={80}
-                                        />
-                                        <RechartsTooltip
-                                            cursor={{ fill: 'transparent' }}
-                                            contentStyle={{
-                                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                                                borderRadius: '12px',
-                                                border: 'none',
-                                                color: '#fff'
-                                            }}
-                                        />
-                                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
-                                            {[
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                                <div className="h-[250px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={[
                                                 { name: 'Strong Buy', value: data.strongBuy, color: '#10b981' },
                                                 { name: 'Buy', value: data.buy, color: '#34d399' },
                                                 { name: 'Hold', value: data.hold, color: '#94a3b8' },
                                                 { name: 'Sell', value: data.sell, color: '#f87171' },
                                                 { name: 'Strong Sell', value: data.strongSell, color: '#ef4444' },
-                                            ].filter(d => d.value > 0).map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
+                                            ].filter(d => d.value > 0)}
+                                            layout="vertical"
+                                            margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                                        >
+                                            <XAxis type="number" hide />
+                                            <YAxis
+                                                dataKey="name"
+                                                type="category"
+                                                tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                width={80}
+                                            />
+                                            <RechartsTooltip
+                                                cursor={{ fill: 'transparent' }}
+                                                contentStyle={{
+                                                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    color: '#fff'
+                                                }}
+                                            />
+                                            <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                                                {[
+                                                    { name: 'Strong Buy', value: data.strongBuy, color: '#10b981' },
+                                                    { name: 'Buy', value: data.buy, color: '#34d399' },
+                                                    { name: 'Hold', value: data.hold, color: '#94a3b8' },
+                                                    { name: 'Sell', value: data.sell, color: '#f87171' },
+                                                    { name: 'Strong Sell', value: data.strongSell, color: '#ef4444' },
+                                                ].filter(d => d.value > 0).map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                {/* Price Prediction Panel */}
+                                <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform duration-700">
+                                        <TrendingUp className="w-20 h-20 text-white" />
+                                    </div>
+                                    <div className="relative z-10">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <Activity className="w-4 h-4 text-blue-400" />
+                                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Price Prediction Area</span>
+                                        </div>
+
+                                        <div className="space-y-6">
+                                            <div>
+                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Target Rata-rata (Mean)</p>
+                                                <p className="text-3xl font-black text-white tracking-tight">
+                                                    {data.targetMeanPrice ? (isIndonesianStock ? formatIDR(data.targetMeanPrice) : `$${data.targetMeanPrice.toFixed(2)}`) : "Data N/A"}
+                                                </p>
+                                                {data.targetMeanPrice && data.currentPrice && (
+                                                    <div className={cn(
+                                                        "inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg text-xs font-black",
+                                                        data.targetMeanPrice > data.currentPrice ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                                                    )}>
+                                                        {data.targetMeanPrice > data.currentPrice ? "POTENSI UPSIDE" : "POTENSI DOWNSIDE"}:
+                                                        {(((data.targetMeanPrice - data.currentPrice) / data.currentPrice) * 100).toFixed(1)}%
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                                                    <p className="text-[9px] text-gray-500 font-bold uppercase mb-1">High Target</p>
+                                                    <p className="text-sm font-black text-white">
+                                                        {data.targetHighPrice ? (isIndonesianStock ? formatIDR(data.targetHighPrice) : `$${data.targetHighPrice.toFixed(2)}`) : "-"}
+                                                    </p>
+                                                </div>
+                                                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                                                    <p className="text-[9px] text-gray-500 font-bold uppercase mb-1">Low Target</p>
+                                                    <p className="text-sm font-black text-white">
+                                                        {data.targetLowPrice ? (isIndonesianStock ? formatIDR(data.targetLowPrice) : `$${data.targetLowPrice.toFixed(2)}`) : "-"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <p className="text-[10px] text-center text-gray-500 mt-4 italic">
                                 * Berdasarkan data konsensus analis terbaru dari berbagai sekuritas/institusi finansial global.

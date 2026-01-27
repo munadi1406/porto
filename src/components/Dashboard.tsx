@@ -15,6 +15,7 @@ import { GainLossChart } from "./GainLossChart";
 import { Briefcase, DollarSign, TrendingUp, Activity, Plus } from "lucide-react";
 import { formatIDR, formatPercentage } from "@/lib/utils";
 import { DashboardSkeleton } from "./Skeleton";
+import { DecisionAdvisor } from "./DecisionAdvisor";
 
 export default function Dashboard() {
     const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
@@ -29,28 +30,30 @@ export default function Dashboard() {
         let totalInvested = 0;
         let totalMarketValue = 0;
 
+        let totalDayChange = 0;
         portfolio.forEach((item) => {
-            const livePrice = prices[item.ticker]?.price || 0; // Use 0 if price not loaded yet
-
-            // If price is 0 but we have valid stock, maybe fallback to avgPrice to not show -100% loss?
-            // No, strictly use live price. If live price is 0, it means loading or error.
-            // Ideally we should track if price is successfully fetched. 
-            // For MVP, we accept 0 means 0 value temporarily.
-
+            const livePrice = prices[item.ticker]?.price || 0;
+            const change = prices[item.ticker]?.change || 0;
             const marketPrice = livePrice > 0 ? livePrice : 0;
 
             totalInvested += item.lots * 100 * item.averagePrice;
             totalMarketValue += item.lots * 100 * marketPrice;
+            totalDayChange += item.lots * 100 * change;
         });
 
         const totalPL = totalMarketValue - totalInvested;
         const returnPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
+        const dayChangePercent = (totalMarketValue - totalDayChange) > 0
+            ? (totalDayChange / (totalMarketValue - totalDayChange)) * 100
+            : 0;
 
         return {
             totalInvested,
             totalMarketValue,
             totalPL,
             returnPercent,
+            totalDayChange,
+            dayChangePercent,
         };
     }, [portfolio, prices]);
 
@@ -152,7 +155,7 @@ export default function Dashboard() {
     return (
         <div className="space-y-6">
             {/* Header Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <SummaryCard
                     title="Total Modal"
                     value={formatIDR(summary.totalInvested)}
@@ -178,7 +181,22 @@ export default function Dashboard() {
                     icon={TrendingUp}
                     trend={summary.returnPercent >= 0 ? "up" : "down"}
                 />
+                <SummaryCard
+                    title="Day Change"
+                    value={summary.totalDayChange > 0 ? `+${formatIDR(summary.totalDayChange)}` : formatIDR(summary.totalDayChange)}
+                    subValue={(summary.dayChangePercent > 0 ? "+" : "") + formatPercentage(summary.dayChangePercent)}
+                    subLabel="Hari Ini"
+                    icon={Activity}
+                    trend={summary.totalDayChange > 0 ? "up" : summary.totalDayChange < 0 ? "down" : "neutral"}
+                />
             </div>
+
+            {/* Smart Advisor */}
+            <DecisionAdvisor
+                portfolio={portfolio}
+                cash={cash}
+                prices={prices}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Col: Chart */}

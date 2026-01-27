@@ -1,15 +1,18 @@
 "use client";
 
-import { Home, PieChart, TrendingUp, History, Wallet, Building2 } from "lucide-react";
+import { Home, PieChart, TrendingUp, History, Wallet, Building2, Layers } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+
+import { PortfolioSelector } from "./PortfolioSelector";
 
 const navigation = [
     { name: "Home", href: "/", icon: Home },
     { name: "Portfolio", href: "/portfolio", icon: PieChart },
     { name: "Analytics", href: "/analytics", icon: TrendingUp },
-    { name: "Fundamentals", href: "/fundamentals", icon: Building2 },
+    { name: "Fund", href: "/fundamentals", icon: Building2 },
+    { name: "Total View", href: "/aggregate", icon: Layers },
     { name: "History", href: "/history", icon: History },
 ];
 
@@ -18,10 +21,39 @@ export function MobileNav() {
 
     return (
         <>
+            {/* Mobile Top Header */}
+            <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg">
+                            <Wallet className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="font-bold text-[10px] dark:text-white whitespace-nowrap">Porto IDX</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-1 justify-end">
+                        <div className="w-full max-w-[140px]">
+                            <PortfolioSelector />
+                        </div>
+                        <Link
+                            href="/aggregate"
+                            className={cn(
+                                "p-2.5 rounded-xl transition-all",
+                                pathname === "/aggregate"
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                            )}
+                        >
+                            <Layers className="w-5 h-5" />
+                        </Link>
+                    </div>
+                </div>
+            </header>
+
             {/* Mobile Bottom Navigation */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 safe-area-bottom">
                 <div className="grid grid-cols-5 h-16">
-                    {navigation.map((item) => {
+                    {navigation.filter(i => i.name !== "Total View").map((item) => {
                         const isActive = pathname === item.href;
                         return (
                             <Link
@@ -56,6 +88,11 @@ export function MobileNav() {
                             <p className="text-xs text-gray-500">Investor Dashboard</p>
                         </div>
                     </div>
+                </div>
+
+                {/* Portfolio Switcher */}
+                <div className="mb-6">
+                    <PortfolioSelector />
                 </div>
 
                 <div className="flex-1 space-y-2">

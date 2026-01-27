@@ -16,6 +16,7 @@ import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatma
 import { EquityGrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/components/Skeleton";
 import { DashboardTabs } from "@/components/DashboardTabs";
 import { TrendingUp, LayoutList } from "lucide-react";
+import { DecisionAdvisor } from "@/components/DecisionAdvisor";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
@@ -134,6 +135,15 @@ export default function AnalyticsPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                         Analisis performa portfolio Anda
                     </p>
+                </div>
+
+                {/* Smart Advisor */}
+                <div className="mb-8">
+                    <DecisionAdvisor
+                        portfolio={portfolio}
+                        cash={cash}
+                        prices={prices}
+                    />
                 </div>
 
                 {/* Main Performance Tabs */}

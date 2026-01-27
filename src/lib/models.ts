@@ -2,29 +2,93 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from './db';
 
+// = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+// Portfolio Model (The Parent Model)
+// = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+interface PortfolioAttributes {
+    id: string;
+    name: string;
+    description?: string;
+    color?: string;
+    targetValue?: number;
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+
+interface PortfolioCreationAttributes extends Optional<PortfolioAttributes, 'id' | 'description' | 'color' | 'createdAt' | 'updatedAt'> { }
+
+export class Portfolio extends Model<PortfolioAttributes, PortfolioCreationAttributes> implements PortfolioAttributes {
+    declare id: string;
+    declare name: string;
+    declare description?: string;
+    declare color?: string;
+    declare targetValue?: number;
+    declare readonly createdAt: Date;
+    declare readonly updatedAt: Date;
+}
+
+Portfolio.init(
+    {
+        id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            primaryKey: true,
+        },
+        name: {
+            type: DataTypes.STRING(100),
+            allowNull: false,
+        },
+        description: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        color: {
+            type: DataTypes.STRING(20),
+            allowNull: true,
+            defaultValue: '#3b82f6', // blue-500
+        },
+        targetValue: {
+            type: DataTypes.DECIMAL(20, 2),
+            allowNull: true,
+            defaultValue: 0,
+            get() {
+                const raw = this.getDataValue('targetValue');
+                return raw ? Number(raw) : 0;
+            }
+        },
+    },
+    {
+        sequelize,
+        tableName: 'portfolios',
+        timestamps: true,
+    }
+);
+
 // ============================================
 // Portfolio Item Model
 // ============================================
 interface PortfolioItemAttributes {
     id: string;
-    userId: string;
+    portfolioId: string;
     ticker: string;
     name: string;
     lots: number;
     averagePrice: number;
+    targetPercentage?: number;
     createdAt?: Date;
     updatedAt?: Date;
 }
 
-interface PortfolioItemCreationAttributes extends Optional<PortfolioItemAttributes, 'id' | 'userId' | 'createdAt' | 'updatedAt'> { }
+interface PortfolioItemCreationAttributes extends Optional<PortfolioItemAttributes, 'id' | 'createdAt' | 'updatedAt'> { }
 
 export class PortfolioItem extends Model<PortfolioItemAttributes, PortfolioItemCreationAttributes> implements PortfolioItemAttributes {
     declare id: string;
-    declare userId: string;
+    declare portfolioId: string;
     declare ticker: string;
     declare name: string;
     declare lots: number;
     declare averagePrice: number;
+    declare targetPercentage?: number;
     declare readonly createdAt: Date;
     declare readonly updatedAt: Date;
 }
@@ -36,10 +100,13 @@ PortfolioItem.init(
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        userId: {
-            type: DataTypes.STRING(50),
+        portfolioId: {
+            type: DataTypes.UUID,
             allowNull: false,
-            defaultValue: 'default',
+            references: {
+                model: 'portfolios',
+                key: 'id'
+            }
         },
         ticker: {
             type: DataTypes.STRING(20),
@@ -62,6 +129,15 @@ PortfolioItem.init(
                 return rawValue ? Number(rawValue) : 0;
             }
         },
+        targetPercentage: {
+            type: DataTypes.DECIMAL(5, 2),
+            allowNull: true,
+            defaultValue: 0,
+            get() {
+                const rawLevel = this.getDataValue('targetPercentage');
+                return rawLevel ? Number(rawLevel) : 0;
+            }
+        },
     },
     {
         sequelize,
@@ -70,8 +146,8 @@ PortfolioItem.init(
         indexes: [
             {
                 unique: true,
-                fields: ['userId', 'ticker'],
-                name: 'portfolio_item_user_ticker_unique'
+                fields: ['portfolioId', 'ticker'],
+                name: 'portfolio_item_port_ticker_unique'
             },
         ],
     }
@@ -82,7 +158,7 @@ PortfolioItem.init(
 // ============================================
 interface TransactionAttributes {
     id: string;
-    userId: string;
+    portfolioId: string;
     type: 'buy' | 'sell';
     ticker: string;
     name: string;
@@ -95,11 +171,11 @@ interface TransactionAttributes {
     updatedAt?: Date;
 }
 
-interface TransactionCreationAttributes extends Optional<TransactionAttributes, 'id' | 'userId' | 'notes' | 'createdAt' | 'updatedAt'> { }
+interface TransactionCreationAttributes extends Optional<TransactionAttributes, 'id' | 'notes' | 'createdAt' | 'updatedAt'> { }
 
 export class Transaction extends Model<TransactionAttributes, TransactionCreationAttributes> implements TransactionAttributes {
     declare id: string;
-    declare userId: string;
+    declare portfolioId: string;
     declare type: 'buy' | 'sell';
     declare ticker: string;
     declare name: string;
@@ -119,10 +195,13 @@ Transaction.init(
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        userId: {
-            type: DataTypes.STRING(50),
+        portfolioId: {
+            type: DataTypes.UUID,
             allowNull: false,
-            defaultValue: 'default',
+            references: {
+                model: 'portfolios',
+                key: 'id'
+            }
         },
         type: {
             type: DataTypes.ENUM('buy', 'sell'),
@@ -164,8 +243,8 @@ Transaction.init(
         timestamps: true,
         indexes: [
             {
-                fields: ['userId'],
-                name: 'transaction_user_id_idx'
+                fields: ['portfolioId'],
+                name: 'transaction_portfolio_id_idx'
             },
             {
                 fields: ['ticker'],
@@ -184,20 +263,20 @@ Transaction.init(
 // ============================================
 interface SnapshotAttributes {
     id: string;
-    userId: string;
-    timestamp: number; // Changed to number (milliseconds)
-    totalValue: number; // Will be stored as BIGINT
+    portfolioId: string;
+    timestamp: number;
+    totalValue: number;
     stockValue: number;
     cashValue: number;
     createdAt?: Date;
     updatedAt?: Date;
 }
 
-interface SnapshotCreationAttributes extends Optional<SnapshotAttributes, 'id' | 'userId' | 'createdAt' | 'updatedAt'> { }
+interface SnapshotCreationAttributes extends Optional<SnapshotAttributes, 'id' | 'createdAt' | 'updatedAt'> { }
 
 export class PortfolioSnapshot extends Model<SnapshotAttributes, SnapshotCreationAttributes> implements SnapshotAttributes {
     declare id: string;
-    declare userId: string;
+    declare portfolioId: string;
     declare timestamp: number;
     declare totalValue: number;
     declare stockValue: number;
@@ -213,10 +292,13 @@ PortfolioSnapshot.init(
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        userId: {
-            type: DataTypes.STRING(50),
+        portfolioId: {
+            type: DataTypes.UUID,
             allowNull: false,
-            defaultValue: 'default',
+            references: {
+                model: 'portfolios',
+                key: 'id'
+            }
         },
         timestamp: {
             type: DataTypes.BIGINT,
@@ -260,8 +342,8 @@ PortfolioSnapshot.init(
         timestamps: true,
         indexes: [
             {
-                fields: ['userId'],
-                name: 'snapshot_user_id_idx'
+                fields: ['portfolioId'],
+                name: 'snapshot_portfolio_id_idx'
             },
             {
                 fields: ['timestamp'],
@@ -276,18 +358,18 @@ PortfolioSnapshot.init(
 // ============================================
 interface CashHoldingAttributes {
     id: number;
-    userId: string;
+    portfolioId: string;
     amount: number;
     lastUpdated: Date;
     createdAt?: Date;
     updatedAt?: Date;
 }
 
-interface CashHoldingCreationAttributes extends Optional<CashHoldingAttributes, 'id' | 'userId' | 'createdAt' | 'updatedAt'> { }
+interface CashHoldingCreationAttributes extends Optional<CashHoldingAttributes, 'id' | 'createdAt' | 'updatedAt'> { }
 
 export class CashHolding extends Model<CashHoldingAttributes, CashHoldingCreationAttributes> implements CashHoldingAttributes {
     declare id: number;
-    declare userId: string;
+    declare portfolioId: string;
     declare amount: number;
     declare lastUpdated: Date;
     declare readonly createdAt: Date;
@@ -301,10 +383,13 @@ CashHolding.init(
             autoIncrement: true,
             primaryKey: true,
         },
-        userId: {
-            type: DataTypes.STRING(50),
+        portfolioId: {
+            type: DataTypes.UUID,
             allowNull: false,
-            defaultValue: 'default',
+            references: {
+                model: 'portfolios',
+                key: 'id'
+            }
         },
         amount: {
             type: DataTypes.DECIMAL(15, 2),
@@ -324,8 +409,8 @@ CashHolding.init(
         indexes: [
             {
                 unique: true,
-                fields: ['userId'],
-                name: 'cash_holding_user_id_unique'
+                fields: ['portfolioId'],
+                name: 'cash_holding_portfolio_id_unique'
             }
         ]
     }
@@ -343,18 +428,6 @@ export async function syncDatabase() {
         try {
             await sequelize.sync({ alter: true });
             console.log('✅ All models synchronized successfully.');
-
-            // Ensure there's at least one cash holding record for default user
-            const cashCount = await CashHolding.count({ where: { userId: 'default' } });
-            if (cashCount === 0) {
-                await CashHolding.create({
-                    userId: 'default',
-                    amount: 0,
-                    lastUpdated: new Date(),
-                });
-                console.log('✅ Initial cash holding created for default user.');
-            }
-
             return true;
         } catch (error) {
             console.error('❌ Error syncing database:', error);

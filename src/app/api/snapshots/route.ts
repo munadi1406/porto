@@ -4,8 +4,6 @@ import { PortfolioSnapshot, syncDatabase } from '@/lib/models';
 import sequelize from '@/lib/db';
 import { Op } from 'sequelize';
 
-const USER_ID = 'default';
-
 let dbInitialized = false;
 async function ensureDbInitialized() {
     if (!dbInitialized) {
@@ -20,7 +18,15 @@ export async function GET(request: NextRequest) {
         await ensureDbInitialized();
 
         const { searchParams } = new URL(request.url);
+        const portfolioId = searchParams.get('portfolioId');
         const period = searchParams.get('period') || 'all';
+
+        if (!portfolioId) {
+            return NextResponse.json(
+                { success: false, error: 'portfolioId is required' },
+                { status: 400 }
+            );
+        }
 
         const now = new Date();
         let startTime: Date;
@@ -50,18 +56,18 @@ export async function GET(request: NextRequest) {
         const [snapshots]: any = await sequelize.query(`
             SELECT 
                 id,
-                userId,
+                portfolioId,
                 CAST(timestamp AS CHAR) as timestamp,
                 CAST(totalValue AS CHAR) as totalValue,
                 CAST(stockValue AS CHAR) as stockValue,
                 CAST(cashValue AS CHAR) as cashValue
             FROM portfolio_snapshots
-            WHERE userId = :userId
+            WHERE portfolioId = :portfolioId
                 AND timestamp >= :startTime
                 AND totalValue > 0
             ORDER BY timestamp ASC
         `, {
-            replacements: { userId: USER_ID, startTime },
+            replacements: { portfolioId, startTime },
         });
 
         // Calculate growth
@@ -105,9 +111,9 @@ export async function POST(request: NextRequest) {
         await ensureDbInitialized();
 
         const body = await request.json();
-        const { stockValue, cashValue } = body;
+        const { portfolioId, stockValue, cashValue } = body;
 
-        if (stockValue === undefined || cashValue === undefined) {
+        if (!portfolioId || stockValue === undefined || cashValue === undefined) {
             return NextResponse.json(
                 { success: false, error: 'Missing required fields' },
                 { status: 400 }
@@ -132,7 +138,7 @@ export async function POST(request: NextRequest) {
         const fiveSecondsAgo = Date.now() - 5000;
         const recentSnapshot = await PortfolioSnapshot.findOne({
             where: {
-                userId: USER_ID,
+                portfolioId,
                 timestamp: {
                     [Op.gte]: fiveSecondsAgo,
                 },
@@ -155,7 +161,7 @@ export async function POST(request: NextRequest) {
         }
 
         const snapshot = await PortfolioSnapshot.create({
-            userId: USER_ID,
+            portfolioId,
             timestamp: Date.now(),
             totalValue,
             stockValue: stockVal,
@@ -163,10 +169,10 @@ export async function POST(request: NextRequest) {
         });
 
         // Clean up old snapshots (keep last 365 days)
-        const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+        const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
         await PortfolioSnapshot.destroy({
             where: {
-                userId: USER_ID,
+                portfolioId,
                 timestamp: {
                     [Op.lt]: oneYearAgo,
                 },
@@ -192,13 +198,22 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// DELETE: Clear all snapshots for current user
-export async function DELETE() {
+// DELETE: Clear all snapshots for a specific portfolio
+export async function DELETE(request: NextRequest) {
     try {
         await ensureDbInitialized();
+        const { searchParams } = new URL(request.url);
+        const portfolioId = searchParams.get('portfolioId');
+
+        if (!portfolioId) {
+            return NextResponse.json(
+                { success: false, error: 'portfolioId is required' },
+                { status: 400 }
+            );
+        }
 
         await PortfolioSnapshot.destroy({
-            where: { userId: USER_ID },
+            where: { portfolioId },
         });
 
         return NextResponse.json({

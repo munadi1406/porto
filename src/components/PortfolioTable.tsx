@@ -3,11 +3,12 @@
 import { useMemo, useState, useRef } from "react";
 import { PortfolioItem, StockPrice } from "@/lib/types";
 import { formatIDR, formatNumber, formatPercentage, cn } from "@/lib/utils";
-import { Trash2, Edit2, TrendingUp, TrendingDown, Minus, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, ShieldOff, Target } from "lucide-react";
+import { Trash2, Edit2, TrendingUp, TrendingDown, Minus, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, ShieldOff, Target, Calculator } from "lucide-react";
 import { StockForm } from "./StockForm";
 import { TransactionForm } from "./TransactionForm";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { exportToPDF, exportToImage } from "@/lib/exportPDF";
+import { AvgDownModal } from "./AvgDownModal";
 
 interface PortfolioTableProps {
     portfolio: PortfolioItem[];
@@ -23,6 +24,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; ticker: string; name: string } | null>(null);
     const [exportTarget, setExportTarget] = useState<PortfolioItem | null>(null);
     const [projectionTarget, setProjectionTarget] = useState<PortfolioItem | null>(null);
+    const [avgDownTarget, setAvgDownTarget] = useState<PortfolioItem | null>(null);
     const [isSummarySelected, setIsSummarySelected] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -435,10 +437,11 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                         <tr>
                             <th className="px-4 md:px-6 py-4 text-left text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Saham</th>
                             <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Lot</th>
-                            <th className="hidden lg:table-cell px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Avg Price</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Avg Price</th>
                             <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Current</th>
-                            <th className="hidden sm:table-cell px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Value</th>
-                            <th className="hidden md:table-cell px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Unrealized P/L</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Day Chg</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Value</th>
+                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Unrealized P/L</th>
                             <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Return</th>
                             <th className="px-4 md:px-6 py-4 text-center text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Aksi</th>
                         </tr>
@@ -454,6 +457,11 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             const isProfit = gainLoss > 0;
                             const isLoss = gainLoss < 0;
 
+                            const dailyChangeValue = (quote?.change || 0) * (item.lots * 100);
+                            const dailyChangePercent = quote?.changePercent || 0;
+                            const isDayProfit = dailyChangeValue > 0;
+                            const isDayLoss = dailyChangeValue < 0;
+
                             return (
                                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors group">
                                     <td className="px-4 md:px-6 py-4">
@@ -463,16 +471,44 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                     <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300 text-sm">
                                         {formatNumber(item.lots)}
                                     </td>
-                                    <td className="hidden lg:table-cell px-4 md:px-6 py-4 text-right text-gray-500 dark:text-gray-400 text-xs font-medium">
+                                    <td className="px-4 md:px-6 py-4 text-right text-gray-500 dark:text-gray-400 text-xs font-medium">
                                         {formatIDR(item.averagePrice)}
                                     </td>
-                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-900 dark:text-white text-sm">
-                                        {currentPrice > 0 ? formatIDR(currentPrice) : '...'}
+                                    <td className="px-4 md:px-6 py-4 text-right">
+                                        <div className="font-bold text-gray-900 dark:text-white text-sm">
+                                            {currentPrice > 0 ? formatIDR(currentPrice) : '...'}
+                                        </div>
+                                        <div className={cn(
+                                            "sm:hidden text-[10px] font-bold mt-0.5",
+                                            isDayProfit && "text-emerald-500",
+                                            isDayLoss && "text-rose-500",
+                                            !isDayProfit && !isDayLoss && "text-gray-500"
+                                        )}>
+                                            {dailyChangePercent > 0 ? "+" : ""}{formatPercentage(dailyChangePercent)}
+                                        </div>
                                     </td>
-                                    <td className="hidden sm:table-cell px-4 md:px-6 py-4 text-right font-bold text-gray-900 dark:text-white text-sm">
+                                    <td className="px-4 md:px-6 py-4 text-right">
+                                        <div className={cn(
+                                            "font-bold text-sm leading-none mb-1",
+                                            isDayProfit && "text-emerald-500",
+                                            isDayLoss && "text-rose-500",
+                                            !isDayProfit && !isDayLoss && "text-gray-500"
+                                        )}>
+                                            {dailyChangeValue > 0 ? "+" : ""}{formatIDR(dailyChangeValue)}
+                                        </div>
+                                        <div className={cn(
+                                            "text-[10px] font-bold",
+                                            isDayProfit && "text-emerald-500/80",
+                                            isDayLoss && "text-rose-500/80",
+                                            !isDayProfit && !isDayLoss && "text-gray-500/80"
+                                        )}>
+                                            {dailyChangePercent > 0 ? "+" : ""}{formatPercentage(dailyChangePercent)}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-900 dark:text-white text-sm">
                                         {formatIDR(marketValue)}
                                     </td>
-                                    <td className="hidden md:table-cell px-4 md:px-6 py-4 text-right">
+                                    <td className="px-4 md:px-6 py-4 text-right">
                                         <div className={cn(
                                             "font-bold text-sm",
                                             isProfit && "text-emerald-500",
@@ -494,6 +530,18 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                     <td className="px-4 md:px-6 py-4">
                                         <div className="flex items-center justify-center gap-1">
                                             <button onClick={() => setProjectionTarget(item)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all" title="Proyeksi Harga"><Target className="w-4 h-4" /></button>
+                                            <button
+                                                onClick={() => setAvgDownTarget(item)}
+                                                className={cn(
+                                                    "p-2 rounded-lg transition-all",
+                                                    isLoss
+                                                        ? "text-orange-500 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20"
+                                                        : "text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10"
+                                                )}
+                                                title="Average Down Strategy"
+                                            >
+                                                <Calculator className="w-4 h-4" />
+                                            </button>
                                             <button onClick={() => setExportTarget(item)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Export PDF/Image"><Download className="w-4 h-4" /></button>
                                             <button onClick={() => setTransactionId(item.id)} className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all" title="Beli/Jual"><ArrowRightLeft className="w-4 h-4" /></button>
                                             <button onClick={() => setEditingId(item.id)} className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-all" title="Edit"><Edit2 className="w-4 h-4" /></button>
@@ -504,7 +552,78 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             );
                         })}
                     </tbody>
+                    <tfoot className="bg-gray-50/50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-800">
+                        {(() => {
+                            const totals = sortedPortfolio.reduce((acc, item) => {
+                                const quote = marketData[item.ticker];
+                                const currentPrice = quote?.price || 0;
+                                const change = quote?.change || 0;
+                                const marketValue = item.lots * 100 * currentPrice;
+                                const initialValue = item.lots * 100 * item.averagePrice;
+                                const gainLoss = marketValue - initialValue;
+
+                                acc.marketValue += marketValue;
+                                acc.dayChange += (item.lots * 100 * change);
+                                acc.unrealizedPL += gainLoss;
+                                return acc;
+                            }, { marketValue: 0, dayChange: 0, unrealizedPL: 0 });
+
+                            const dayChangePercent = (totals.marketValue - totals.dayChange) > 0
+                                ? (totals.dayChange / (totals.marketValue - totals.dayChange)) * 100
+                                : 0;
+
+                            const isDayProfit = totals.dayChange > 0;
+                            const isDayLoss = totals.dayChange < 0;
+
+                            return (
+                                <tr>
+                                    <td className="px-4 md:px-6 py-4 font-black text-[10px] md:text-xs text-gray-400 uppercase tracking-widest">
+                                        Total Portofolio
+                                    </td>
+                                    <td colSpan={3}></td>
+                                    <td className="px-4 md:px-6 py-4 text-right">
+                                        <div className={cn(
+                                            "font-bold text-sm leading-none mb-1",
+                                            isDayProfit && "text-emerald-500",
+                                            isDayLoss && "text-rose-500",
+                                            !isDayProfit && !isDayLoss && "text-gray-500"
+                                        )}>
+                                            {totals.dayChange > 0 ? "+" : ""}{formatIDR(totals.dayChange)}
+                                        </div>
+                                        <div className={cn(
+                                            "text-[10px] font-bold",
+                                            isDayProfit && "text-emerald-500/80",
+                                            isDayLoss && "text-rose-500/80",
+                                            !isDayProfit && !isDayLoss && "text-gray-500/80"
+                                        )}>
+                                            {dayChangePercent > 0 ? "+" : ""}{formatPercentage(dayChangePercent)}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 md:px-6 py-4 text-right font-black text-gray-900 dark:text-white text-sm">
+                                        {formatIDR(totals.marketValue)}
+                                    </td>
+                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-sm">
+                                        <span className={cn(
+                                            totals.unrealizedPL > 0 ? "text-emerald-500" : totals.unrealizedPL < 0 ? "text-rose-500" : "text-gray-500"
+                                        )}>
+                                            {totals.unrealizedPL > 0 ? "+" : ""}{formatIDR(totals.unrealizedPL)}
+                                        </span>
+                                    </td>
+                                    <td colSpan={2}></td>
+                                </tr>
+                            );
+                        })()}
+                    </tfoot>
                 </table>
+
+                {/* Modal Average Down Strategy */}
+                {avgDownTarget && (
+                    <AvgDownModal
+                        item={avgDownTarget}
+                        currentPrice={marketData[avgDownTarget.ticker]?.price || 0}
+                        onClose={() => setAvgDownTarget(null)}
+                    />
+                )}
 
                 {/* Modal Proyeksi Harga */}
                 {projectionTarget && (

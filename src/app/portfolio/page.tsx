@@ -10,10 +10,14 @@ import { Plus } from "lucide-react";
 import { PortfolioTableSkeleton } from "@/components/Skeleton";
 import { ExportPDFButton } from "@/components/ExportPDFButton";
 import { exportToPDF } from "@/lib/exportPDF";
+import { DecisionAdvisor } from "@/components/DecisionAdvisor";
+import { DashboardTabs } from "@/components/DashboardTabs";
+import { TargetPortfolio } from "@/components/TargetPortfolio";
+import { Target, Layers } from "lucide-react";
 
 export default function PortfolioPage() {
-    const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
-    const { recordTransaction } = useCashAndHistory();
+    const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded, selectedPortfolioId } = usePortfolio();
+    const { cash, recordTransaction } = useCashAndHistory();
     const portfolioRef = useRef<HTMLDivElement>(null);
 
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
@@ -34,6 +38,7 @@ export default function PortfolioPage() {
         setIsAddModalOpen(false); // Close modal after success
 
         recordTransaction({
+            portfolioId: selectedPortfolioId || '',
             type: 'buy',
             ticker: data.ticker,
             name: data.name,
@@ -51,6 +56,7 @@ export default function PortfolioPage() {
         executeTransaction(id, type, lots, price);
 
         recordTransaction({
+            portfolioId: selectedPortfolioId || '',
             type,
             ticker: item.ticker,
             name: item.name,
@@ -91,6 +97,15 @@ export default function PortfolioPage() {
                     </p>
                 </div>
 
+                {/* Smart Advisor */}
+                <div className="mb-8">
+                    <DecisionAdvisor
+                        portfolio={portfolio}
+                        cash={cash}
+                        prices={prices}
+                    />
+                </div>
+
                 {/* Quick Add Action Button */}
                 <div className="mb-8">
                     <button
@@ -123,17 +138,32 @@ export default function PortfolioPage() {
                     </div>
                 )}
 
-                {/* Portfolio Table */}
-                <div ref={portfolioRef}>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Holdings</h2>
-                    <PortfolioTable
-                        portfolio={portfolio}
-                        marketData={prices}
-                        onRemove={removeStock}
-                        onUpdate={updateStock}
-                        onTransaction={handleExecuteTransaction}
-                    />
-                </div>
+                {/* Content Tabs */}
+                <DashboardTabs
+                    tabs={[
+                        { id: "holdings", label: "Holdings", icon: <Layers className="w-4 h-4" /> },
+                        { id: "target", label: "Target Portfolio", icon: <Target className="w-4 h-4" /> }
+                    ]}
+                >
+                    {(activeTab) => (
+                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            {activeTab === "holdings" ? (
+                                <div ref={portfolioRef}>
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Holdings</h2>
+                                    <PortfolioTable
+                                        portfolio={portfolio}
+                                        marketData={prices}
+                                        onRemove={removeStock}
+                                        onUpdate={updateStock}
+                                        onTransaction={handleExecuteTransaction}
+                                    />
+                                </div>
+                            ) : (
+                                <TargetPortfolio portfolio={portfolio} prices={prices} cash={cash} />
+                            )}
+                        </div>
+                    )}
+                </DashboardTabs>
             </div>
         </div>
     );
