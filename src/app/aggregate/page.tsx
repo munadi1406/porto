@@ -29,11 +29,11 @@ export default function AggregatePage() {
     const { portfolios, totals, consolidatedItems } = data;
 
     // Prepare chart data
-    const chartData = portfolios.map(p => ({
+    const chartData = portfolios.map((p: any) => ({
         name: p.name,
         value: p.totalValue,
         color: p.color
-    })).filter(d => d.value > 0);
+    })).filter((d: any) => d.value > 0);
 
     return (
         <div className="p-6 space-y-8 max-w-7xl mx-auto">
@@ -87,7 +87,7 @@ export default function AggregatePage() {
                 />
                 <SummaryCard
                     title="Market Share"
-                    value={portfolios.sort((a, b) => b.marketValue - a.marketValue)[0]?.name || "-"}
+                    value={portfolios.sort((a: any, b: any) => b.marketValue - a.marketValue)[0]?.name || "-"}
                     subValue="Leading Portfolio"
                     icon={PieChart}
                     trend="up"
@@ -121,7 +121,7 @@ export default function AggregatePage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                                {portfolios.map((p) => (
+                                                {portfolios.map((p: any) => (
                                                     <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
@@ -172,20 +172,20 @@ export default function AggregatePage() {
                                                     paddingAngle={5}
                                                     dataKey="value"
                                                 >
-                                                    {chartData.map((entry, index) => (
+                                                    {chartData.map((entry: any, index: number) => (
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
                                                 </Pie>
                                                 <RechartsTooltip
                                                     contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: number) => formatIDR(value)}
+                                                    formatter={(value: any) => formatIDR(Number(value || 0))}
                                                 />
                                                 <Legend verticalAlign="bottom" height={36} />
                                             </RechartsPieChart>
                                         </ResponsiveContainer>
                                     </div>
                                     <div className="mt-4 space-y-3">
-                                        {chartData.map((d, i) => (
+                                        {chartData.map((d: any, i: number) => (
                                             <div key={i} className="flex items-center justify-between text-sm">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
@@ -217,13 +217,13 @@ export default function AggregatePage() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                            {consolidatedItems.map((item) => (
+                                            {consolidatedItems.map((item: any) => (
                                                 <tr key={item.ticker} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="text-sm font-black text-indigo-600 uppercase mb-0.5">{item.ticker}</div>
                                                         <div className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{item.name}</div>
                                                         <div className="flex flex-wrap gap-1 mt-2">
-                                                            {item.portfolios.map(pName => (
+                                                            {item.portfolios.map((pName: string) => (
                                                                 <span key={pName} className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[8px] font-bold text-gray-500 uppercase tracking-tighter">
                                                                     {pName}
                                                                 </span>
