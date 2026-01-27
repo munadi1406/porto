@@ -13,14 +13,14 @@ async function fixSnapshotsTableSchema() {
         await sequelize.query(`
             CREATE TABLE portfolio_snapshots (
                 id CHAR(36) PRIMARY KEY,
-                userId VARCHAR(50) NOT NULL DEFAULT 'default',
+                portfolioId CHAR(36) NOT NULL,
                 timestamp BIGINT NOT NULL,
                 totalValue BIGINT NOT NULL DEFAULT 0,
                 stockValue BIGINT NOT NULL DEFAULT 0,
                 cashValue BIGINT NOT NULL DEFAULT 0,
                 createdAt DATETIME NOT NULL,
                 updatedAt DATETIME NOT NULL,
-                INDEX idx_userId (userId),
+                INDEX idx_portfolioId (portfolioId),
                 INDEX idx_timestamp (timestamp)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);

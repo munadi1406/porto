@@ -27,19 +27,8 @@ async function runMigration() {
         });
         console.log('');
 
-        // Create initial cash record if not exists
         console.log('3️⃣ Initializing default data...');
-        const cashCount = await CashHolding.count();
-        if (cashCount === 0) {
-            await CashHolding.create({
-                userId: 'default',
-                amount: 0,
-                lastUpdated: new Date(),
-            });
-            console.log('✅ Initial cash record created\n');
-        } else {
-            console.log('ℹ️  Cash records already exist\n');
-        }
+        console.log('ℹ️ Skipping default data initialization (portfolios managed manually)\n');
 
         console.log('🎉 Migration completed successfully!');
         console.log('\n📊 Database is ready to use!');
