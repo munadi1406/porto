@@ -18,11 +18,11 @@ import { DashboardSkeleton } from "./Skeleton";
 import { DecisionAdvisor } from "./DecisionAdvisor";
 
 export default function Dashboard() {
-    const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
+    const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded, selectedPortfolioId } = usePortfolio();
     const { cash, updateCash, recordSnapshot, recordTransaction, getGrowth, getHistoryForPeriod, clearHistory, transactions, isLoaded: cashLoaded } = useCashAndHistory();
 
     // Extract tickers for market data fetching
-    const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
+    const tickers = useMemo(() => portfolio.map((p: any) => p.ticker), [portfolio]);
     const { prices, loading: pricesLoading, lastUpdated } = useMarketData(tickers);
 
     // Calculate Summary Metrics
@@ -102,7 +102,7 @@ export default function Dashboard() {
                 gainLoss: gainLoss,
                 percentage: percentage,
             };
-        }).filter(d => d.gainLoss !== 0); // Only show stocks with gain/loss
+        }).filter((d: any) => d.gainLoss !== 0); // Only show stocks with gain/loss
     }, [portfolio, prices]);
 
     // Wrapper to add stock and record transaction
@@ -112,6 +112,7 @@ export default function Dashboard() {
 
             // Record transaction (updates cash)
             await recordTransaction({
+                portfolioId: selectedPortfolioId || '',
                 type: 'buy',
                 ticker: data.ticker,
                 name: data.name,
@@ -135,6 +136,7 @@ export default function Dashboard() {
 
             // Record transaction (updates cash)
             await recordTransaction({
+                portfolioId: selectedPortfolioId || '',
                 type,
                 ticker: item.ticker,
                 name: item.name,

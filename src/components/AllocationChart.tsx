@@ -44,12 +44,12 @@ export function AllocationChart({ data }: AllocationChartProps) {
                             cx="50%"
                             cy="50%"
                             innerRadius={50}
-                            outerRadius={window.innerWidth < 768 ? 80 : 100}
+                            outerRadius={typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 100}
                             paddingAngle={4}
                             dataKey="value"
                             stroke="none"
                         >
-                            {data.map((entry, index) => (
+                            {data.map((entry: any, index: number) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>

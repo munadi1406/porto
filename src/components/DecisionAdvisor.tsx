@@ -144,7 +144,7 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
 
                     {advice.tips.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
-                            {advice.tips.map((tip, i) => (
+                            {advice.tips.map((tip: string, i: number) => (
                                 <div key={i} className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
                                     <ArrowRight className="w-3 h-3 text-indigo-500" />
                                     {tip}

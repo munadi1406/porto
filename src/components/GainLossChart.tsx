@@ -157,7 +157,7 @@ export function GainLossChart({ data }: GainLossChartProps) {
                             paddingAngle={2}
                             dataKey="displayValue"
                         >
-                            {chartData.map((entry, index) => {
+                            {chartData.map((entry: any, index: number) => {
                                 const isProfit = entry.gainLoss > 0;
                                 const colorArray = isProfit ? COLORS.profit : COLORS.loss;
                                 const colorIndex = index % colorArray.length;
@@ -175,7 +175,7 @@ export function GainLossChart({ data }: GainLossChartProps) {
                         <Legend
                             verticalAlign="bottom"
                             height={36}
-                            formatter={(value, entry: any) => {
+                            formatter={(value: any, entry: any) => {
                                 const data = entry.payload;
                                 return (
                                     <span className={cn(
