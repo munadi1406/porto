@@ -51,3 +51,12 @@ body {
   scrollbar-width: none;
   /* Firefox */
 }
+
+/* Safe area utilities for mobile */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
