@@ -86,7 +86,9 @@ export function useCashAndHistory() {
         queryKey: ['snapshots', 'all', selectedPortfolioId],
         queryFn: () => fetchSnapshots(selectedPortfolioId, 'all'),
         enabled: !!selectedPortfolioId,
-        refetchInterval: 60000,
+        refetchInterval: 5000, // Refresh every 5 seconds for ultra real-time updates
+        refetchOnWindowFocus: false, // Don't refetch on window focus
+        staleTime: 3000, // Consider data fresh for 3 seconds
     });
 
     const history: PortfolioSnapshot[] = snapshotsData?.snapshots || [];

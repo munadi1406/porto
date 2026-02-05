@@ -40,7 +40,7 @@ export default function HomePage() {
   })).filter((d: any) => d.value > 0);
 
   return (
-    <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-8 space-y-6 sm:space-y-10 max-w-7xl mx-auto">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-3 border border-blue-100 dark:border-blue-800">
@@ -74,7 +74,7 @@ export default function HomePage() {
       </header>
 
       {/* Global Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-6">
         <SummaryCard
           title="Modal Total"
           value={formatIDR(totals.invested)}
@@ -295,8 +295,10 @@ export default function HomePage() {
                       {consolidatedItems.map((item: any) => (
                         <tr key={item.ticker} className="group hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-all duration-300">
                           <td className="px-8 py-6">
-                            <div className="text-sm font-black text-indigo-600 dark:text-[#3498db] uppercase tracking-tight mb-1">{item.ticker}</div>
-                            <div className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{item.name}</div>
+                            <Link href={`/analysis/${item.ticker}`} className="block group/ticker">
+                              <div className="text-sm font-black text-indigo-600 dark:text-[#3498db] uppercase tracking-tight mb-1 group-hover/ticker:underline">{item.ticker}</div>
+                              <div className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{item.name}</div>
+                            </Link>
                             <div className="flex flex-wrap gap-1.5 mt-3">
                               {item.portfolios.map((pName: string) => (
                                 <span key={pName} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-md text-[9px] font-black text-gray-400 uppercase tracking-tighter border border-transparent group-hover:border-gray-200 dark:group-hover:border-[#2d3139] transition-colors">

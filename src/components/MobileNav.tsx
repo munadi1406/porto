@@ -20,6 +20,7 @@ const secondaryNav = [
         title: "Analysis & Reports",
         items: [
             { name: "Analytics", href: "/analytics", icon: TrendingUp, desc: "Performance & growth metrics" },
+            { name: "Stock Chart", href: "/analysis/BBCA.JK", icon: Activity, desc: "Technical chart & patterns" },
             { name: "Fundamentals", href: "/fundamentals", icon: Building2, desc: "Stock data & valuation" },
         ]
     },

@@ -147,7 +147,7 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
     return (
         <div ref={tableRef} className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl shadow-2xl border border-gray-800/50 overflow-hidden">
             {/* Header */}
-            <div className="p-6 border-b border-gray-800">
+            <div className="p-4 sm:p-6 border-b border-gray-800">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold text-white">Total Equity Return</h3>
@@ -222,13 +222,13 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                     <table className="w-full">
                         <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                     {viewMode === "hourly" ? "Time" : "Date"}
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                     Equity
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                     P&L
                                 </th>
                             </tr>
@@ -243,13 +243,13 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                                         key={index}
                                         className="hover:bg-gray-800/30 transition-colors"
                                     >
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                                             {item.date}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-white">
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-white">
                                             {formatIDR(item.equity).replace('Rp', '').trim()}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-semibold">
                                             {item.pl !== 0 ? (
                                                 <span className={cn(
                                                     isPositive && "text-emerald-400",

@@ -30,7 +30,11 @@ export function useAggregatePortfolio() {
     const { prices, loading: pricesLoading } = useMarketData(allTickers);
 
     const processedData = useMemo(() => {
-        if (!aggregate || pricesLoading) return null;
+        // Only return null if we have NO aggregate data at all
+        if (!aggregate) return null;
+
+        // We don't block on pricesLoading anymore. 
+        // If prices are not yet available for a ticker, it will fallback to item.averagePrice (line 40)
 
         const detailedSummaries = aggregate.summaries.map((s: any) => {
             let marketValue = 0;
@@ -133,8 +137,9 @@ export function useAggregatePortfolio() {
         };
     }, [aggregate, prices, pricesLoading]);
 
+
     return {
         data: processedData,
-        loading: aggregateLoading || pricesLoading,
+        loading: aggregateLoading && !aggregate, // Only show loading if we have absolutely NO aggregate data
     };
 }

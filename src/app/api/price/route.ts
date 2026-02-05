@@ -8,7 +8,7 @@ interface CacheItem {
     timestamp: number;
 }
 
-const CACHE_TTL = 60 * 1000; // 60 seconds (1 minute) to reduce API load and timeouts
+const CACHE_TTL = 5 * 1000; // 5 seconds - matches ultra-fast refresh interval
 const cache: Record<string, CacheItem> = {};
 
 // Initialize Yahoo Finance instance for v3.x
