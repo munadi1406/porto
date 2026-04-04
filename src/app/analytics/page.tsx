@@ -13,6 +13,7 @@ import { CostBasisAnalysis } from "@/components/CostBasisAnalysis";
 import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
 import { EquityReturnTable } from "@/components/EquityReturnTable";
 import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
+import { DailyPerformanceCalendar } from "@/components/DailyPerformanceCalendar";
 import { EquityGrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/components/Skeleton";
 import { DashboardTabs } from "@/components/DashboardTabs";
 import { TrendingUp, LayoutList } from "lucide-react";
@@ -168,7 +169,10 @@ export default function AnalyticsPage() {
                                 {activeTab === "table" && (
                                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
-                                        <MonthlyPerformanceHeatmap history={history} />
+                                        <div className="grid grid-cols-1 gap-6">
+                                            <DailyPerformanceCalendar history={history} />
+                                            <MonthlyPerformanceHeatmap history={history} />
+                                        </div>
                                     </div>
                                 )}
                             </div>

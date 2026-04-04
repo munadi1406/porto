@@ -111,8 +111,12 @@ export function useAggregatePortfolio() {
             const profitLoss = marketValue - item.totalInvested;
             const returnPercent = item.totalInvested > 0 ? (profitLoss / item.totalInvested) * 100 : 0;
 
+            // Use real company name from Yahoo Finance if available
+            const realName = prices[item.ticker]?.name || item.name;
+
             return {
                 ...item,
+                name: realName, // Override with Yahoo Finance name
                 avgPrice: item.totalInvested / (item.totalLots * 100),
                 currentPrice: price,
                 marketValue,

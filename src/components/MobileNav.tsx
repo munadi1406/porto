@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, PieChart, TrendingUp, History, Wallet, Building2, Layers, Menu, X, ChevronRight, Activity } from "lucide-react";
+import { Home, PieChart, TrendingUp, History, Wallet, Building2, Layers, Menu, X, ChevronRight, Activity, Bot } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,13 @@ const secondaryNav = [
             { name: "Analytics", href: "/analytics", icon: TrendingUp, desc: "Performance & growth metrics" },
             { name: "Stock Chart", href: "/analysis/BBCA.JK", icon: Activity, desc: "Technical chart & patterns" },
             { name: "Fundamentals", href: "/fundamentals", icon: Building2, desc: "Stock data & valuation" },
+        ]
+    },
+    {
+        title: "Trading Tools",
+        items: [
+            { name: "Crypto Bot", href: "/crypto-bot", icon: Bot, desc: "Auto trading simulator" },
+            { name: "Stock Bot", href: "/stock-bot", icon: Bot, desc: "IDX auto trading bot" },
         ]
     },
     {

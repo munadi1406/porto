@@ -27,6 +27,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 @keyframes progress-bar-stripes {
   from {
     background-position: 24px 0;
