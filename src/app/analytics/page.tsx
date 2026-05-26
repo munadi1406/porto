@@ -21,16 +21,7 @@ import { DecisionAdvisor } from "@/components/DecisionAdvisor";
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
-    const {
-        cash,
-        recordSnapshot,
-        getGrowth,
-        getHistoryForPeriod,
-        clearHistory,
-        transactions,
-        history,
-        isLoaded: cashLoaded
-    } = useCashAndHistory();
+    const { cash, recordSnapshot, getHistoryForPeriod, transactions, history, isLoaded: cashLoaded } = useCashAndHistory();
 
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const { prices, loading: pricesLoading } = useMarketData(tickers);
@@ -44,17 +35,12 @@ export default function AnalyticsPage() {
         return { totalMarketValue };
     }, [portfolio, prices]);
 
-
-    // Record snapshot on value changes (with debounce to prevent spam)
     useEffect(() => {
         if (!isLoaded || !cashLoaded || pricesLoading) return;
         if (summary.totalMarketValue === 0) return;
-
-        // Debounce to prevent too many calls
         const timeoutId = setTimeout(() => {
             recordSnapshot(summary.totalMarketValue, cash);
-        }, 2000); // 2 second debounce
-
+        }, 2000);
         return () => clearTimeout(timeoutId);
     }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading]);
 
@@ -62,20 +48,13 @@ export default function AnalyticsPage() {
         const totalValue = portfolio.reduce((sum, item) => {
             return sum + (item.lots * 100 * (prices[item.ticker]?.price || item.averagePrice));
         }, 0);
-
         return portfolio.map((item) => {
             const livePrice = prices[item.ticker]?.price || item.averagePrice;
             const value = item.lots * 100 * livePrice;
             const costBasis = item.lots * 100 * item.averagePrice;
             const gainLoss = value - costBasis;
             const percentage = totalValue > 0 ? (value / totalValue) * 100 : 0;
-
-            return {
-                name: item.ticker,
-                value,
-                percentage,
-                gainLoss,
-            };
+            return { name: item.ticker, value, percentage, gainLoss };
         }).filter(d => d.value > 0);
     }, [portfolio, prices]);
 
@@ -83,44 +62,34 @@ export default function AnalyticsPage() {
         const totalGainLoss = portfolio.reduce((sum, item) => {
             const livePrice = prices[item.ticker]?.price || 0;
             if (livePrice === 0) return sum;
-
             const marketValue = item.lots * 100 * livePrice;
             const initialValue = item.lots * 100 * item.averagePrice;
             return sum + Math.abs(marketValue - initialValue);
         }, 0);
-
         return portfolio.map((item) => {
             const livePrice = prices[item.ticker]?.price || 0;
             const marketValue = item.lots * 100 * livePrice;
             const initialValue = item.lots * 100 * item.averagePrice;
             const gainLoss = marketValue - initialValue;
             const percentage = totalGainLoss > 0 ? (Math.abs(gainLoss) / totalGainLoss) * 100 : 0;
-
-            return {
-                name: item.ticker,
-                value: Math.abs(gainLoss),
-                gainLoss: gainLoss,
-                percentage: percentage,
-            };
+            return { name: item.ticker, value: Math.abs(gainLoss), gainLoss, percentage };
         }).filter(d => d.gainLoss !== 0);
     }, [portfolio, prices]);
 
     if (!isLoaded) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                    <div className="mb-6 space-y-2">
-                        <div className="h-8 w-32 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
-                        <div className="h-4 w-64 bg-gray-200 dark:bg-gray-800 rounded animate-pulse"></div>
-                    </div>
-                    <div className="space-y-6">
-                        <EquityGrowthChartSkeleton />
-                        <ChartSkeleton />
-                        <ChartSkeleton />
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <CardSkeleton />
-                            <CardSkeleton />
-                        </div>
+            <div>
+                <div className="mb-4 space-y-2">
+                    <div className="h-6 w-32 bg-[var(--border)] animate-pulse rounded" />
+                    <div className="h-4 w-48 bg-[var(--border)] animate-pulse rounded" />
+                </div>
+                <div className="space-y-4">
+                    <EquityGrowthChartSkeleton />
+                    <ChartSkeleton />
+                    <ChartSkeleton />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <CardSkeleton />
+                        <CardSkeleton />
                     </div>
                 </div>
             </div>
@@ -128,80 +97,52 @@ export default function AnalyticsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics</h1>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Analisis performa portfolio Anda
-                    </p>
-                </div>
-
-                {/* Smart Advisor */}
-                <div className="mb-8">
-                    <DecisionAdvisor
-                        portfolio={portfolio}
-                        cash={cash}
-                        prices={prices}
-                    />
-                </div>
-
-                {/* Main Performance Tabs */}
-                <div className="mb-8">
-                    <DashboardTabs
-                        tabs={[
-                            { id: "chart", label: "Growth Chart", icon: <TrendingUp className="w-4 h-4" /> },
-                            { id: "table", label: "Return Table", icon: <LayoutList className="w-4 h-4" /> },
-                        ]}
-                    >
-                        {(activeTab) => (
-                            <div className="space-y-6">
-                                {activeTab === "chart" && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <EquityGrowthChart
-                                            getHistoryForPeriod={getHistoryForPeriod}
-                                            currentEquity={summary.totalMarketValue + cash}
-                                        />
-                                        <PerformanceMetrics portfolio={portfolio} prices={prices} />
-                                    </div>
-                                )}
-                                {activeTab === "table" && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
-                                        <div className="grid grid-cols-1 gap-6">
-                                            <DailyPerformanceCalendar history={history} />
-                                            <MonthlyPerformanceHeatmap history={history} />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </DashboardTabs>
-                </div>
-
-                {/* Allocation Tabs (Stock & Sector) - Full Width */}
-                <div className="mb-6">
-                    <AllocationTabs portfolio={portfolio} prices={prices} allocationData={chartData} />
-                </div>
-
-                {/* Gain/Loss Chart - Full Width */}
-                <div className="mb-6">
-                    <GainLossChart data={gainLossChartData} />
-                </div>
-
-                {/* Diversification & Cost Basis */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <DiversificationScore portfolio={portfolio} prices={prices} />
-                    <CostBasisAnalysis portfolio={portfolio} prices={prices} />
-                </div>
-
-                {/* Holding Period Analysis - Full Width */}
-                <div className="mb-6">
-                    <HoldingPeriodAnalysis portfolio={portfolio} transactions={transactions} prices={prices} />
-                </div>
-
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-semibold text-[var(--fg)] tracking-tight">Analytics</h1>
+                <p className="text-sm text-[var(--muted)]">Analisis performa portfolio Anda</p>
             </div>
+
+            <div>
+                <DecisionAdvisor portfolio={portfolio} cash={cash} prices={prices} />
+            </div>
+
+            <DashboardTabs
+                tabs={[
+                    { id: "chart", label: "Growth Chart", icon: <TrendingUp className="w-4 h-4" /> },
+                    { id: "table", label: "Return Table", icon: <LayoutList className="w-4 h-4" /> },
+                ]}
+            >
+                {(activeTab) => (
+                    <div className="space-y-4">
+                        {activeTab === "chart" && (
+                            <>
+                                <EquityGrowthChart getHistoryForPeriod={getHistoryForPeriod} currentEquity={summary.totalMarketValue + cash} />
+                                <PerformanceMetrics portfolio={portfolio} prices={prices} />
+                            </>
+                        )}
+                        {activeTab === "table" && (
+                            <>
+                                <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
+                                <div className="grid grid-cols-1 gap-4">
+                                    <DailyPerformanceCalendar history={history} />
+                                    <MonthlyPerformanceHeatmap history={history} />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+            </DashboardTabs>
+
+            <AllocationTabs portfolio={portfolio} prices={prices} allocationData={chartData} />
+            <GainLossChart data={gainLossChartData} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <DiversificationScore portfolio={portfolio} prices={prices} />
+                <CostBasisAnalysis portfolio={portfolio} prices={prices} />
+            </div>
+
+            <HoldingPeriodAnalysis portfolio={portfolio} transactions={transactions} prices={prices} />
         </div>
     );
 }

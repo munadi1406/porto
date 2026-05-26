@@ -84,7 +84,7 @@ export function SummaryCardsSkeleton() {
 // Dashboard Skeleton
 export function DashboardSkeleton() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-6">
+        <div className="p-6">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="space-y-2">
@@ -153,7 +153,7 @@ export function TransactionHistorySkeleton() {
 // Equity Growth Chart Skeleton (Pro Version)
 export function EquityGrowthChartSkeleton() {
     return (
-        <div className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl p-6 space-y-6 border border-gray-800/50">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6 space-y-4">
             <div className="space-y-2">
                 <Skeleton className="h-3 w-20 bg-gray-800" />
                 <Skeleton className="h-10 w-56 bg-gray-800" />

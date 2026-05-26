@@ -145,7 +145,7 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
     ];
 
     return (
-        <div ref={tableRef} className="bg-gradient-to-br from-gray-900 via-gray-950 to-black rounded-2xl shadow-2xl border border-gray-800/50 overflow-hidden">
+        <div ref={tableRef} className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
             {/* Header */}
             <div className="p-4 sm:p-6 border-b border-gray-800">
                 <div className="flex items-center justify-between mb-4">

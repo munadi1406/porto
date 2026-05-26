@@ -37,77 +37,51 @@ export function CashManager({ cash, onUpdateCash }: CashManagerProps) {
     };
 
     return (
-        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-green-600 dark:from-emerald-600 dark:to-green-700 p-6 rounded-2xl shadow-lg">
-            {/* Decorative circles */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-
-            <div className="relative">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl">
-                            <Wallet className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-semibold text-white/90 uppercase tracking-wide">
-                                Cash Holdings
-                            </h3>
-                            <p className="text-xs text-white/70 mt-0.5">Uang tunai tersedia</p>
-                        </div>
-                    </div>
-                    {!isEditing && (
-                        <button
-                            onClick={handleEdit}
-                            className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg transition-all duration-200 group"
-                            title="Edit cash"
-                        >
-                            <Edit3 className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                        </button>
-                    )}
-                </div>
-
-                {isEditing ? (
-                    <form onSubmit={handleSubmit} className="space-y-3">
-                        <input
-                            type="number"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Masukkan jumlah cash"
-                            min="0"
-                            step="1000"
-                            className="w-full px-4 py-3 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-2 border-white/50 rounded-xl focus:ring-2 focus:ring-white focus:border-white text-gray-900 dark:text-white placeholder:text-gray-400 font-semibold text-lg"
-                            autoFocus
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-emerald-700 bg-white hover:bg-gray-50 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Check className="w-4 h-4" />
-                                {isSubmitting ? "Menyimpan..." : "Simpan"}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsEditing(false)}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                                Batal
-                            </button>
-                        </div>
-                    </form>
-                ) : (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-[var(--muted-fg)]" />
                     <div>
-                        <div className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-1">
-                            {formatIDR(cash)}
-                        </div>
-                        <p className="text-xs text-white/70">
-                            Klik icon edit untuk mengubah
-                        </p>
+                        <h3 className="font-medium text-sm text-[var(--fg)]">Cash Holdings</h3>
+                        <p className="text-xs text-[var(--muted)]">Uang tunai tersedia</p>
                     </div>
+                </div>
+                {!isEditing && (
+                    <button onClick={handleEdit} className="p-1.5 rounded hover:bg-[var(--surface-hover)] text-[var(--muted)] transition-colors">
+                        <Edit3 className="w-4 h-4" />
+                    </button>
                 )}
             </div>
+
+            {isEditing ? (
+                <form onSubmit={handleSubmit} className="space-y-3">
+                    <input
+                        type="number"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        placeholder="Jumlah cash"
+                        min="0"
+                        step="1000"
+                        className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                        autoFocus
+                    />
+                    <div className="flex gap-2">
+                        <button type="submit" disabled={isSubmitting} className="flex-1 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50">
+                            <Check className="w-4 h-4 inline mr-1" />
+                            {isSubmitting ? "Menyimpan..." : "Simpan"}
+                        </button>
+                        <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm text-[var(--muted-fg)] hover:bg-[var(--border)] transition-colors">
+                            <X className="w-4 h-4 inline mr-1" />
+                            Batal
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                <div>
+                    <p className="text-2xl font-semibold text-[var(--fg)]">{formatIDR(cash)}</p>
+                    <p className="text-xs text-[var(--muted)] mt-1">Klik edit untuk mengubah</p>
+                </div>
+            )}
         </div>
     );
 }

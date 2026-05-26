@@ -16,121 +16,51 @@ interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({
-    isOpen,
-    onClose,
-    onConfirm,
-    title,
-    message,
-    confirmText = "Hapus",
-    cancelText = "Batal",
-    variant = "danger",
+    isOpen, onClose, onConfirm, title, message,
+    confirmText = "Hapus", cancelText = "Batal", variant = "danger",
 }: ConfirmDialogProps) {
-    // Close on ESC key
     useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
-        };
-
+        const handleEscape = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         if (isOpen) {
             document.addEventListener("keydown", handleEscape);
-            // Prevent body scroll when modal is open
             document.body.style.overflow = "hidden";
         }
-
         return () => {
             document.removeEventListener("keydown", handleEscape);
-            document.body.style.overflow = "unset";
+            document.body.style.overflow = "";
         };
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 
-    const handleConfirm = () => {
-        onConfirm();
-        onClose();
-    };
-
     const variantStyles = {
-        danger: {
-            icon: "text-red-500",
-            iconBg: "bg-red-100 dark:bg-red-900/30",
-            button: "bg-red-600 hover:bg-red-700 focus:ring-red-500",
-        },
-        warning: {
-            icon: "text-amber-500",
-            iconBg: "bg-amber-100 dark:bg-amber-900/30",
-            button: "bg-amber-600 hover:bg-amber-700 focus:ring-amber-500",
-        },
-        info: {
-            icon: "text-blue-500",
-            iconBg: "bg-blue-100 dark:bg-blue-900/30",
-            button: "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500",
-        },
+        danger: { icon: "text-[var(--danger)]", iconBg: "bg-[var(--danger-bg)]", button: "bg-[var(--danger)] hover:opacity-90" },
+        warning: { icon: "text-[var(--warning)]", iconBg: "bg-[var(--warning-bg)]", button: "bg-[var(--warning)] hover:opacity-90" },
+        info: { icon: "text-[var(--accent)]", iconBg: "bg-[var(--accent)]/10", button: "bg-[var(--accent)] hover:opacity-90" },
     };
 
     const styles = variantStyles[variant];
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
-            />
-
-            {/* Modal */}
+            <div className="fixed inset-0 bg-black/40" onClick={onClose} />
             <div className="flex min-h-full items-center justify-center p-4">
-                <div
-                    className="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-2xl transition-all border border-gray-200 dark:border-gray-700"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Close button */}
-                    <button
-                        onClick={onClose}
-                        className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                    >
+                <div className="relative w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={onClose} className="absolute right-4 top-4 text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
                         <X className="w-5 h-5" />
                     </button>
-
-                    {/* Content */}
-                    <div className="p-6">
-                        {/* Icon */}
-                        <div className={cn("mx-auto flex h-12 w-12 items-center justify-center rounded-full", styles.iconBg)}>
-                            <AlertTriangle className={cn("h-6 w-6", styles.icon)} />
-                        </div>
-
-                        {/* Title */}
-                        <div className="mt-4 text-center">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {title}
-                            </h3>
-                            <div className="mt-2">
-                                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
-                                    {message}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="mt-6 flex gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="flex-1 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
-                            >
-                                {cancelText}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirm}
-                                className={cn(
-                                    "flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors shadow-sm",
-                                    styles.button
-                                )}
-                            >
-                                {confirmText}
-                            </button>
-                        </div>
+                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3", styles.iconBg)}>
+                        <AlertTriangle className={cn("w-5 h-5", styles.icon)} />
+                    </div>
+                    <h3 className="font-medium text-[var(--fg)] text-center mb-2">{title}</h3>
+                    <p className="text-sm text-[var(--muted-fg)] text-center mb-5">{message}</p>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="flex-1 py-2 border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] transition-colors">
+                            {cancelText}
+                        </button>
+                        <button onClick={() => { onConfirm(); onClose(); }} className={cn("flex-1 py-2 rounded-lg text-sm font-medium text-white transition-colors", styles.button)}>
+                            {confirmText}
+                        </button>
                     </div>
                 </div>
             </div>

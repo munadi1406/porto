@@ -2,10 +2,9 @@
 
 import { usePortfolios } from "@/hooks/usePortfolios";
 import { useAggregatePortfolio } from "@/hooks/useAggregatePortfolio";
-import { Plus, Briefcase, Trash2, Check, Settings2, X, Layers, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2, X, Layers } from "lucide-react";
 import { useState } from "react";
 import { cn, formatPercentage } from "@/lib/utils";
-import { toast } from "sonner";
 import { usePathname, useRouter } from "next/navigation";
 
 export function SidebarPortfolios() {
@@ -18,155 +17,102 @@ export function SidebarPortfolios() {
     const router = useRouter();
 
     const portfolioColors = [
-        "#3b82f6", // Blue
-        "#10b981", // Emerald
-        "#f59e0b", // Amber
-        "#ef4444", // Red
-        "#8b5cf6", // Violet
-        "#ec4899", // Pink
-        "#06b6d4", // Cyan
-        "#f97316", // Orange
+        "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
+        "#8b5cf6", "#ec4899", "#06b6d4", "#f97316",
     ];
 
     const handleCreate = async () => {
         if (!newName.trim()) return;
         try {
-            await createPortfolio({
-                name: newName.trim(),
-                color: selectedColor
-            });
+            await createPortfolio({ name: newName.trim(), color: selectedColor });
             setNewName("");
             setIsAdding(false);
-            toast.success("Portofolio created successfully");
-        } catch (error) {
-            // Error handled by hook toast
-        }
+        } catch (error) {}
     };
 
     const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
         e.stopPropagation();
-        if (confirm(`Hapus portofolio "${name}"? Seluruh data saham dan riwayat di dalamnya akan hilang permanen.`)) {
-            try {
-                await deletePortfolio(id);
-            } catch (error) {
-                // Error handled by hook toast
-            }
+        if (confirm(`Hapus portofolio "${name}"? Semua data akan hilang permanen.`)) {
+            try { await deletePortfolio(id); } catch (error) {}
         }
     };
 
     const handleSelectPortfolio = (id: string) => {
         setSelectedPortfolioId(id);
-        if (pathname !== "/dashboard") {
-            router.push("/dashboard");
-        }
+        if (pathname !== "/dashboard") router.push("/dashboard");
     };
 
     if (listLoading) {
         return (
-            <div className="space-y-3 px-2">
+            <div className="space-y-2 px-1">
                 {[1, 2, 3].map(i => (
-                    <div key={i} className="h-10 w-full animate-pulse bg-gray-100 dark:bg-gray-800 rounded-xl" />
+                    <div key={i} className="h-9 bg-[var(--border)] animate-pulse rounded-lg" />
                 ))}
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col gap-1 px-2">
-            <div className="flex items-center justify-between mb-2 px-2">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">My Portfolios</span>
-                <button
-                    onClick={() => setIsAdding(true)}
-                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-blue-600 transition-all"
-                >
-                    <Plus className="w-3.5 h-3.5" />
+        <div className="space-y-1">
+            <div className="flex items-center justify-between mb-2 px-1">
+                <span className="text-xs font-medium text-[var(--muted)]">Portofolio</span>
+                <button onClick={() => setIsAdding(true)} className="p-1 rounded hover:bg-[var(--surface-hover)] text-[var(--muted)] transition-colors">
+                    <Plus className="w-4 h-4" />
                 </button>
             </div>
 
-            {/* Consolidated View Link */}
             <button
                 onClick={() => router.push("/")}
                 className={cn(
-                    "group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 text-left border-l-4",
+                    "flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm transition-colors",
                     pathname === "/"
-                        ? "bg-slate-50 dark:bg-white/[0.04] border-l-blue-500 dark:border-l-[#3498db] shadow-[0_4px_20px_rgba(0,0,0,0.02)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.15)] text-blue-600 dark:text-[#3498db] font-black"
-                        : "hover:bg-slate-50 dark:hover:bg-white/[0.02] border-l-transparent text-slate-600 dark:text-slate-400"
+                        ? "bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
+                        : "text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
                 )}
             >
-                <div className="flex items-center gap-3 overflow-hidden">
-                    <div className={cn(
-                        "p-1.5 rounded-lg transition-colors",
-                        pathname === "/" ? "bg-blue-500/10 text-blue-500" : "bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-500/10 dark:group-hover:bg-blue-900/30"
-                    )}>
-                        <Layers className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-bold truncate">Consolidated</span>
+                <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    <span>Konsolidasi</span>
                 </div>
                 {aggregateData && (
-                    <div className={cn(
-                        "text-[9px] font-black px-1.5 py-0.5 rounded-md",
-                        pathname === "/"
-                            ? "bg-blue-500/15 text-blue-600 dark:text-[#3498db]"
-                            : (aggregateData.totals.dayChangePercent >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500")
+                    <span className={cn(
+                        "text-xs font-medium px-1.5 py-0.5 rounded",
+                        aggregateData.totals.dayChangePercent >= 0 ? "text-[var(--success)] bg-[var(--success-bg)]" : "text-[var(--danger)] bg-[var(--danger-bg)]"
                     )}>
                         {aggregateData.totals.dayChangePercent >= 0 ? "+" : ""}{aggregateData.totals.dayChangePercent.toFixed(1)}%
-                    </div>
+                    </span>
                 )}
             </button>
 
-            {/* Portfolio List */}
             {portfolios.map((p) => {
                 const isSelected = currentPortfolio?.id === p.id && pathname !== "/aggregate";
                 const perf = aggregateData?.portfolios.find((ap: any) => ap.id === p.id);
-
                 return (
                     <div
                         key={p.id}
                         onClick={() => handleSelectPortfolio(p.id)}
                         className={cn(
-                            "group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 text-left cursor-pointer border-l-4",
+                            "flex items-center justify-between px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors group",
                             isSelected
-                                ? "bg-slate-50 dark:bg-white/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.02)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
-                                : "hover:bg-slate-50 dark:hover:bg-white/[0.02] border-l-transparent text-slate-600 dark:text-slate-400"
+                                ? "bg-[var(--surface-hover)] text-[var(--fg)]"
+                                : "text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
                         )}
-                        style={{ borderLeftColor: isSelected ? (p.color || '#3b82f6') : 'transparent' }}
                     >
-                        <div className="flex items-center gap-3 overflow-hidden ml-1">
-                            <div
-                                className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse"
-                                style={{ backgroundColor: p.color || '#3b82f6' }}
-                            />
-                            <div className="flex flex-col overflow-hidden">
-                                <span className={cn(
-                                    "text-xs font-bold truncate transition-all",
-                                    isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
-                                )}>
-                                    {p.name}
-                                </span>
-                                {perf && (
-                                    <span className="text-[10px] text-gray-400 font-medium">
-                                        {perf.tickerCount} Aset
-                                    </span>
-                                )}
-                            </div>
+                        <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || '#3b82f6' }} />
+                            <span className="truncate">{p.name}</span>
                         </div>
-
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                             {perf && (
-                                <div className={cn(
-                                    "text-[9px] font-black flex items-center gap-0.5 px-1.5 py-0.5 rounded-md",
-                                    perf.dayChangePercent >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                <span className={cn(
+                                    "text-[11px] font-medium px-1 rounded hidden group-hover:block",
+                                    perf.dayChangePercent >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
                                 )}>
                                     {perf.dayChangePercent >= 0 ? "+" : ""}{perf.dayChangePercent.toFixed(1)}%
-                                    {perf.dayChangePercent >= 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                                </div>
+                                </span>
                             )}
-
                             {portfolios.length > 1 && (
-                                <button
-                                    onClick={(e) => handleDelete(e, p.id, p.name)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all hover:scale-110"
-                                >
+                                <button onClick={(e) => handleDelete(e, p.id, p.name)} className="opacity-0 group-hover:opacity-100 p-0.5 text-[var(--muted)] hover:text-[var(--danger)] transition-all">
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                             )}
@@ -175,12 +121,11 @@ export function SidebarPortfolios() {
                 );
             })}
 
-            {/* Add New Portfolio Form */}
             {isAdding && (
-                <div className="mt-2 p-3 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 rounded-xl animate-in slide-in-from-top-2">
+                <div className="mt-2 p-3 bg-[var(--surface)] border border-[var(--border)] rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase">New Portfolio</span>
-                        <button onClick={() => setIsAdding(false)} className="text-gray-400 hover:text-gray-600">
+                        <span className="text-xs font-medium text-[var(--muted)]">Portofolio Baru</span>
+                        <button onClick={() => setIsAdding(false)} className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
                             <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
@@ -188,29 +133,22 @@ export function SidebarPortfolios() {
                         autoFocus
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        placeholder="Portfolio Name"
-                        className="w-full px-2 py-1.5 text-xs bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 mb-2"
+                        placeholder="Nama portofolio"
+                        className="w-full px-2 py-1.5 text-sm bg-[var(--bg)] border border-[var(--border)] rounded outline-none focus:ring-1 focus:ring-[var(--accent)] mb-2"
                         onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                     />
-                    <div className="flex flex-wrap gap-1 mb-3">
+                    <div className="flex flex-wrap gap-1 mb-2">
                         {portfolioColors.map(color => (
                             <button
                                 key={color}
                                 onClick={() => setSelectedColor(color)}
-                                className={cn(
-                                    "w-4 h-4 rounded-full border transition-transform",
-                                    selectedColor === color ? "border-gray-900 dark:border-white scale-110 shadow-sm" : "border-transparent"
-                                )}
+                                className={cn("w-4 h-4 rounded-full border transition-transform", selectedColor === color ? "border-[var(--fg)] scale-110" : "border-transparent")}
                                 style={{ backgroundColor: color }}
                             />
                         ))}
                     </div>
-                    <button
-                        onClick={handleCreate}
-                        disabled={!newName.trim()}
-                        className="w-full py-1.5 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700 transition-colors disabled:opacity-50"
-                    >
-                        Create Portfolio
+                    <button onClick={handleCreate} disabled={!newName.trim()} className="w-full py-1.5 bg-[var(--accent)] text-white rounded-lg text-xs font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50">
+                        Buat
                     </button>
                 </div>
             )}

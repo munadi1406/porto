@@ -1,10 +1,9 @@
 "use client";
 
 import { usePortfolios } from "@/hooks/usePortfolios";
-import { Plus, Briefcase, Trash2, Check, Settings2, X, Palette } from "lucide-react";
+import { Plus, Check, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 export function PortfolioSelector() {
     const { portfolios, currentPortfolio, setSelectedPortfolioId, createPortfolio, deletePortfolio, isLoading } = usePortfolios();
@@ -14,145 +13,95 @@ export function PortfolioSelector() {
     const [selectedColor, setSelectedColor] = useState("#3b82f6");
 
     const portfolioColors = [
-        "#3b82f6", // Blue
-        "#10b981", // Emerald
-        "#f59e0b", // Amber
-        "#ef4444", // Red
-        "#8b5cf6", // Violet
-        "#ec4899", // Pink
-        "#06b6d4", // Cyan
-        "#f97316", // Orange
+        "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
+        "#8b5cf6", "#ec4899", "#06b6d4", "#f97316",
     ];
 
-    if (isLoading) return <div className="h-10 w-full animate-pulse bg-gray-100 dark:bg-gray-800 rounded-xl" />;
+    if (isLoading) return <div className="h-8 w-full animate-pulse bg-[var(--border)] rounded-lg" />;
 
     const handleCreate = async () => {
         if (!newName.trim()) return;
         try {
-            await createPortfolio({
-                name: newName.trim(),
-                color: selectedColor
-            });
+            await createPortfolio({ name: newName.trim(), color: selectedColor });
             setNewName("");
             setIsAdding(false);
-        } catch (error) {
-            // Error handled by hook toast
-        }
+        } catch (error) {}
     };
 
     const handleDelete = async (id: string, name: string) => {
-        if (confirm(`Hapus portofolio "${name}"? Seluruh data saham dan riwayat di dalamnya akan hilang permanen.`)) {
-            try {
-                await deletePortfolio(id);
-            } catch (error) {
-                // Error handled by hook toast
-            }
+        if (confirm(`Hapus portofolio "${name}"?`)) {
+            try { await deletePortfolio(id); } catch (error) {}
         }
     };
 
     return (
         <div className="relative">
-            {/* Active Selection Button */}
             <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all"
+                className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-sm transition-colors hover:bg-[var(--surface-hover)]"
             >
-                <div className="flex items-center gap-2 overflow-hidden">
-                    <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }}
-                    />
-                    <span className="font-bold text-[10px] text-gray-900 dark:text-gray-100 truncate uppercase tracking-tighter">
-                        {currentPortfolio?.name || "Pilih"}
-                    </span>
+                <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }} />
+                    <span className="truncate text-[var(--fg)]">{currentPortfolio?.name || "Pilih"}</span>
                 </div>
-                <Settings2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             </button>
 
-            {/* Dropdown Menu */}
             {isMenuOpen && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-                    <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="p-2 space-y-1">
+                    <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-md)] overflow-hidden">
+                        <div className="p-1 space-y-0.5">
                             {portfolios.map((p) => (
                                 <div key={p.id} className="group flex items-center gap-1">
                                     <button
-                                        onClick={() => {
-                                            setSelectedPortfolioId(p.id);
-                                            setIsMenuOpen(false);
-                                        }}
+                                        onClick={() => { setSelectedPortfolioId(p.id); setIsMenuOpen(false); }}
                                         className={cn(
-                                            "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
+                                            "flex-1 flex items-center gap-2 px-2.5 py-2 rounded-md text-sm transition-colors text-left",
                                             currentPortfolio?.id === p.id
-                                                ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                                                : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
+                                                ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                                                : "text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
                                         )}
                                     >
-                                        <div
-                                            className="w-2.5 h-2.5 rounded-full"
-                                            style={{ backgroundColor: p.color || '#3b82f6' }}
-                                        />
-                                        <span className="text-sm font-semibold truncate">{p.name}</span>
-                                        {currentPortfolio?.id === p.id && <Check className="w-4 h-4 ml-auto" />}
+                                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || '#3b82f6' }} />
+                                        <span className="truncate">{p.name}</span>
+                                        {currentPortfolio?.id === p.id && <Check className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
                                     </button>
-
                                     {portfolios.length > 1 && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDelete(p.id, p.name);
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
+                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id, p.name); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-[var(--muted)] hover:text-[var(--danger)] transition-all">
+                                            <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     )}
                                 </div>
                             ))}
                         </div>
 
-                        {/* Add New Portfolio Action */}
-                        <div className="p-3 bg-gray-50/50 dark:bg-gray-800/20 border-t border-gray-100 dark:border-gray-800">
+                        <div className="p-2 border-t border-[var(--border)]">
                             {isAdding ? (
-                                <div className="space-y-3 p-1">
+                                <div className="space-y-2">
                                     <input
                                         autoFocus
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
-                                        placeholder="Nama Portofolio..."
-                                        className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Nama portofolio..."
+                                        className="w-full px-2 py-1.5 text-sm bg-[var(--bg)] border border-[var(--border)] rounded outline-none focus:ring-1 focus:ring-[var(--accent)]"
                                         onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                                     />
-
-                                    <div className="flex flex-wrap gap-1.5 px-0.5">
+                                    <div className="flex flex-wrap gap-1">
                                         {portfolioColors.map(color => (
-                                            <button
-                                                key={color}
-                                                onClick={() => setSelectedColor(color)}
-                                                className={cn(
-                                                    "w-5 h-5 rounded-full border-2 transition-transform",
-                                                    selectedColor === color ? "border-gray-900 dark:border-white scale-110" : "border-transparent"
-                                                )}
-                                                style={{ backgroundColor: color }}
-                                            />
+                                            <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-4 h-4 rounded-full border transition-transform", selectedColor === color ? "border-[var(--fg)] scale-110" : "border-transparent")} style={{ backgroundColor: color }} />
                                         ))}
                                     </div>
-
                                     <div className="flex items-center gap-2">
-                                        <button onClick={handleCreate} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700 transition-colors">
-                                            Buat Portofolio
+                                        <button onClick={handleCreate} className="flex-1 py-1 bg-[var(--accent)] text-white rounded-md text-xs font-medium hover:bg-[var(--accent-hover)] transition-colors">
+                                            Buat
                                         </button>
-                                        <button onClick={() => setIsAdding(false)} className="p-1.5 text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        <button onClick={() => setIsAdding(false)} className="p-1 text-[var(--muted)] hover:bg-[var(--surface-hover)] rounded-md transition-colors">
                                             <X className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                <button
-                                    onClick={() => setIsAdding(true)}
-                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
-                                >
+                                <button onClick={() => setIsAdding(true)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] transition-colors">
                                     <Plus className="w-4 h-4" />
                                     <span>Portofolio Baru</span>
                                 </button>

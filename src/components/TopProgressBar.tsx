@@ -36,7 +36,7 @@ function ProgressContent() {
     return (
         <div className="fixed top-0 left-0 right-0 z-[9999] h-1 bg-transparent pointer-events-none">
             <div
-                className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                className="h-full bg-[var(--accent)] transition-all duration-300 ease-out"
                 style={{
                     width: `${progress}%`,
                     opacity: progress >= 100 ? 0 : 1,

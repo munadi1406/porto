@@ -72,7 +72,7 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
             <button
                 onClick={() => setIsOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm
-          bg-gradient-to-r from-green-500 to-emerald-600 text-white
+          bg-[var(--accent)] text-white
           border border-green-600 shadow-md hover:from-green-600 hover:to-emerald-700
           active:scale-95 transition-all duration-200"
             >
@@ -81,7 +81,7 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
             </button>
 
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
                     <div className="bg-[#0f172a] rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-white/10">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#1e293b]">
@@ -152,7 +152,7 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                             {/* Info Section */}
                             <div className="flex-1 flex flex-col gap-6 text-white max-w-sm">
                                 <div className="space-y-2">
-                                    <h4 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic">PREMIUM STORY<br />TEMPLATE</h4>
+                                    <h4 className="text-3xl font-bold tracking-tight text-white italic">PORTO<br />STORY</h4>
                                     <p className="text-gray-400 text-sm leading-relaxed">Layout 2-kolom yang optimal memastikan sisi kanan tidak kosong dan memenuhi layar Story Anda dengan sempurna.</p>
                                 </div>
 
@@ -172,7 +172,7 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                                 <button
                                     onClick={handleShare}
                                     disabled={isExporting}
-                                    className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 p-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 disabled:opacity-50 shadow-lg shadow-green-500/20 active:scale-95 transition-all"
+                                    className="w-full mt-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] p-4 rounded-lg font-medium text-lg flex items-center justify-center gap-3 disabled:opacity-50 transition-colors"
                                 >
                                     {isExporting ? (
                                         <>

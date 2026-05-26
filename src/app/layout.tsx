@@ -2,8 +2,12 @@ import { MobileNav } from "@/components/MobileNav";
 import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "sonner";
 import { TopProgressBar } from "@/components/TopProgressBar";
-import { Inter } from "next/font/google";
+import { Inter, Geist } from "next/font/google";
+import { ThemeInit } from "@/components/ThemeInit";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,23 +20,20 @@ export const metadata = {
   description: "Kelola portfolio investasi saham Indonesia",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={inter.variable}>
-      <body className="bg-gradient-to-tr from-[#f8fafc] via-[#f1f5f9] to-[#edf2f7] min-h-screen font-sans antialiased text-slate-800 transition-colors duration-300">
+    <html lang="id" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+      <body className="min-h-screen font-sans antialiased">
+        <ThemeInit />
         <QueryProvider>
           <TopProgressBar />
-          <Toaster position="top-right" richColors />
+          <Toaster position="top-right" />
           <MobileNav />
-
-          {/* Desktop: with sidebar padding. Mobile: with top and bottom nav padding */}
-          <div className="md:pl-72">
-            <div className="pt-20 pb-16 md:pt-10 md:pb-10">
-              {children}
+          <div className="md:pl-64">
+            <div className="pt-16 pb-20 md:pt-8 md:pb-8">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {children}
+              </div>
             </div>
           </div>
         </QueryProvider>

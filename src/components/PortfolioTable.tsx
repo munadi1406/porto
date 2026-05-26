@@ -245,12 +245,12 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
     if (portfolio.length === 0) {
         return (
-            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-                <div className="mx-auto w-12 h-12 text-gray-400 mb-3 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6" />
+            <div className="text-center py-12 bg-[var(--surface)] border border-[var(--border)] rounded-lg">
+                <div className="mx-auto w-10 h-10 text-[var(--muted)] mb-2 bg-[var(--surface-hover)] rounded-full flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">Belum ada investasi</h3>
-                <p className="text-gray-500 dark:text-gray-400">Tambahkan saham pertama Anda untuk mulai memantau.</p>
+                <p className="font-medium text-[var(--fg)] mb-1">Belum ada investasi</p>
+                <p className="text-sm text-[var(--muted)]">Tambahkan saham pertama Anda.</p>
             </div>
         );
     }
@@ -272,12 +272,12 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                 </button>
             </div>
 
-            <div className="overflow-x-auto glass-panel rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.01)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
+            <div className="overflow-x-auto bg-[var(--surface)] border border-[var(--border)] rounded-lg">
                 {/* Modal Edit */}
                 {editingId && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Edit Saham</h3>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-md border border-[var(--border)]">
+                            <h3 className="font-medium text-[var(--fg)] mb-4">Edit Saham</h3>
                             <StockForm
                                 initialData={portfolio.find(p => p.id === editingId)}
                                 isEdit={true}
@@ -293,9 +293,9 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
                 {/* Modal Transaksi */}
                 {transactionId && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Beli/Jual Saham</h3>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-md border border-[var(--border)]">
+                            <h3 className="font-medium text-[var(--fg)] mb-4">Beli/Jual Saham</h3>
                             <TransactionForm
                                 item={portfolio.find(p => p.id === transactionId)!}
                                 currentPrice={marketData[portfolio.find(p => p.id === transactionId)!.ticker]?.price || 0}
@@ -311,66 +311,28 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
                 {/* Modal Opsi Export Modern (Individual) */}
                 {exportTarget && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl border border-white/20 dark:border-gray-700 overflow-hidden relative">
-                            {/* Background Decoration */}
-                            <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
-
-                            <div className="relative">
-                                <div className="text-center mb-6">
-                                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl rotate-3">
-                                        <Download className="w-10 h-10 text-white" />
-                                    </div>
-                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Export Laporan</h3>
-                                    <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">{exportTarget.ticker} — {marketData[exportTarget.ticker]?.name || exportTarget.name}</p>
-                                </div>
-
-                                <div className="space-y-4">
-                                    {/* Format Selection */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            disabled={isExporting}
-                                            onClick={() => handleExportAction(exportTarget, 'pdf', false)}
-                                            className="flex flex-col items-center gap-2 p-4 bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-100 dark:border-gray-600 rounded-2xl transition-all group"
-                                        >
-                                            <FileText className="w-6 h-6 text-red-500" />
-                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-200">PDF Report</span>
-                                        </button>
-                                        <button
-                                            disabled={isExporting}
-                                            onClick={() => handleExportAction(exportTarget, 'image', false)}
-                                            className="flex flex-col items-center gap-2 p-4 bg-gray-50 dark:bg-gray-700/50 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-100 dark:border-gray-600 rounded-2xl transition-all group"
-                                        >
-                                            <ImageIcon className="w-6 h-6 text-purple-500" />
-                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Profit Card</span>
-                                        </button>
-                                    </div>
-
-                                    <div className="h-px bg-gray-100 dark:bg-gray-700 mx-4" />
-
-                                    {/* Privacy Mode */}
-                                    <button
-                                        disabled={isExporting}
-                                        onClick={() => handleExportAction(exportTarget, 'image', true)}
-                                        className="w-full flex items-center gap-3 p-4 bg-emerald-50/50 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl transition-all group"
-                                    >
-                                        <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                                            <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                                        </div>
-                                        <div className="text-left">
-                                            <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Mode Privasi</div>
-                                            <div className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">Sembunyikan Nilai Investasi</div>
-                                        </div>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-sm border border-[var(--border)]">
+                            <h3 className="font-medium text-[var(--fg)] mb-1">Export Laporan</h3>
+                            <p className="text-sm text-[var(--muted)] mb-4">{exportTarget.ticker} — {marketData[exportTarget.ticker]?.name || exportTarget.name}</p>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button disabled={isExporting} onClick={() => handleExportAction(exportTarget, 'pdf', false)} className="flex items-center justify-center gap-2 px-4 py-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--border)] transition-colors">
+                                        <FileText className="w-4 h-4" />
+                                        <span>PDF</span>
                                     </button>
-
-                                    <button
-                                        disabled={isExporting}
-                                        onClick={() => setExportTarget(null)}
-                                        className="w-full py-2 text-sm font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                                    >
-                                        {isExporting ? 'Memproses...' : 'Batal'}
+                                    <button disabled={isExporting} onClick={() => handleExportAction(exportTarget, 'image', false)} className="flex items-center justify-center gap-2 px-4 py-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--border)] transition-colors">
+                                        <ImageIcon className="w-4 h-4" />
+                                        <span>Image</span>
                                     </button>
                                 </div>
+                                <button disabled={isExporting} onClick={() => handleExportAction(exportTarget, 'image', true)} className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--surface-hover)] transition-colors">
+                                    <Shield className="w-4 h-4" />
+                                    <span>Mode Privasi</span>
+                                </button>
+                                <button disabled={isExporting} onClick={() => setExportTarget(null)} className="w-full py-2 text-sm text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
+                                    {isExporting ? 'Memproses...' : 'Batal'}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -378,75 +340,42 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
                 {/* Modal Opsi Export Modern (Summary) */}
                 {isSummarySelected && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl border border-white/20 dark:border-gray-700 overflow-hidden relative">
-                            {/* Background Decoration */}
-                            <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
-
-                            <div className="relative text-center">
-                                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl -rotate-3">
-                                    <ImageIcon className="w-10 h-10 text-white" />
-                                </div>
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Portfolio Summary</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Bagikan ringkasan performa Anda</p>
-
-                                <div className="mt-8 space-y-4">
-                                    <button
-                                        disabled={isExporting}
-                                        onClick={async () => {
-                                            await handleExportPortfolioAction(portfolio, marketData, 'image', false);
-                                            setIsSummarySelected(false);
-                                        }}
-                                        className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-100 dark:border-gray-600 rounded-2xl transition-all group"
-                                    >
-                                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-xl flex items-center justify-center">
-                                            <ImageIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                        <div className="text-left font-bold text-gray-900 dark:text-white">Normal Card</div>
-                                    </button>
-
-                                    <button
-                                        disabled={isExporting}
-                                        onClick={async () => {
-                                            await handleExportPortfolioAction(portfolio, marketData, 'image', true);
-                                            setIsSummarySelected(false);
-                                        }}
-                                        className="w-full flex items-center gap-3 p-4 bg-emerald-50/50 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl transition-all group"
-                                    >
-                                        <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                                            <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                                        </div>
-                                        <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Mode Privasi</div>
-                                    </button>
-
-                                    <button
-                                        disabled={isExporting}
-                                        onClick={() => setIsSummarySelected(false)}
-                                        className="w-full py-2 text-sm font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                                    >
-                                        {isExporting ? 'Memproses...' : 'Batal'}
-                                    </button>
-                                </div>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-sm border border-[var(--border)]">
+                            <h3 className="font-medium text-[var(--fg)] mb-1">Portfolio Summary</h3>
+                            <p className="text-sm text-[var(--muted)] mb-4">Bagikan ringkasan performa</p>
+                            <div className="space-y-3">
+                                <button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', false); setIsSummarySelected(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--border)] transition-colors">
+                                    <ImageIcon className="w-4 h-4" />
+                                    <span>Normal Card</span>
+                                </button>
+                                <button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', true); setIsSummarySelected(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--surface-hover)] transition-colors">
+                                    <Shield className="w-4 h-4" />
+                                    <span>Mode Privasi</span>
+                                </button>
+                                <button disabled={isExporting} onClick={() => setIsSummarySelected(false)} className="w-full py-2 text-sm text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
+                                    {isExporting ? 'Memproses...' : 'Batal'}
+                                </button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <table className="w-full border-collapse">
-                    <thead className="bg-slate-50/70 dark:bg-[#151a23]/60 border-b border-slate-200/50 dark:border-white/[0.04]">
+                <table className="w-full text-sm">
+                    <thead className="border-b border-[var(--border)]">
                         <tr>
-                            <th className="px-4 md:px-6 py-4.5 text-left text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Saham</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Lot</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Avg Price</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Current</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Day Chg</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Value</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Unrealized P/L</th>
-                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Return</th>
-                            <th className="px-4 md:px-6 py-4.5 text-center text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Aksi</th>
+                            <th className="px-4 py-3 font-medium text-left text-xs text-[var(--muted)]">Saham</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Lot</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Avg Price</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Current</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Day Chg</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Value</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">P/L</th>
+                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Return</th>
+                            <th className="px-4 py-3 font-medium text-center text-xs text-[var(--muted)]">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04]">
+                    <tbody className="divide-y divide-[var(--border)]">
                         {sortedPortfolio.map((item) => {
                             const quote = marketData[item.ticker];
                             const currentPrice = quote?.price || 0;
@@ -552,7 +481,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             );
                         })}
                     </tbody>
-                    <tfoot className="bg-gray-50/50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-800">
+                    <tfoot className="bg-[var(--surface-hover)] border-t border-[var(--border)]">
                         {(() => {
                             const totals = sortedPortfolio.reduce((acc, item) => {
                                 const quote = marketData[item.ticker];
@@ -627,33 +556,31 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
                 {/* Modal Proyeksi Harga */}
                 {projectionTarget && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
-                        <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl w-full max-w-md shadow-2xl border border-white/20 dark:border-gray-700 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-
-                            <div className="flex justify-between items-start mb-6">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-md border border-[var(--border)]">
+                            <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Price Projection</h3>
-                                    <p className="text-gray-500 dark:text-gray-400 font-medium">{projectionTarget.ticker} — {marketData[projectionTarget.ticker]?.name || projectionTarget.name}</p>
+                                    <h3 className="font-medium text-[var(--fg)]">Price Projection</h3>
+                                    <p className="text-sm text-[var(--muted)]">{projectionTarget.ticker} — {marketData[projectionTarget.ticker]?.name || projectionTarget.name}</p>
                                 </div>
-                                <button onClick={() => setProjectionTarget(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
-                                    <Minus className="w-5 h-5 text-gray-400" />
+                                <button onClick={() => setProjectionTarget(null)} className="p-1 text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
+                                    <Minus className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Avg Price</div>
-                                        <div className="text-lg font-black dark:text-white">{formatIDR(projectionTarget.averagePrice)}</div>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg">
+                                        <div className="text-xs text-[var(--muted)] mb-1">Avg Price</div>
+                                        <div className="font-medium text-[var(--fg)]">{formatIDR(projectionTarget.averagePrice)}</div>
                                     </div>
-                                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Current Price</div>
-                                        <div className="text-lg font-black dark:text-white">{formatIDR(marketData[projectionTarget.ticker]?.price || 0)}</div>
+                                    <div className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg">
+                                        <div className="text-xs text-[var(--muted)] mb-1">Current Price</div>
+                                        <div className="font-medium text-[var(--fg)]">{formatIDR(marketData[projectionTarget.ticker]?.price || 0)}</div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                <div className="space-y-2 max-h-80 overflow-y-auto">
                                     <div className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">Target Projections</div>
                                     <div className="grid gap-3">
                                         {(() => {

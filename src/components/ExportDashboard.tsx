@@ -98,7 +98,7 @@ export function ExportDashboard({ targetRef, filename = "dashboard" }: ExportDas
                 disabled={isExporting}
                 className={`
           flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm
-          bg-gradient-to-r from-blue-500 to-blue-600 text-white
+          bg-[var(--accent)] text-white
           border border-blue-600 shadow-md
           hover:from-blue-600 hover:to-blue-700 hover:shadow-lg
           active:scale-95 transition-all duration-200
