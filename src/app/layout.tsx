@@ -23,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" className={inter.variable}>
-      <body className="bg-gray-50 dark:bg-[#080a0f] font-sans antialiased text-gray-900 dark:text-gray-100">
+      <body className="bg-gradient-to-tr from-[#f8fafc] via-[#f1f5f9] to-[#edf2f7] min-h-screen font-sans antialiased text-slate-800 transition-colors duration-300">
         <QueryProvider>
           <TopProgressBar />
           <Toaster position="top-right" richColors />

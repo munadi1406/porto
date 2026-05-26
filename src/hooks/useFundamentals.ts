@@ -44,6 +44,23 @@ interface FundamentalData {
     targetMeanPrice: number | null;
     targetHighPrice: number | null;
     targetLowPrice: number | null;
+    foreignNetBuyValue: number;
+    foreignNetBuyVolume: number;
+    foreignBuyValue: number;
+    foreignSellValue: number;
+    foreignAccumulationStatus: string;
+    domesticNetBuyValue: number;
+    domesticBuyValue: number;
+    domesticSellValue: number;
+    smartMoneyPhase: string;
+    smartMoneyColor: string;
+    smartMoneyDescription: string;
+    topBuyBrokers: string[];
+    topSellBrokers: string[];
+    concentrationScore: number;
+    lastFiscalYearEnd: Date | string | null;
+    mostRecentQuarter: Date | string | null;
+    lastUpdated: Date | string | null;
 }
 
 export function useFundamentals(ticker: string) {

@@ -66,15 +66,15 @@ export function MobileNav() {
     return (
         <>
             {/* Mobile Top Header */}
-            <header className="md:hidden fixed top-0 left-0 right-0 z-[60] bg-white/95 dark:bg-[#1a1d23]/95 backdrop-blur-xl border-b border-gray-100 dark:border-[#2d3139] px-4 h-16 flex items-center shadow-sm">
+            <header className="md:hidden fixed top-0 left-0 right-0 z-[60] bg-white/80 dark:bg-[#0f131a]/85 backdrop-blur-xl border-b border-slate-200/40 dark:border-white/[0.04] px-4 h-16 flex items-center shadow-sm">
                 <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2.5">
-                        <div className="p-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-xl shadow-lg shadow-blue-500/20">
+                        <div className="p-2 bg-gradient-to-br from-[#2980b9] to-[#3498db] rounded-xl shadow-md shadow-blue-500/10">
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
                         <div className="flex flex-col -space-y-0.5">
-                            <span className="font-black text-[11px] text-gray-900 dark:text-white uppercase tracking-tighter">Porto IDX</span>
-                            <span className="text-[8px] font-bold text-[#3498db] dark:text-[#3498db] uppercase tracking-[0.2em] opacity-80">Pro Investor</span>
+                            <span className="font-black text-[11px] text-slate-900 dark:text-white uppercase tracking-wider">Porto IDX</span>
+                            <span className="text-[8px] font-black text-[#3498db] uppercase tracking-[0.15em] opacity-95">Pro Investor</span>
                         </div>
                     </div>
 
@@ -96,30 +96,30 @@ export function MobileNav() {
 
             {/* Mobile Drawer Menu */}
             <div className={cn(
-                "fixed bottom-0 left-0 right-0 z-[80] md:hidden bg-white dark:bg-[#1a1d23] rounded-t-[2.5rem] border-t border-gray-100 dark:border-[#2d3139] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.25)]",
+                "fixed bottom-0 left-0 right-0 z-[80] md:hidden bg-white/95 dark:bg-[#0f131a]/98 backdrop-blur-2xl rounded-t-[2.5rem] border-t border-slate-200/40 dark:border-white/[0.05] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] shadow-[0_-20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_-20px_50px_rgba(0,0,0,0.4)]",
                 isMenuOpen ? "translate-y-0" : "translate-y-full"
             )}>
-                <div className="p-6 pb-12">
+                <div className="p-6 pb-12 max-h-[85vh] overflow-y-auto">
                     {/* Handle */}
-                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full mx-auto mb-8" onClick={() => setIsMenuOpen(false)} />
+                    <div className="w-12 h-1 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" onClick={() => setIsMenuOpen(false)} />
 
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Main Menu</h2>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Explore features</p>
+                            <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Main Menu</h2>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Explore features</p>
                         </div>
                         <button
                             onClick={() => setIsMenuOpen(false)}
-                            className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500"
+                            className="p-2 bg-slate-100 dark:bg-slate-800/80 rounded-full text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <X className="w-4.5 h-4.5" />
                         </button>
                     </div>
 
-                    <div className="space-y-8">
+                    <div className="space-y-6">
                         {secondaryNav.map((group, idx) => (
-                            <div key={idx} className="space-y-4">
-                                <h3 className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-[0.2rem] px-2">{group.title}</h3>
+                            <div key={idx} className="space-y-3">
+                                <h3 className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.15rem] px-2">{group.title}</h3>
                                 <div className="grid gap-2">
                                     {group.items.map((item) => {
                                         const isActive = pathname === item.href;
@@ -128,22 +128,22 @@ export function MobileNav() {
                                                 key={item.name}
                                                 href={item.href}
                                                 className={cn(
-                                                    "flex items-center gap-4 p-4 rounded-2xl transition-all border",
+                                                    "flex items-center gap-3.5 p-3 rounded-xl transition-all border",
                                                     isActive
-                                                        ? "bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30"
-                                                        : "bg-gray-50 dark:bg-white/[0.02] border-transparent hover:border-gray-200 dark:hover:border-white/10"
+                                                        ? "bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/20 dark:border-blue-500/30"
+                                                        : "bg-slate-50 dark:bg-white/[0.01] border-transparent hover:border-slate-200 dark:hover:border-white/5"
                                                 )}
                                             >
-                                                <div className={cn("p-2.5 rounded-xl", isActive ? "bg-white dark:bg-blue-900/30 shadow-sm" : "bg-white dark:bg-gray-800")}>
-                                                    <item.icon className={cn("w-5 h-5", isActive ? "text-blue-600" : "text-gray-400")} />
+                                                <div className={cn("p-2 rounded-lg", isActive ? "bg-blue-500/15 dark:bg-blue-500/20 shadow-sm" : "bg-white dark:bg-slate-800")}>
+                                                    <item.icon className={cn("w-4.5 h-4.5", isActive ? "text-blue-500" : "text-slate-400")} />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <p className={cn("text-sm font-black tracking-tight", isActive ? "text-blue-600" : "text-gray-900 dark:text-white uppercase")}>
+                                                    <p className={cn("text-xs font-bold tracking-tight", isActive ? "text-blue-500" : "text-slate-900 dark:text-white uppercase")}>
                                                         {item.name}
                                                     </p>
-                                                    <p className="text-[10px] text-gray-500 font-medium">{item.desc}</p>
+                                                    <p className="text-[9px] text-slate-400 font-medium leading-none mt-0.5">{item.desc}</p>
                                                 </div>
-                                                <ChevronRight className="w-4 h-4 text-gray-300" />
+                                                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                                             </Link>
                                         );
                                     })}
@@ -152,20 +152,20 @@ export function MobileNav() {
                         ))}
                     </div>
 
-                    <div className="mt-8 p-4 bg-blue-50/50 dark:bg-blue-900/5 rounded-2xl border border-blue-100/50 dark:border-blue-900/10">
+                    <div className="mt-6 p-4 bg-blue-500/5 dark:bg-blue-500/10 rounded-xl border border-blue-500/10 dark:border-blue-500/20">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                <Activity className="w-4 h-4 text-blue-600" />
+                            <div className="p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg">
+                                <Activity className="w-4 h-4 text-blue-500" />
                             </div>
-                            <p className="text-[10px] font-bold text-blue-600/80 uppercase tracking-widest">Version 2.0.4 Premium</p>
+                            <p className="text-[9px] font-bold text-blue-500/80 uppercase tracking-widest">Version 2.0.4 Premium</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-6 left-4 right-4 z-50 bg-white/95 dark:bg-[#1a1d23]/95 backdrop-blur-xl border border-gray-100 dark:border-[#2d3139] shadow-2xl rounded-3xl safe-area-bottom overflow-hidden">
-                <div className="grid grid-cols-4 h-18">
+            {/* Mobile Bottom Navigation (Floating glass dock) */}
+            <nav className="md:hidden fixed bottom-6 left-4 right-4 z-50 bg-white/80 dark:bg-[#0f131a]/85 backdrop-blur-xl border border-slate-200/40 dark:border-white/[0.06] shadow-[0_12px_40px_rgba(0,0,0,0.15)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.4)] rounded-[2rem] safe-area-bottom overflow-hidden">
+                <div className="grid grid-cols-4 h-16">
                     {primaryNav.map((item) => {
                         const isActive = pathname === item.href;
                         return (
@@ -173,18 +173,18 @@ export function MobileNav() {
                                 key={item.name}
                                 href={item.href}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-1.5 transition-all relative py-3",
+                                    "flex flex-col items-center justify-center gap-1 transition-all duration-300 relative py-2",
                                     isActive
-                                        ? "text-[#3498db] dark:text-[#3498db]"
-                                        : "text-gray-400 dark:text-gray-600"
+                                        ? "text-blue-500 dark:text-[#3498db]"
+                                        : "text-slate-400 dark:text-slate-500"
                                 )}
                             >
-                                <item.icon className={cn("w-5 h-5 transition-transform duration-300", isActive ? "scale-110" : "scale-100")} />
-                                <span className={cn("text-[10px] uppercase font-black tracking-tighter transition-all duration-300", isActive ? "opacity-100 translate-y-0" : "opacity-60 translate-y-0.5")}>
+                                <item.icon className={cn("w-4.5 h-4.5 transition-all duration-300", isActive ? "scale-110 translate-y-[-2px]" : "scale-100")} />
+                                <span className={cn("text-[9px] uppercase font-bold tracking-wider transition-all duration-300", isActive ? "opacity-100 font-extrabold" : "opacity-75")}>
                                     {item.name}
                                 </span>
                                 {isActive && (
-                                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#3498db] rounded-full shadow-[0_-2px_10px_rgba(52,152,219,0.5)]" />
+                                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-5 h-1 bg-blue-500 dark:bg-[#3498db] rounded-full shadow-[0_0_8px_rgba(52,152,219,0.6)]" />
                                 )}
                             </Link>
                         );
@@ -194,46 +194,46 @@ export function MobileNav() {
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className={cn(
-                            "flex flex-col items-center justify-center gap-1.5 transition-all relative py-3",
+                            "flex flex-col items-center justify-center gap-1 transition-all duration-300 relative py-2",
                             isMenuOpen
-                                ? "text-[#3498db] dark:text-[#3498db]"
-                                : "text-gray-400 dark:text-gray-600"
+                                ? "text-blue-500 dark:text-[#3498db]"
+                                : "text-slate-400 dark:text-slate-500"
                         )}
                     >
-                        {isMenuOpen ? <X className="w-5 h-5 scale-110 transition-transform" /> : <Menu className="w-5 h-5 transition-transform" />}
-                        <span className={cn("text-[10px] uppercase font-black tracking-tighter", isMenuOpen ? "opacity-100" : "opacity-60")}>
+                        {isMenuOpen ? <X className="w-4.5 h-4.5 scale-110 transition-transform" /> : <Menu className="w-4.5 h-4.5 transition-transform" />}
+                        <span className={cn("text-[9px] uppercase font-bold tracking-wider", isMenuOpen ? "opacity-100 font-extrabold" : "opacity-75")}>
                             Menu
                         </span>
                         {isMenuOpen && (
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#3498db] rounded-full shadow-[0_-2px_10px_rgba(52,152,219,0.5)]" />
+                            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-5 h-1 bg-blue-500 dark:bg-[#3498db] rounded-full shadow-[0_0_8px_rgba(52,152,219,0.6)]" />
                         )}
                     </button>
                 </div>
             </nav>
 
-            {/* Desktop Sidebar (Remains mostly same but improved slightly) */}
-            <nav className="hidden md:flex md:flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:w-72 bg-white dark:bg-[#1a1d23] border-r border-gray-200 dark:border-[#2d3139] p-6 shadow-sm">
-                <div className="mb-10 p-5 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-[#23272f] dark:to-[#1a1d23] rounded-[2.5rem] border border-gray-100 dark:border-[#2d3139] shadow-inner">
+            {/* Desktop Sidebar (Floating premium glass panel) */}
+            <nav className="hidden md:flex md:flex-col md:fixed md:left-4 md:top-4 md:bottom-4 md:w-64 bg-white/70 dark:bg-[#0f131a]/80 backdrop-blur-xl border border-slate-200/50 dark:border-white/[0.06] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.25)] rounded-[2rem] z-50">
+                <div className="mb-6 p-4 bg-gradient-to-br from-slate-50 to-blue-50/50 dark:from-[#1b202c]/50 dark:to-[#0f131a]/50 rounded-[1.8rem] border border-slate-200/40 dark:border-white/[0.03] shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-2xl shadow-lg shadow-blue-500/20">
-                            <Wallet className="w-5 h-5 text-white" />
+                        <div className="p-2.5 bg-gradient-to-br from-[#2980b9] to-[#3498db] rounded-xl shadow-md shadow-blue-500/10">
+                            <Wallet className="w-4.5 h-4.5 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+                            <h1 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">
                                 Portfolio IDX
                             </h1>
-                            <p className="text-[10px] font-bold text-[#3498db] uppercase tracking-widest leading-none mt-1 opacity-80">Pro Investor</p>
+                            <p className="text-[8px] font-black text-[#3498db] uppercase tracking-[0.2em] leading-none mt-1">Pro Investor</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-8 flex-1 overflow-y-auto custom-scrollbar scrollbar-hide">
+                <div className="mb-6 flex-1 overflow-y-auto scrollbar-hide">
                     <SidebarPortfolios />
                 </div>
 
-                <div className="space-y-1 mb-6">
-                    <div className="px-4 mb-4">
-                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-[0.25em]">Navigation</span>
+                <div className="space-y-0.5 mb-4">
+                    <div className="px-3 mb-2">
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.25em]">Navigation</span>
                     </div>
                     {allNavItems.map((item) => {
                         const isActive = pathname === item.href;
@@ -242,25 +242,28 @@ export function MobileNav() {
                                 key={item.name}
                                 href={item.href}
                                 className={cn(
-                                    "flex items-center gap-3.5 px-4 py-3.5 rounded-2xl transition-all group mb-1",
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group relative",
                                     isActive
-                                        ? "bg-[#3498db]/10 text-[#3498db] font-black shadow-sm"
-                                        : "text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-white/[0.03] hover:text-gray-900 dark:hover:text-gray-300"
+                                        ? "bg-blue-500/10 dark:bg-[#3498db]/10 text-blue-600 dark:text-[#3498db] font-black shadow-sm"
+                                        : "text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-white/[0.02] hover:text-slate-900 dark:hover:text-slate-300"
                                 )}
                             >
-                                <item.icon className={cn("w-4 h-4 transition-colors", isActive ? "text-[#3498db]" : "text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-400")} />
-                                <span className="text-[11px] uppercase font-black tracking-widest">{item.name}</span>
+                                <item.icon className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110", isActive ? "text-blue-600 dark:text-[#3498db]" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-400")} />
+                                <span className="text-[10px] uppercase font-bold tracking-widest">{item.name}</span>
+                                {isActive && (
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-500 dark:bg-[#3498db] rounded-r-full shadow-[0_0_8px_rgba(52,152,219,0.5)]" />
+                                )}
                             </Link>
                         );
                     })}
                 </div>
 
-                <div className="pt-6 border-t border-gray-100 dark:border-[#2d3139]">
+                <div className="pt-4 border-t border-slate-200/50 dark:border-white/[0.05]">
                     <div className="flex items-center justify-between px-2">
-                        <p className="text-[9px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-widest">
+                        <p className="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">
                             © 2026 Porto IDX
                         </p>
-                        <div className="w-2 h-2 bg-[#3498db] rounded-full animate-pulse" />
+                        <div className="w-1.5 h-1.5 bg-[#3498db] rounded-full animate-pulse shadow-[0_0_8px_#3498db]" />
                     </div>
                 </div>
             </nav>

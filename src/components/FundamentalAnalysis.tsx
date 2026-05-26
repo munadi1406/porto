@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, Activity } from "lucide-react";
+import { Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, Activity, Users, Zap } from "lucide-react";
 import { cn, formatIDR, formatCompactIDR } from "@/lib/utils";
 import { PortfolioItem } from "@/lib/types";
 import { useFundamentals } from "@/hooks/useFundamentals";
@@ -338,6 +338,121 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+
+                    {/* Foreign Flow Analysis */}
+                    <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Users className="w-5 h-5 text-blue-600" />
+                                <h4 className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-wider">Analisa Foreign Flow</h4>
+                            </div>
+                            <div className={cn(
+                                "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tight",
+                                data.foreignAccumulationStatus === "Akumulasi" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                data.foreignAccumulationStatus === "Distribusi" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
+                                "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                            )}>
+                                {data.foreignAccumulationStatus}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Net Foreign Buy/Sell (Value)</div>
+                                <div className={cn(
+                                    "text-2xl font-black",
+                                    data.foreignNetBuyValue >= 0 ? "text-emerald-500" : "text-rose-500"
+                                )}>
+                                    {data.foreignNetBuyValue >= 0 ? "+" : ""}{formatCompactIDR(data.foreignNetBuyValue)}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Net Foreign Buy/Sell (Volume)</div>
+                                <div className={cn(
+                                    "text-2xl font-black",
+                                    data.foreignNetBuyVolume >= 0 ? "text-emerald-500" : "text-rose-500"
+                                )}>
+                                    {data.foreignNetBuyVolume >= 0 ? "+" : ""}{Intl.NumberFormat('id-ID').format(data.foreignNetBuyVolume)} <span className="text-sm font-normal text-gray-400">lot</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-4 p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                {data.foreignAccumulationStatus === "Akumulasi" 
+                                    ? "Investor asing terpantau sedang melakukan akumulasi beli bersih pada saham ini. Ini merupakan sinyal positif untuk tren harga jangka menengah."
+                                    : data.foreignAccumulationStatus === "Distribusi"
+                                    ? "Investor asing terpantau sedang melakukan distribusi atau jual bersih. Tetap waspada terhadap tekanan jual yang mungkin berlanjut."
+                                    : "Aliran dana asing terpantau netral atau tidak signifikan. Pergerakan harga kemungkinan akan didominasi oleh investor domestik."
+                                }
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Smart Money (Bandarmology) Analysis */}
+                    <div className="mb-6 p-5 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/10 dark:to-yellow-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-amber-600" />
+                                <h4 className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-wider">Analisa Smart Money</h4>
+                            </div>
+                            <div className={cn(
+                                "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tight",
+                                data.smartMoneyColor === "emerald" || data.smartMoneyColor === "green" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                data.smartMoneyColor === "rose" || data.smartMoneyColor === "red" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
+                                "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            )}>
+                                {data.smartMoneyPhase}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">Top Buyer Brokers</div>
+                                <div className="flex gap-2">
+                                    {data.topBuyBrokers.map(broker => (
+                                        <div key={broker} className="px-3 py-1.5 bg-white dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                            {broker}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">Top Seller Brokers</div>
+                                <div className="flex gap-2">
+                                    {data.topSellBrokers.map(broker => (
+                                        <div key={broker} className="px-3 py-1.5 bg-white dark:bg-gray-900 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400">
+                                            {broker}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
+                            <div className="flex-1 w-full">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase">Concentration Score</span>
+                                    <span className="text-xs font-black dark:text-white">{data.concentrationScore}/100</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div 
+                                        className={cn(
+                                            "h-full transition-all",
+                                            data.smartMoneyPhase.includes("Accumulation") ? "bg-emerald-500" : 
+                                            data.smartMoneyPhase.includes("Distribution") ? "bg-rose-500" : "bg-blue-500"
+                                        )}
+                                        style={{ width: `${data.concentrationScore}%` }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex-shrink-0 w-full sm:w-auto p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl border border-amber-200/50 dark:border-amber-800/50">
+                                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 italic leading-snug">
+                                    "{data.smartMoneyDescription}"
+                                </p>
+                            </div>
                         </div>
                     </div>
 

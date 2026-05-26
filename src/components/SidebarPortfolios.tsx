@@ -87,16 +87,16 @@ export function SidebarPortfolios() {
             <button
                 onClick={() => router.push("/")}
                 className={cn(
-                    "group flex items-center justify-between gap-3 px-3 py-3 rounded-xl transition-all border border-transparent text-left",
+                    "group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 text-left border-l-4",
                     pathname === "/"
-                        ? "bg-blue-600 shadow-lg shadow-blue-500/20 text-white font-bold"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        ? "bg-slate-50 dark:bg-white/[0.04] border-l-blue-500 dark:border-l-[#3498db] shadow-[0_4px_20px_rgba(0,0,0,0.02)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.15)] text-blue-600 dark:text-[#3498db] font-black"
+                        : "hover:bg-slate-50 dark:hover:bg-white/[0.02] border-l-transparent text-slate-600 dark:text-slate-400"
                 )}
             >
                 <div className="flex items-center gap-3 overflow-hidden">
                     <div className={cn(
                         "p-1.5 rounded-lg transition-colors",
-                        pathname === "/" ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30"
+                        pathname === "/" ? "bg-blue-500/10 text-blue-500" : "bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-500/10 dark:group-hover:bg-blue-900/30"
                     )}>
                         <Layers className="w-3.5 h-3.5" />
                     </div>
@@ -104,12 +104,12 @@ export function SidebarPortfolios() {
                 </div>
                 {aggregateData && (
                     <div className={cn(
-                        "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                        "text-[9px] font-black px-1.5 py-0.5 rounded-md",
                         pathname === "/"
-                            ? "bg-white/20 text-white"
+                            ? "bg-blue-500/15 text-blue-600 dark:text-[#3498db]"
                             : (aggregateData.totals.dayChangePercent >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500")
                     )}>
-                        {aggregateData.totals.dayChangePercent >= 0 ? "+" : ""}{aggregateData.totals.dayChangePercent.toFixed(2)}%
+                        {aggregateData.totals.dayChangePercent >= 0 ? "+" : ""}{aggregateData.totals.dayChangePercent.toFixed(1)}%
                     </div>
                 )}
             </button>
@@ -124,11 +124,12 @@ export function SidebarPortfolios() {
                         key={p.id}
                         onClick={() => handleSelectPortfolio(p.id)}
                         className={cn(
-                            "group flex items-center justify-between gap-3 px-3 py-3 rounded-xl transition-all border-2 text-left cursor-pointer",
+                            "group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 text-left cursor-pointer border-l-4",
                             isSelected
-                                ? "bg-white dark:bg-gray-800 border-blue-500 shadow-md translate-x-1"
-                                : "hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent text-gray-600 dark:text-gray-400"
+                                ? "bg-slate-50 dark:bg-white/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.02)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
+                                : "hover:bg-slate-50 dark:hover:bg-white/[0.02] border-l-transparent text-slate-600 dark:text-slate-400"
                         )}
+                        style={{ borderLeftColor: isSelected ? (p.color || '#3b82f6') : 'transparent' }}
                     >
                         <div className="flex items-center gap-3 overflow-hidden ml-1">
                             <div
@@ -153,7 +154,7 @@ export function SidebarPortfolios() {
                         <div className="flex items-center gap-2">
                             {perf && (
                                 <div className={cn(
-                                    "text-[10px] font-black flex items-center gap-0.5 px-1.5 py-0.5 rounded-md",
+                                    "text-[9px] font-black flex items-center gap-0.5 px-1.5 py-0.5 rounded-md",
                                     perf.dayChangePercent >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
                                 )}>
                                     {perf.dayChangePercent >= 0 ? "+" : ""}{perf.dayChangePercent.toFixed(1)}%

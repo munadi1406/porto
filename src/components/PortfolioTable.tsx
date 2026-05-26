@@ -272,7 +272,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                 </button>
             </div>
 
-            <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="overflow-x-auto glass-panel rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.01)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.15)]">
                 {/* Modal Edit */}
                 {editingId && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -432,21 +432,21 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                     </div>
                 )}
 
-                <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800">
+                <table className="w-full border-collapse">
+                    <thead className="bg-slate-50/70 dark:bg-[#151a23]/60 border-b border-slate-200/50 dark:border-white/[0.04]">
                         <tr>
-                            <th className="px-4 md:px-6 py-4 text-left text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Saham</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Lot</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Avg Price</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Current</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Day Chg</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Value</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Unrealized P/L</th>
-                            <th className="px-4 md:px-6 py-4 text-right text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Return</th>
-                            <th className="px-4 md:px-6 py-4 text-center text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Aksi</th>
+                            <th className="px-4 md:px-6 py-4.5 text-left text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Saham</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Lot</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Avg Price</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Current</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Day Chg</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Value</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Unrealized P/L</th>
+                            <th className="px-4 md:px-6 py-4.5 text-right text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Return</th>
+                            <th className="px-4 md:px-6 py-4.5 text-center text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em]">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tbody className="divide-y divide-slate-100 dark:divide-white/[0.04]">
                         {sortedPortfolio.map((item) => {
                             const quote = marketData[item.ticker];
                             const currentPrice = quote?.price || 0;
@@ -463,10 +463,10 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             const isDayLoss = dailyChangeValue < 0;
 
                             return (
-                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors group">
-                                    <td className="px-4 md:px-6 py-4">
-                                        <div className="font-bold text-gray-900 dark:text-white leading-none mb-1 text-sm md:text-base">{item.ticker}</div>
-                                        <div className="text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-tight line-clamp-1">{quote?.name || item.name}</div>
+                                <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors duration-300 group">
+                                    <td className="px-4 md:px-6 py-4.5">
+                                        <div className="inline-flex font-mono font-bold tracking-tight text-blue-600 dark:text-[#3498db] bg-blue-500/10 dark:bg-[#3498db]/15 px-2 py-0.5 rounded text-xs md:text-sm mb-1">{item.ticker}</div>
+                                        <div className="text-[9px] md:text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider line-clamp-1">{quote?.name || item.name}</div>
                                     </td>
                                     <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300 text-sm">
                                         {formatNumber(item.lots)}
