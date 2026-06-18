@@ -80,8 +80,8 @@ export default function AnalyticsPage() {
         return (
             <div>
                 <div className="mb-4 space-y-2">
-                    <div className="h-6 w-32 bg-[var(--border)] animate-pulse rounded" />
-                    <div className="h-4 w-48 bg-[var(--border)] animate-pulse rounded" />
+                    <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+                    <div className="h-4 w-48 bg-muted animate-pulse rounded" />
                 </div>
                 <div className="space-y-4">
                     <EquityGrowthChartSkeleton />
@@ -99,8 +99,8 @@ export default function AnalyticsPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-semibold text-[var(--fg)] tracking-tight">Analytics</h1>
-                <p className="text-sm text-[var(--muted)]">Analisis performa portfolio Anda</p>
+                <h1 className="text-2xl font-semibold text-foreground tracking-tight">Analytics</h1>
+                <p className="text-sm text-muted-foreground">Analisis performa portfolio Anda</p>
             </div>
 
             <div>

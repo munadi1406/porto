@@ -5,7 +5,6 @@ import { create } from "zustand";
 interface ThemeStore {
   theme: "light" | "dark";
   toggle: () => void;
-  setTheme: (t: "light" | "dark") => void;
 }
 
 function getInitialTheme(): "light" | "dark" {
@@ -16,8 +15,7 @@ function getInitialTheme(): "light" | "dark" {
 }
 
 function applyTheme(theme: "light" | "dark") {
-  const root = document.documentElement;
-  root.classList.toggle("dark", theme === "dark");
+  document.documentElement.classList.toggle("dark", theme === "dark");
   localStorage.setItem("porto-theme", theme);
 }
 
@@ -32,9 +30,5 @@ export const useTheme = create<ThemeStore>((set) => {
         applyTheme(next);
         return { theme: next };
       }),
-    setTheme: (t) => {
-      applyTheme(t);
-      set({ theme: t });
-    },
   };
 });

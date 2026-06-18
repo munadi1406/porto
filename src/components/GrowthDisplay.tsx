@@ -24,12 +24,12 @@ export function GrowthDisplay({ getGrowth }: GrowthDisplayProps) {
     const isPositive = growth.value >= 0;
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
             <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <div className="p-2 bg-primary/10 rounded-lg">
+                    <Calendar className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-bold text-foreground">
                     Portfolio Growth
                 </h3>
             </div>
@@ -43,8 +43,8 @@ export function GrowthDisplay({ getGrowth }: GrowthDisplayProps) {
                         className={cn(
                             "flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors",
                             selectedPeriod === period.key
-                                ? "bg-purple-600 text-white shadow-sm"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "bg-muted text-muted-foreground hover:bg-muted"
                         )}
                     >
                         {period.label}
@@ -57,7 +57,7 @@ export function GrowthDisplay({ getGrowth }: GrowthDisplayProps) {
                 <div
                     className={cn(
                         "text-3xl font-bold flex items-center gap-2",
-                        isPositive ? "text-green-600" : "text-red-600"
+                        isPositive ? "text-success" : "text-destructive"
                     )}
                 >
                     {isPositive ? (
@@ -71,13 +71,13 @@ export function GrowthDisplay({ getGrowth }: GrowthDisplayProps) {
                 <div
                     className={cn(
                         "text-lg font-semibold",
-                        isPositive ? "text-green-600" : "text-red-600"
+                        isPositive ? "text-success" : "text-destructive"
                     )}
                 >
                     {isPositive ? "+" : ""}
                     {formatPercentage(growth.percent)}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                     {selectedPeriod === "day" && "Last 24 hours"}
                     {selectedPeriod === "week" && "Last 7 days"}
                     {selectedPeriod === "year" && "Last 365 days"}

@@ -19,9 +19,9 @@ export function ExportPDFButton({
     const baseStyles = "inline-flex items-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
 
     const variantStyles = {
-        default: "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",
-        ghost: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300",
-        outline: "border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-gray-500",
+        default: "bg-primary hover:bg-primary/80 text-primary-foreground focus:ring-primary/50",
+        ghost: "bg-transparent hover:bg-muted text-muted-foreground",
+        outline: "border border-border bg-card hover:bg-muted text-muted-foreground focus:ring-muted-foreground",
     };
 
     const sizeStyles = {

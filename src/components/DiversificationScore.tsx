@@ -82,22 +82,22 @@ export function DiversificationScore({ portfolio, prices }: DiversificationScore
 
     if (!analysis) {
         return (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Diversification Score</h3>
-                <p className="text-sm text-gray-500">Tambahkan saham untuk analisis</p>
+            <div className="bg-card p-6 rounded-2xl border border-border">
+                <h3 className="text-lg font-bold text-foreground mb-2">Diversification Score</h3>
+                <p className="text-sm text-muted-foreground">Tambahkan saham untuk analisis</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
             <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-                    <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <div className="p-2 bg-primary/10 rounded-xl">
+                    <Shield className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Diversification Score</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Analisis risiko konsentrasi</p>
+                    <h3 className="text-base sm:text-lg font-bold text-foreground">Diversification Score</h3>
+                    <p className="text-xs text-muted-foreground">Analisis risiko konsentrasi</p>
                 </div>
             </div>
 
@@ -105,29 +105,29 @@ export function DiversificationScore({ portfolio, prices }: DiversificationScore
             <div className="mb-6">
                 <div className="flex items-end justify-between mb-2">
                     <div>
-                        <p className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                        <p className="text-4xl sm:text-5xl font-bold text-foreground">
                             {analysis.score.toFixed(0)}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">out of 100</p>
+                        <p className="text-xs text-muted-foreground mt-1">out of 100</p>
                     </div>
                     <div className={cn(
                         "px-3 py-1.5 rounded-lg font-semibold text-sm",
-                        analysis.riskColor === "green" && "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
-                        analysis.riskColor === "yellow" && "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
-                        analysis.riskColor === "red" && "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                        analysis.riskColor === "green" && "bg-success/10 text-success",
+                        analysis.riskColor === "yellow" && "bg-warning/10 text-warning",
+                        analysis.riskColor === "red" && "bg-destructive/10 text-destructive"
                     )}>
                         {analysis.riskLevel.toUpperCase()} RISK
                     </div>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
                     <div
                         className={cn(
                             "h-full rounded-full transition-all duration-500",
-                            analysis.riskColor === "green" && "bg-gradient-to-r from-green-500 to-emerald-500",
-                            analysis.riskColor === "yellow" && "bg-gradient-to-r from-yellow-500 to-amber-500",
-                            analysis.riskColor === "red" && "bg-gradient-to-r from-red-500 to-rose-500"
+                            analysis.riskColor === "green" && "bg-success",
+                            analysis.riskColor === "yellow" && "bg-warning",
+                            analysis.riskColor === "red" && "bg-destructive"
                         )}
                         style={{ width: `${analysis.score}%` }}
                     />
@@ -136,21 +136,21 @@ export function DiversificationScore({ portfolio, prices }: DiversificationScore
                 {/* Recommendation */}
                 <div className={cn(
                     "mt-3 p-3 rounded-lg flex items-start gap-2",
-                    analysis.riskColor === "green" && "bg-green-50 dark:bg-green-900/10",
-                    analysis.riskColor === "yellow" && "bg-yellow-50 dark:bg-yellow-900/10",
-                    analysis.riskColor === "red" && "bg-red-50 dark:bg-red-900/10"
+                    analysis.riskColor === "green" && "bg-success/10",
+                    analysis.riskColor === "yellow" && "bg-warning/10",
+                    analysis.riskColor === "red" && "bg-destructive/10"
                 )}>
                     <AlertCircle className={cn(
                         "w-4 h-4 mt-0.5 flex-shrink-0",
-                        analysis.riskColor === "green" && "text-green-600",
-                        analysis.riskColor === "yellow" && "text-yellow-600",
-                        analysis.riskColor === "red" && "text-red-600"
+                        analysis.riskColor === "green" && "text-success",
+                        analysis.riskColor === "yellow" && "text-warning",
+                        analysis.riskColor === "red" && "text-destructive"
                     )} />
                     <p className={cn(
                         "text-sm font-medium",
-                        analysis.riskColor === "green" && "text-green-700 dark:text-green-400",
-                        analysis.riskColor === "yellow" && "text-yellow-700 dark:text-yellow-400",
-                        analysis.riskColor === "red" && "text-red-700 dark:text-red-400"
+                        analysis.riskColor === "green" && "text-success",
+                        analysis.riskColor === "yellow" && "text-warning",
+                        analysis.riskColor === "red" && "text-destructive"
                     )}>
                         {analysis.recommendation}
                     </p>
@@ -159,37 +159,37 @@ export function DiversificationScore({ portfolio, prices }: DiversificationScore
 
             {/* Concentration Metrics */}
             <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Top 1</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">{analysis.top1.toFixed(1)}%</p>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Top 1</p>
+                    <p className="text-lg font-bold text-foreground">{analysis.top1.toFixed(1)}%</p>
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Top 3</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">{analysis.top3.toFixed(1)}%</p>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Top 3</p>
+                    <p className="text-lg font-bold text-foreground">{analysis.top3.toFixed(1)}%</p>
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Stocks</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">{analysis.totalStocks}</p>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Stocks</p>
+                    <p className="text-lg font-bold text-foreground">{analysis.totalStocks}</p>
                 </div>
             </div>
 
             {/* Top Holdings */}
             <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Top Holdings</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Top Holdings</h4>
                 <div className="space-y-2">
                     {analysis.topHoldings.map((holding, index) => (
                         <div key={`holding-${index}`} className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{index + 1}</span>
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-bold text-primary">{index + 1}</span>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{holding.ticker}</span>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">{holding.percentage.toFixed(1)}%</span>
+                                    <span className="text-sm font-semibold text-foreground">{holding.ticker}</span>
+                                    <span className="text-sm font-bold text-foreground">{holding.percentage.toFixed(1)}%</span>
                                 </div>
-                                <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
+                                        className="h-full bg-primary rounded-full"
                                         style={{ width: `${holding.percentage}%` }}
                                     />
                                 </div>

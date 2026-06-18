@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { Wallet, Edit3, Check, X } from "lucide-react";
 import { formatIDR } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface CashManagerProps {
     cash: number;
@@ -31,57 +34,39 @@ export function CashManager({ cash, onUpdateCash }: CashManagerProps) {
         }
     };
 
-    const handleEdit = () => {
-        setIsEditing(true);
-        setInputValue(cash.toString());
-    };
-
     return (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
                 <div className="flex items-center gap-2">
-                    <Wallet className="w-5 h-5 text-[var(--muted-fg)]" />
-                    <div>
-                        <h3 className="font-medium text-sm text-[var(--fg)]">Cash Holdings</h3>
-                        <p className="text-xs text-[var(--muted)]">Uang tunai tersedia</p>
-                    </div>
+                    <Wallet className="w-5 h-5 text-muted-foreground" />
+                    <CardTitle className="text-sm font-medium">Cash Holdings</CardTitle>
                 </div>
                 {!isEditing && (
-                    <button onClick={handleEdit} className="p-1.5 rounded hover:bg-[var(--surface-hover)] text-[var(--muted)] transition-colors">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setIsEditing(true); setInputValue(cash.toString()); }}>
                         <Edit3 className="w-4 h-4" />
-                    </button>
+                    </Button>
                 )}
-            </div>
-
-            {isEditing ? (
-                <form onSubmit={handleSubmit} className="space-y-3">
-                    <input
-                        type="number"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder="Jumlah cash"
-                        min="0"
-                        step="1000"
-                        className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                        autoFocus
-                    />
-                    <div className="flex gap-2">
-                        <button type="submit" disabled={isSubmitting} className="flex-1 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50">
-                            <Check className="w-4 h-4 inline mr-1" />
-                            {isSubmitting ? "Menyimpan..." : "Simpan"}
-                        </button>
-                        <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm text-[var(--muted-fg)] hover:bg-[var(--border)] transition-colors">
-                            <X className="w-4 h-4 inline mr-1" />
-                            Batal
-                        </button>
-                    </div>
-                </form>
-            ) : (
-                <div>
-                    <p className="text-2xl font-semibold text-[var(--fg)]">{formatIDR(cash)}</p>
-                    <p className="text-xs text-[var(--muted)] mt-1">Klik edit untuk mengubah</p>
-                </div>
-            )}
-        </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+                {isEditing ? (
+                    <form onSubmit={handleSubmit} className="space-y-3">
+                        <Input type="number" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Jumlah cash" min="0" step="1000" autoFocus />
+                        <div className="flex gap-2">
+                            <Button type="submit" disabled={isSubmitting} className="flex-1">
+                                <Check className="w-4 h-4 mr-1" />{isSubmitting ? "Menyimpan..." : "Simpan"}
+                            </Button>
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setIsEditing(false)}>
+                                <X className="w-4 h-4 mr-1" />Batal
+                            </Button>
+                        </div>
+                    </form>
+                ) : (
+                    <>
+                        <p className="text-2xl font-semibold">{formatIDR(cash)}</p>
+                        <p className="text-sm text-muted-foreground mt-1">Klik edit untuk mengubah</p>
+                    </>
+                )}
+            </CardContent>
+        </Card>
     );
 }

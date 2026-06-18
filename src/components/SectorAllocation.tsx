@@ -14,17 +14,17 @@ interface SectorAllocationProps {
 
 const SECTOR_COLORS: Record<string, string> = {
     "Financial Services": "#3b82f6",
-    "Communication Services": "#10b981",
+    "Communication Services": "hsl(var(--success))",
     "Consumer Defensive": "#f59e0b",
     "Consumer Cyclical": "#f97316",
     "Basic Materials": "#8b5cf6",
-    "Energy": "#ef4444",
+    "Energy": "hsl(var(--destructive))",
     "Real Estate": "#ec4899",
     "Industrials": "#06b6d4",
     "Technology": "#84cc16",
     "Healthcare": "#14b8a6",
     "Utilities": "#6366f1",
-    "Others": "#94a3b8",
+    "Others": "hsl(var(--muted-foreground))",
 };
 
 export function SectorAllocation({ portfolio, prices }: SectorAllocationProps) {
@@ -134,19 +134,19 @@ export function SectorAllocation({ portfolio, prices }: SectorAllocationProps) {
         if (active && payload && payload.length) {
             const data = payload[0].payload;
             return (
-                <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
-                    <p className="font-bold text-gray-900 dark:text-white mb-2">{data.sector}</p>
+                <div className="bg-card p-3 rounded-lg shadow-xl border border-border">
+                    <p className="font-bold text-foreground mb-2">{data.sector}</p>
                     <div className="space-y-1 text-xs">
                         <div className="flex justify-between gap-4">
-                            <span className="text-gray-600 dark:text-gray-400">Value:</span>
+                            <span className="text-muted-foreground">Value:</span>
                             <span className="font-semibold">{formatIDR(data.value)}</span>
                         </div>
                         <div className="flex justify-between gap-4">
-                            <span className="text-gray-600 dark:text-gray-400">Allocation:</span>
+                            <span className="text-muted-foreground">Allocation:</span>
                             <span className="font-bold">{data.percentage.toFixed(1)}%</span>
                         </div>
                         <div className="flex justify-between gap-4">
-                            <span className="text-gray-600 dark:text-gray-400">Stocks:</span>
+                            <span className="text-muted-foreground">Stocks:</span>
                             <span className="font-semibold">{data.stockCount}</span>
                         </div>
                     </div>
@@ -158,53 +158,53 @@ export function SectorAllocation({ portfolio, prices }: SectorAllocationProps) {
 
     if (!analysis) {
         return (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Sector Allocation</h3>
-                <p className="text-sm text-gray-500">Tambahkan saham untuk analisis</p>
+            <div className="bg-card p-6 rounded-2xl border border-border">
+                <h3 className="text-lg font-bold text-foreground mb-2">Sector Allocation</h3>
+                <p className="text-sm text-muted-foreground">Tambahkan saham untuk analisis</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
             <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                    <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 bg-primary/10 rounded-xl">
+                    <Building2 className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Sector Allocation</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <h3 className="text-base sm:text-lg font-bold text-foreground">Sector Allocation</h3>
+                    <p className="text-xs text-muted-foreground">
                         {sectorsLoading ? "Loading sectors..." : "Diversifikasi per sektor"}
                     </p>
                 </div>
                 {sectorsLoading && (
-                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
                 )}
             </div>
 
             {/* Risk Alert */}
             <div className={cn(
                 "mb-4 p-3 rounded-lg flex items-start gap-2",
-                analysis.riskLevel === "low" && "bg-green-50 dark:bg-green-900/10",
-                analysis.riskLevel === "medium" && "bg-yellow-50 dark:bg-yellow-900/10",
-                analysis.riskLevel === "high" && "bg-red-50 dark:bg-red-900/10"
+                analysis.riskLevel === "low" && "bg-success/10",
+                analysis.riskLevel === "medium" && "bg-warning/10",
+                analysis.riskLevel === "high" && "bg-destructive/10"
             )}>
                 <AlertTriangle className={cn(
                     "w-4 h-4 mt-0.5 flex-shrink-0",
-                    analysis.riskLevel === "low" && "text-green-600",
-                    analysis.riskLevel === "medium" && "text-yellow-600",
-                    analysis.riskLevel === "high" && "text-red-600"
+                    analysis.riskLevel === "low" && "text-success",
+                    analysis.riskLevel === "medium" && "text-warning",
+                    analysis.riskLevel === "high" && "text-destructive"
                 )} />
                 <div className="flex-1">
                     <p className={cn(
                         "text-sm font-medium",
-                        analysis.riskLevel === "low" && "text-green-700 dark:text-green-400",
-                        analysis.riskLevel === "medium" && "text-yellow-700 dark:text-yellow-400",
-                        analysis.riskLevel === "high" && "text-red-700 dark:text-red-400"
+                        analysis.riskLevel === "low" && "text-success",
+                        analysis.riskLevel === "medium" && "text-warning",
+                        analysis.riskLevel === "high" && "text-destructive"
                     )}>
                         {analysis.recommendation}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                         {analysis.totalSectors} sectors • Top sector: {analysis.topSector.toFixed(0)}%
                     </p>
                 </div>
@@ -234,7 +234,7 @@ export function SectorAllocation({ portfolio, prices }: SectorAllocationProps) {
                             formatter={(value, entry: any) => {
                                 const data = entry.payload;
                                 return (
-                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    <span className="text-xs font-medium text-muted-foreground">
                                         {value} ({data.percentage.toFixed(0)}%)
                                     </span>
                                 );
@@ -247,29 +247,29 @@ export function SectorAllocation({ portfolio, prices }: SectorAllocationProps) {
 
             {/* Expandable Sectors List */}
             <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Sectors & Holdings</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Sectors & Holdings</h4>
                 <div className="space-y-2">
                     {analysis.sectorData.map((sector, index) => {
                         const isExpanded = expandedSectors.has(sector.sector);
                         return (
-                            <div key={`sector-${index}`} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                            <div key={`sector-${index}`} className="border border-border rounded-lg overflow-hidden">
                                 {/* Sector Header - Clickable */}
                                 <button
                                     onClick={() => toggleSector(sector.sector)}
-                                    className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                                    className="w-full p-3 flex items-center gap-3 hover:bg-muted transition-colors"
                                 >
                                     <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: sector.color }}>
-                                        <span className="text-xs font-bold text-white">{index + 1}</span>
+                                        <span className="text-xs font-bold">{index + 1}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between mb-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{sector.sector}</span>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">({sector.stockCount} stocks)</span>
+                                                <span className="text-sm font-semibold text-foreground truncate">{sector.sector}</span>
+                                                <span className="text-xs text-muted-foreground">({sector.stockCount} stocks)</span>
                                             </div>
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white ml-2">{sector.percentage.toFixed(1)}%</span>
+                                            <span className="text-sm font-bold text-foreground ml-2">{sector.percentage.toFixed(1)}%</span>
                                         </div>
-                                        <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                             <div
                                                 className="h-full rounded-full transition-all"
                                                 style={{ width: `${sector.percentage}%`, backgroundColor: sector.color }}
@@ -277,38 +277,38 @@ export function SectorAllocation({ portfolio, prices }: SectorAllocationProps) {
                                         </div>
                                     </div>
                                     {isExpanded ? (
-                                        <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                     ) : (
-                                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                     )}
                                 </button>
 
                                 {/* Expanded Stock List */}
                                 {isExpanded && (
-                                    <div className="bg-gray-50 dark:bg-gray-900/30 border-t border-gray-200 dark:border-gray-700">
+                                    <div className="bg-muted/50 border-t border-border">
                                         {sector.stocks.map((stock, stockIndex) => (
                                             <div
                                                 key={`stock-${stockIndex}`}
-                                                className="px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/50 transition-colors border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                                                className="px-4 py-3 flex items-center justify-between hover:bg-muted transition-colors border-b border-border last:border-b-0"
                                             >
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{stock.ticker}</p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{stock.name}</p>
+                                                        <p className="text-sm font-bold text-foreground">{stock.ticker}</p>
+                                                        <p className="text-xs text-muted-foreground truncate">{stock.name}</p>
                                                     </div>
-                                                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                                         <span>{stock.lots} lot</span>
                                                         <span>•</span>
                                                         <span>{formatIDR(stock.currentPrice)}</span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right ml-3">
-                                                    <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
+                                                    <p className="text-sm font-bold text-foreground mb-1">
                                                         {formatIDR(stock.value)}
                                                     </p>
                                                     <div className={cn(
                                                         "flex items-center gap-1 text-xs font-semibold",
-                                                        stock.gainLoss >= 0 ? "text-green-600" : "text-red-600"
+                                                        stock.gainLoss >= 0 ? "text-success" : "text-destructive"
                                                     )}>
                                                         {stock.gainLoss >= 0 ? (
                                                             <TrendingUp className="w-3 h-3" />

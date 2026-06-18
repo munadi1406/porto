@@ -95,11 +95,11 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
     return (
         <div className={cn(
             "relative overflow-hidden p-6 rounded-3xl border transition-all duration-500",
-            advice.color === "emerald" && "bg-emerald-50/50 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/20",
-            advice.color === "blue" && "bg-blue-50/50 dark:bg-blue-500/5 border-blue-100 dark:border-blue-500/20",
-            advice.color === "orange" && "bg-orange-50/50 dark:bg-orange-500/5 border-orange-100 dark:border-orange-500/20",
-            advice.color === "rose" && "bg-rose-50/50 dark:bg-rose-500/5 border-rose-100 dark:border-rose-500/20",
-            advice.color === "indigo" && "bg-indigo-50/50 dark:bg-indigo-500/5 border-indigo-100 dark:border-indigo-500/20",
+            advice.color === "emerald" && "bg-success/10 border-success/20",
+            advice.color === "blue" && "bg-primary/10 border-primary/20",
+            advice.color === "orange" && "bg-warning/10 border-warning/20",
+            advice.color === "rose" && "bg-destructive/10 border-destructive/20",
+            advice.color === "indigo" && "bg-primary/10 border-primary/20",
         )}>
             {/* Background Accent */}
             <div className={cn(
@@ -110,11 +110,10 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
             <div className="relative flex flex-col md:flex-row gap-6 items-start">
                 <div className={cn(
                     "p-4 rounded-2xl shadow-lg flex-shrink-0 animate-pulse",
-                    advice.color === "emerald" && "bg-emerald-500 text-white shadow-emerald-500/20",
-                    advice.color === "blue" && "bg-blue-500 text-white shadow-blue-500/20",
-                    advice.color === "orange" && "bg-orange-500 text-white shadow-orange-500/20",
-                    advice.color === "rose" && "bg-rose-500 text-white shadow-rose-500/20",
-                    advice.color === "indigo" && "bg-indigo-500 text-white shadow-indigo-500/20",
+                    advice.color === "emerald" && "bg-success text-success-foreground shadow-success/20",
+                    advice.color === "blue" && "bg-primary text-primary-foreground shadow-primary/20",
+                    advice.color === "orange" && "bg-warning text-warning-foreground shadow-warning/20",
+                    advice.color === "indigo" && "bg-primary text-primary-foreground shadow-primary/20",
                 )}>
                     <Icon className="w-8 h-8" />
                 </div>
@@ -124,20 +123,19 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
                         <div className="flex items-center gap-2 mb-1">
                             <span className={cn(
                                 "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
-                                advice.color === "emerald" && "bg-emerald-500/10 text-emerald-600",
-                                advice.color === "blue" && "bg-blue-500/10 text-blue-600",
-                                advice.color === "orange" && "bg-orange-500/10 text-orange-600",
-                                advice.color === "rose" && "bg-rose-500/10 text-rose-600",
-                                advice.color === "indigo" && "bg-indigo-500/10 text-indigo-600",
+                                advice.color === "emerald" && "bg-success/10 text-success",
+                                advice.color === "blue" && "bg-primary/10 text-primary",
+                                advice.color === "orange" && "bg-warning/10 text-warning",
+                                advice.color === "indigo" && "bg-primary/10 text-primary",
                             )}>
                                 Smart Advisor
                             </span>
-                            <span className="text-[10px] font-bold text-gray-400">• Berdasarkan Profil Portofolio</span>
+                            <span className="text-[10px] font-bold text-muted-foreground">• Berdasarkan Profil Portofolio</span>
                         </div>
-                        <h3 className="text-xl font-black text-gray-900 dark:text-white leading-tight">
+                        <h3 className="text-xl font-black text-foreground leading-tight">
                             {advice.title}
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 font-medium leading-relaxed max-w-2xl">
+                        <p className="text-sm text-muted-foreground mt-2 font-medium leading-relaxed max-w-2xl">
                             {advice.description}
                         </p>
                     </div>
@@ -145,8 +143,8 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
                     {advice.tips.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
                             {advice.tips.map((tip: string, i: number) => (
-                                <div key={i} className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
-                                    <ArrowRight className="w-3 h-3 text-indigo-500" />
+                                <div key={i} className="flex items-center gap-2 text-xs font-bold text-muted-foreground bg-muted p-2.5 rounded-xl border border-border">
+                                    <ArrowRight className="w-3 h-3 text-primary" />
                                     {tip}
                                 </div>
                             ))}
@@ -154,15 +152,15 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
                     )}
                 </div>
 
-                <div className="w-full md:w-auto flex-shrink-0 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                <div className="w-full md:w-auto flex-shrink-0 bg-card p-4 rounded-2xl border border-border shadow-sm">
                     <div className="text-center">
-                        <div className="text-[9px] font-black text-gray-400 uppercase mb-1">CASH RATIO</div>
-                        <div className="text-2xl font-black text-gray-900 dark:text-white">{advice.cashRatio.toFixed(0)}%</div>
-                        <div className="w-24 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full mt-2 overflow-hidden mx-auto">
+                        <div className="text-[9px] font-black text-muted-foreground uppercase mb-1">CASH RATIO</div>
+                        <div className="text-2xl font-black text-foreground">{advice.cashRatio.toFixed(0)}%</div>
+                        <div className="w-24 h-1.5 bg-muted rounded-full mt-2 overflow-hidden mx-auto">
                             <div
                                 className={cn(
                                     "h-full rounded-full",
-                                    advice.cashRatio > 20 ? "bg-emerald-500" : advice.cashRatio > 10 ? "bg-orange-500" : "bg-rose-500"
+                                    advice.cashRatio > 20 ? "bg-success" : advice.cashRatio > 10 ? "bg-warning" : "bg-destructive"
                                 )}
                                 style={{ width: `${advice.cashRatio}%` }}
                             />

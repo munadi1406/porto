@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 interface StockFormProps {
     onSubmit: (data: { ticker: string; name: string; lots: number; averagePrice: number }) => void;
@@ -14,14 +18,32 @@ export function StockForm({ onSubmit, onCancel, initialData, isEdit = false }: S
     const [name, setName] = useState(initialData?.name || "");
     const [lots, setLots] = useState(initialData?.lots?.toString() || "");
     const [price, setPrice] = useState(initialData?.averagePrice?.toString() || "");
+    const [nameLoading, setNameLoading] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (!ticker || ticker.length < 3 || isEdit) return;
+
+        const finalTicker = ticker.includes('.') ? ticker : ticker + '.JK';
+        debounceRef.current = setTimeout(async () => {
+            setNameLoading(true);
+            try {
+                const res = await fetch(`/api/name?ticker=${encodeURIComponent(finalTicker)}`);
+                const data = await res.json();
+                if (data.name && data.name !== finalTicker) setName(data.name);
+            } catch { /* ignore */ }
+            setNameLoading(false);
+        }, 500);
+
+        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    }, [ticker, isEdit]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!ticker || !lots || !price) return;
         let finalTicker = ticker.toUpperCase();
-        if (!finalTicker.endsWith(".JK") && /^[A-Z]{4}$/.test(finalTicker)) {
-            finalTicker += ".JK";
-        }
+        if (!finalTicker.endsWith(".JK") && /^[A-Z]{4}$/.test(finalTicker)) finalTicker += ".JK";
         onSubmit({ ticker: finalTicker, name: name || finalTicker, lots: Number(lots), averagePrice: Number(price) });
         if (!isEdit) { setTicker(""); setName(""); setLots(""); setPrice(""); }
     };
@@ -29,33 +51,32 @@ export function StockForm({ onSubmit, onCancel, initialData, isEdit = false }: S
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-[var(--muted-fg)] mb-1">Kode Saham</label>
-                    <input type="text" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} placeholder="BBCA.JK" className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]" required />
-                    <p className="text-xs text-[var(--muted)] mt-1">Gunakan akhiran .JK (opsional)</p>
+                <div className="space-y-2">
+                    <Label htmlFor="ticker">Kode Saham</Label>
+                    <Input id="ticker" value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} placeholder="BBCA.JK" required />
+                    <p className="text-xs text-muted-foreground">Gunakan akhiran .JK (opsional)</p>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-[var(--muted-fg)] mb-1">Nama Perusahaan</label>
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bank Central Asia" className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]" />
+                <div className="space-y-2">
+                    <Label htmlFor="name">Nama Perusahaan</Label>
+                    <div className="relative">
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bank Central Asia" />
+                        {nameLoading && (
+                            <Loader2 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin" />
+                        )}
+                    </div>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-[var(--muted-fg)] mb-1">Jumlah Lot</label>
-                    <input type="number" value={lots} onChange={(e) => setLots(e.target.value)} placeholder="10" min="1" className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]" required />
+                <div className="space-y-2">
+                    <Label htmlFor="lots">Jumlah Lot</Label>
+                    <Input id="lots" type="number" value={lots} onChange={(e) => setLots(e.target.value)} placeholder="10" min="1" required />
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-[var(--muted-fg)] mb-1">Harga Rata-Rata</label>
-                    <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="8500" min="1" className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]" required />
+                <div className="space-y-2">
+                    <Label htmlFor="price">Harga Rata-Rata</Label>
+                    <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="8500" min="1" required />
                 </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-                {onCancel && (
-                    <button type="button" onClick={onCancel} className="px-4 py-2 border border-[var(--border)] rounded-lg text-sm text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] transition-colors">
-                        Batal
-                    </button>
-                )}
-                <button type="submit" className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors">
-                    {isEdit ? "Simpan" : "Tambah Saham"}
-                </button>
+                {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>}
+                <Button type="submit">{isEdit ? "Simpan" : "Tambah Saham"}</Button>
             </div>
         </form>
     );

@@ -25,36 +25,64 @@ export function ExportDashboard({ targetRef, filename = "dashboard" }: ExportDas
         toast.info("Memproses export...");
 
         try {
-            // Wait a bit for privacy mode to apply if needed
             await new Promise(resolve => setTimeout(resolve, 300));
 
-            const canvas = await html2canvas(targetRef.current, {
-                backgroundColor: "#ffffff",
-                scale: 2, // Higher quality
-                logging: false,
-                useCORS: true,
-                allowTaint: true,
-                windowWidth: targetRef.current.scrollWidth,
-                windowHeight: targetRef.current.scrollHeight,
+            // Disable ALL stylesheets with oklch/lch/lab before html2canvas
+            const savedStyles: { restore: () => void }[] = [];
+
+            document.querySelectorAll('style').forEach(el => {
+                if (el.textContent && /oklch|lch|lab/.test(el.textContent)) {
+                    const orig = el.textContent;
+                    el.textContent = '';
+                    savedStyles.push({ restore: () => { el.textContent = orig; } });
+                }
             });
 
-            // Convert to blob and download
-            canvas.toBlob((blob) => {
-                if (!blob) {
-                    toast.error("Gagal membuat gambar");
-                    return;
+            document.querySelectorAll('link[rel="stylesheet"]').forEach(el => {
+                if (el.parentNode) {
+                    const placeholder = document.createElement('style');
+                    placeholder.setAttribute('data-html2canvas-placeholder', '');
+                    el.parentNode.insertBefore(placeholder, el.nextSibling);
+                    el.parentNode.removeChild(el);
+                    savedStyles.push({ restore: () => {
+                        if (placeholder.parentNode) {
+                            placeholder.parentNode.insertBefore(el, placeholder.nextSibling);
+                            placeholder.parentNode.removeChild(placeholder);
+                        }
+                    }});
                 }
+            });
 
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                const timestamp = new Date().toISOString().split("T")[0];
-                link.download = `${filename}-${timestamp}${isPrivacyMode ? "-private" : ""}.png`;
-                link.href = url;
-                link.click();
-                URL.revokeObjectURL(url);
+            try {
+                const canvas = await html2canvas(targetRef.current, {
+                    backgroundColor: "#ffffff",
+                    scale: 2,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true,
+                    windowWidth: targetRef.current.scrollWidth,
+                    windowHeight: targetRef.current.scrollHeight,
+                });
 
-                toast.success("Dashboard berhasil di-export!");
-            }, "image/png");
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        toast.error("Gagal membuat gambar");
+                        return;
+                    }
+
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    const timestamp = new Date().toISOString().split("T")[0];
+                    link.download = `${filename}-${timestamp}${isPrivacyMode ? "-private" : ""}.png`;
+                    link.href = url;
+                    link.click();
+                    URL.revokeObjectURL(url);
+
+                    toast.success("Dashboard berhasil di-export!");
+                }, "image/png");
+            } finally {
+                savedStyles.forEach(s => s.restore());
+            }
         } catch (error) {
             console.error("Export error:", error);
             toast.error("Gagal export dashboard");
@@ -72,8 +100,8 @@ export function ExportDashboard({ targetRef, filename = "dashboard" }: ExportDas
           flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm
           transition-all duration-200 border
           ${isPrivacyMode
-                        ? "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800"
-                        : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-muted text-muted-foreground border-border"
                     }
           hover:shadow-md active:scale-95
         `}
@@ -98,9 +126,9 @@ export function ExportDashboard({ targetRef, filename = "dashboard" }: ExportDas
                 disabled={isExporting}
                 className={`
           flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm
-          bg-[var(--accent)] text-white
-          border border-blue-600 shadow-md
-          hover:from-blue-600 hover:to-blue-700 hover:shadow-lg
+          bg-primary text-primary-foreground
+          border border-primary shadow-md
+          hover:opacity-90 hover:shadow-lg
           active:scale-95 transition-all duration-200
           disabled:opacity-50 disabled:cursor-not-allowed
         `}

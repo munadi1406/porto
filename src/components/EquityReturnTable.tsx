@@ -145,15 +145,15 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
     ];
 
     return (
-        <div ref={tableRef} className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
+        <div ref={tableRef} className="bg-card border border-border rounded-lg overflow-hidden">
             {/* Header */}
-            <div className="p-4 sm:p-6 border-b border-gray-800">
+            <div className="p-4 sm:p-6 border-b border-border">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold text-white">Total Equity Return</h3>
+                        <h3 className="text-lg font-semibold text-foreground">Total Equity Return</h3>
                         <div className="group relative">
-                            <Info className="w-4 h-4 text-gray-500 cursor-help" />
-                            <div className="absolute left-0 top-6 w-64 p-2 bg-gray-800 text-xs text-gray-300 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                            <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                            <div className="absolute left-0 top-6 w-64 p-2 bg-popover text-xs text-muted-foreground rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                 Riwayat perubahan equity portfolio Anda per hari atau per bulan
                             </div>
                         </div>
@@ -163,14 +163,14 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
 
                 {/* View Mode Toggle */}
                 <div className="flex items-center gap-4 mb-4">
-                    <div className="inline-flex items-center gap-1 p-1 bg-gray-800/50 rounded-lg">
+                    <div className="inline-flex items-center gap-1 p-1 bg-muted rounded-lg">
                         <button
                             onClick={() => setViewMode("hourly")}
                             className={cn(
                                 "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
                                 viewMode === "hourly"
-                                    ? "bg-emerald-500/20 text-emerald-400"
-                                    : "text-gray-400 hover:text-gray-200"
+                                    ? "bg-primary/20 text-primary"
+                                    : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             Hourly
@@ -180,8 +180,8 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                             className={cn(
                                 "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
                                 viewMode === "daily"
-                                    ? "bg-emerald-500/20 text-emerald-400"
-                                    : "text-gray-400 hover:text-gray-200"
+                                    ? "bg-primary/20 text-primary"
+                                    : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             Daily
@@ -191,8 +191,8 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                             className={cn(
                                 "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
                                 viewMode === "monthly"
-                                    ? "bg-emerald-500/20 text-emerald-400"
-                                    : "text-gray-400 hover:text-gray-200"
+                                    ? "bg-primary/20 text-primary"
+                                    : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             Monthly
@@ -204,7 +204,7 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                         <select
                             value={periodFilter}
                             onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
-                            className="px-4 py-1.5 text-sm font-medium bg-gray-800/50 text-gray-300 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                            className="px-4 py-1.5 text-sm font-medium bg-muted text-muted-foreground border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                         >
                             {periodOptions.map(option => (
                                 <option key={option.key} value={option.key}>
@@ -220,20 +220,20 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                 {dataWithPL.length > 0 ? (
                     <table className="w-full">
-                        <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+                        <thead className="sticky top-0 bg-card border-b border-border">
                             <tr>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                     {viewMode === "hourly" ? "Time" : "Date"}
                                 </th>
-                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                     Equity
                                 </th>
-                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                     P&L
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-800/50">
+                        <tbody className="divide-y divide-border/50">
                             {dataWithPL.map((item, index) => {
                                 const isPositive = item.pl > 0;
                                 const isNegative = item.pl < 0;
@@ -241,26 +241,26 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                                 return (
                                     <tr
                                         key={index}
-                                        className="hover:bg-gray-800/30 transition-colors"
+                                        className="hover:bg-muted/50 transition-colors"
                                     >
-                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                             {item.date}
                                         </td>
-                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-white">
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-foreground">
                                             {formatIDR(item.equity).replace('Rp', '').trim()}
                                         </td>
                                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-semibold">
                                             {item.pl !== 0 ? (
                                                 <span className={cn(
-                                                    isPositive && "text-emerald-400",
-                                                    isNegative && "text-red-400"
+                                                    isPositive && "text-success",
+                                                    isNegative && "text-destructive"
                                                 )}>
                                                     {isPositive && "+"}
                                                     {formatIDR(item.pl).replace('Rp', '').trim()} ({isPositive && "+"}
                                                     {formatPercentage(item.plPercent)})
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-500">-</span>
+                                                <span className="text-muted-foreground">-</span>
                                             )}
                                         </td>
                                     </tr>
@@ -269,7 +269,7 @@ export function EquityReturnTable({ getHistoryForPeriod }: EquityReturnTableProp
                         </tbody>
                     </table>
                 ) : (
-                    <div className="p-12 text-center text-gray-500">
+                    <div className="p-12 text-center text-muted-foreground">
                         <p className="text-sm">Belum ada data untuk periode ini</p>
                     </div>
                 )}

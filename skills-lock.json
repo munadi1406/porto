@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "react-best-practices": {
+      "source": "lgariv-dn/frontend-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "91269bb2c6b7147b82ead0e951f232f93a45f6e90c0091a4cbd813ec5726b78f"
+    }
+  }
+}

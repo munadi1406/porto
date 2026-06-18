@@ -56,42 +56,42 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
     return (
         <div className="space-y-8">
             {/* Target Goal Header Card */}
-            <div className="relative overflow-hidden bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-xl shadow-blue-500/5">
+            <div className="relative overflow-hidden bg-card p-8 rounded-[2.5rem] border border-border shadow-xl">
                 {/* Decorative bg */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full -mr-32 -mt-32 blur-3xl" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
 
                 <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                     <div className="space-y-4 max-w-xl">
                         <div>
                             <div className="flex items-center gap-2 mb-2">
-                                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
-                                    <Target className="w-4 h-4 text-blue-600" />
+                                <div className="p-1.5 bg-primary/10 rounded-lg">
+                                    <Target className="w-4 h-4 text-primary" />
                                 </div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Financial Goal Tracker</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Financial Goal Tracker</span>
                             </div>
-                            <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight leading-tight">
+                            <h2 className="text-3xl font-black text-foreground tracking-tight leading-tight">
                                 Capai Kebebasan Finansial Anda
                             </h2>
-                            <p className="text-gray-500 dark:text-gray-400 font-medium">
-                                Masukkan target nilai total aset yang ingin Anda capai untuk portofolio <span className="text-blue-600 font-bold">{currentPortfolio?.name}</span>.
+                            <p className="text-muted-foreground font-medium">
+                                Masukkan target nilai total aset yang ingin Anda capai untuk portofolio <span className="text-primary font-bold">{currentPortfolio?.name}</span>.
                             </p>
                         </div>
 
                         <div className="flex flex-col sm:flex-row items-center gap-3">
                             <div className="relative flex-1 w-full">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">Rp</div>
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">Rp</div>
                                 <input
                                     type="number"
                                     value={targetValue}
                                     onChange={(e) => setTargetValue(e.target.value)}
                                     placeholder="Contoh: 100000000"
-                                    className="w-full pl-12 pr-4 py-4 bg-gray-50/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-lg"
+                                    className="w-full pl-12 pr-4 py-4 bg-muted/50 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-lg"
                                 />
                             </div>
                             <button
                                 onClick={handleSaveTarget}
                                 disabled={isSaving}
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-gray-900/10 dark:shadow-white/5"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-card bg-foreground text-background rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-border/50"
                             >
                                 {isSaving ? <span className="animate-spin">◌</span> : <Save className="w-4 h-4" />}
                                 Simpan Target
@@ -99,13 +99,13 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
                         </div>
                     </div>
 
-                    <div className="flex-shrink-0 bg-gray-50/50 dark:bg-gray-900/50 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-700 min-w-[280px]">
+                    <div className="flex-shrink-0 bg-muted/50 p-8 rounded-[2rem] border border-border min-w-[280px]">
                         <div className="text-center space-y-2">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Progress Saat Ini</p>
-                            <div className="text-5xl font-black text-blue-600 tracking-tighter">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Progress Saat Ini</p>
+                            <div className="text-5xl font-black text-primary tracking-tighter">
                                 {progressPercent.toFixed(1)}%
                             </div>
-                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-gray-500">
+                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground">
                                 <Flag className="w-3 h-3" />
                                 <span>Menuju Goal</span>
                             </div>
@@ -116,15 +116,15 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
 
             {/* Progress Visualization */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm space-y-6">
+                <div className="bg-card p-8 rounded-3xl border border-border shadow-sm space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
-                                <TrendingUp className="w-6 h-6 text-emerald-600" />
+                            <div className="p-3 bg-success/10 rounded-2xl">
+                                <TrendingUp className="w-6 h-6 text-success" />
                             </div>
-                            <h3 className="text-xl font-black text-gray-900 dark:text-white">Estimasi Sisa</h3>
+                            <h3 className="text-xl font-black text-foreground">Estimasi Sisa</h3>
                         </div>
-                        <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 text-[10px] font-bold rounded-lg uppercase">
+                        <div className="px-3 py-1 bg-success/10 text-success text-[10px] font-bold rounded-lg uppercase">
                             Keep Going!
                         </div>
                     </div>
@@ -132,41 +132,41 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
                     <div className="space-y-4">
                         <div className="flex items-end justify-between">
                             <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Kekurangan Dana</p>
-                                <p className="text-2xl font-black text-gray-900 dark:text-white">{formatIDR(sisaTarget)}</p>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase mb-1">Kekurangan Dana</p>
+                                <p className="text-2xl font-black text-foreground">{formatIDR(sisaTarget)}</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Sudah Terkumpul</p>
-                                <p className="text-sm font-bold text-gray-500">{formatIDR(currentTotalEquity)}</p>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase mb-1">Sudah Terkumpul</p>
+                                <p className="text-sm font-bold text-muted-foreground">{formatIDR(currentTotalEquity)}</p>
                             </div>
                         </div>
 
                         {/* Professional Progress Bar */}
-                        <div className="relative h-6 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden p-1 shadow-inner">
+                        <div className="relative h-6 bg-muted rounded-full overflow-hidden p-1 shadow-inner">
                             <div
-                                className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg shadow-blue-500/20 transition-all duration-1000 ease-out"
+                                className="h-full bg-primary rounded-full shadow-lg shadow-primary/20 transition-all duration-1000 ease-out"
                                 style={{ width: `${Math.min(100, progressPercent)}%` }}
                             >
                                 <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:24px_24px] animate-[progress-bar-stripes_1s_linear_infinite]" />
                             </div>
                         </div>
 
-                        <div className="flex justify-between text-[10px] font-black text-gray-400 uppercase px-1">
+                        <div className="flex justify-between text-[10px] font-black text-muted-foreground uppercase px-1">
                             <span>Mulai (Rp 0)</span>
                             <span>Target ({formatIDR(numericTargetValue)})</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-3xl text-white shadow-xl shadow-indigo-200 dark:shadow-none relative overflow-hidden group">
+                <div className="bg-primary p-8 rounded-3xl text-primary-foreground shadow-xl relative overflow-hidden group">
                     <Rocket className="absolute -bottom-4 -right-4 w-48 h-48 opacity-10 group-hover:scale-110 transition-transform duration-500" />
 
                     <div className="relative space-y-6">
                         <h3 className="text-xl font-black leading-tight">Analisis Pencapaian</h3>
 
                         <div className="space-y-4">
-                            <div className="flex items-start gap-4 p-4 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/10">
-                                <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="flex items-start gap-4 p-4 bg-muted/10 rounded-2xl backdrop-blur-sm border border-border/10">
+                                <div className="p-2 bg-background/20 rounded-xl">
                                     <CheckCircle2 className="w-5 h-5" />
                                 </div>
                                 <div>
@@ -181,8 +181,8 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-4 p-4 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/10">
-                                <div className="p-2 bg-white/20 rounded-xl">
+                            <div className="flex items-start gap-4 p-4 bg-muted/10 rounded-2xl backdrop-blur-sm border border-border/10">
+                                <div className="p-2 bg-background/20 rounded-xl">
                                     <Wallet className="w-5 h-5" />
                                 </div>
                                 <div>

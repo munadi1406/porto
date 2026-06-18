@@ -102,19 +102,19 @@ const analyzeFundamentals = (data: any) => {
 
     if (score >= 80) {
         rating = "Sangat Baik";
-        ratingColor = "text-green-600";
+        ratingColor = "text-success";
     } else if (score >= 60) {
         rating = "Baik";
-        ratingColor = "text-blue-600";
+        ratingColor = "text-primary";
     } else if (score >= 40) {
         rating = "Cukup";
-        ratingColor = "text-yellow-600";
+        ratingColor = "text-warning";
     } else if (score >= 20) {
         rating = "Kurang";
-        ratingColor = "text-orange-600";
+        ratingColor = "text-warning";
     } else {
         rating = "Buruk";
-        ratingColor = "text-red-600";
+        ratingColor = "text-destructive";
     }
 
     return { score, insights, rating, ratingColor };
@@ -127,20 +127,20 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
     const analysis = data ? analyzeFundamentals(data) : null;
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-card border border-border p-4 sm:p-6 rounded-2xl shadow-sm">
             <div className="flex items-center gap-2 mb-4">
                 <div className="flex-1">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Analisa Fundamental</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Penilaian kesehatan keuangan dan harga wajar</p>
+                    <h3 className="text-base sm:text-lg font-bold text-foreground">Analisa Fundamental</h3>
+                    <p className="text-xs text-muted-foreground">Penilaian kesehatan keuangan dan harga wajar</p>
                 </div>
             </div>
 
             {/* Fair Value Section */}
             {data && !loading && (
-                <div className="mb-6 p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                <div className="mb-6 p-5 bg-warning/5 rounded-2xl border border-warning/20">
                     <div className="flex items-center gap-2 mb-4">
-                        <DollarSign className="w-5 h-5 text-amber-600" />
-                        <h4 className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-wider">Estimasi Harga Wajar</h4>
+                        <DollarSign className="w-5 h-5 text-warning" />
+                        <h4 className="font-black text-foreground text-sm uppercase tracking-wider">Estimasi Harga Wajar</h4>
                     </div>
 
                     {(() => {
@@ -171,39 +171,39 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                             <div className="space-y-4">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div>
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Rata-rata Harga Wajar</div>
-                                        <div className="text-3xl font-black text-gray-900 dark:text-white">
+                                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1">Rata-rata Harga Wajar</div>
+                                        <div className="text-3xl font-black text-foreground">
                                             {avgFairValue > 0 ? formatIDR(avgFairValue) : "Data tidak cukup"}
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Margin of Safety</div>
+                                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1">Margin of Safety</div>
                                         <div className={cn(
                                             "text-2xl font-black",
-                                            isUndervalued ? "text-emerald-500" : "text-rose-500"
+                                            isUndervalued ? "text-success" : "text-destructive"
                                         )}>
                                             {isUndervalued ? "+" : ""}{marginOfSafety.toFixed(1)}%
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-amber-200/50 dark:border-amber-800/50">
-                                    <div className="p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl">
-                                        <div className="text-[9px] text-gray-400 font-bold uppercase mb-1">Graham Number</div>
-                                        <div className="text-sm font-black dark:text-white">{grahamNumber > 0 ? formatIDR(grahamNumber) : "-"}</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-warning/20">
+                                    <div className="p-3 bg-muted rounded-xl">
+                                        <div className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Graham Number</div>
+                                        <div className="text-sm font-black text-foreground">{grahamNumber > 0 ? formatIDR(grahamNumber) : "-"}</div>
                                     </div>
-                                    <div className="p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl">
-                                        <div className="text-[9px] text-gray-400 font-bold uppercase mb-1">PE-Based (15x)</div>
-                                        <div className="text-sm font-black dark:text-white">{peFair > 0 ? formatIDR(peFair) : "-"}</div>
+                                    <div className="p-3 bg-muted rounded-xl">
+                                        <div className="text-[9px] text-muted-foreground font-bold uppercase mb-1">PE-Based (15x)</div>
+                                        <div className="text-sm font-black text-foreground">{peFair > 0 ? formatIDR(peFair) : "-"}</div>
                                     </div>
-                                    <div className="p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl">
-                                        <div className="text-[9px] text-gray-400 font-bold uppercase mb-1">PBV-Based (1.5x)</div>
-                                        <div className="text-sm font-black dark:text-white">{pbvFair > 0 ? formatIDR(pbvFair) : "-"}</div>
+                                    <div className="p-3 bg-muted rounded-xl">
+                                        <div className="text-[9px] text-muted-foreground font-bold uppercase mb-1">PBV-Based (1.5x)</div>
+                                        <div className="text-sm font-black text-foreground">{pbvFair > 0 ? formatIDR(pbvFair) : "-"}</div>
                                     </div>
                                 </div>
 
-                                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium leading-relaxed italic">
+                                <div className="p-3 bg-warning/10 rounded-xl border border-warning/20">
+                                    <p className="text-[10px] text-warning font-medium leading-relaxed italic">
                                         *Graham Number: Metode konservatif Benjamin Graham. PE-Based: Valuasi wajar berdasarkan laba. PBV-Based: Valuasi berdasarkan nilai buku perusahaan.
                                     </p>
                                 </div>
@@ -215,11 +215,11 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
 
             {/* Stock Selector */}
             <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Pilih Saham:</label>
+                <label className="block text-sm font-semibold text-muted-foreground mb-2">Pilih Saham:</label>
                 <select
                     value={selectedStock}
                     onChange={(e) => setSelectedStock(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                     {portfolio.map((item) => (
                         <option key={item.ticker} value={item.ticker}>
@@ -230,31 +230,31 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
             </div>
 
             {loading && (
-                <div className="flex items-center justify-center gap-2 py-8 text-purple-600">
+                <div className="flex items-center justify-center gap-2 py-8 text-primary">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span className="text-sm">Memuat data fundamental...</span>
                 </div>
             )}
 
             {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <p className="text-sm text-red-700 dark:text-red-400">Error: {error}</p>
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="text-sm text-destructive">Error: {error}</p>
                 </div>
             )}
 
             {data && analysis && !loading && (
                 <>
                     {/* Overall Score */}
-                    <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                    <div className="mb-6 p-4 bg-primary/5 rounded-xl border border-primary/20">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Skor Fundamental</span>
+                            <span className="text-sm font-semibold text-muted-foreground">Skor Fundamental</span>
                             <span className={cn("text-2xl font-bold", analysis.ratingColor)}>
                                 {analysis.score}/100
                             </span>
                         </div>
-                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+                        <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
                             <div
-                                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all"
+                                className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all"
                                 style={{ width: `${analysis.score}%` }}
                             />
                         </div>
@@ -266,72 +266,72 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                     {/* Key Metrics Grid */}
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                         {data.peRatio !== null && (
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                <p className="text-xs text-blue-700 dark:text-blue-400 font-semibold mb-1">P/E Ratio</p>
-                                <p className="text-lg font-bold text-blue-600 dark:text-blue-500">{data.peRatio.toFixed(2)}</p>
+                            <div className="p-3 bg-primary/5 rounded-lg">
+                                <p className="text-xs text-primary font-semibold mb-1">P/E Ratio</p>
+                                <p className="text-lg font-bold text-primary">{data.peRatio.toFixed(2)}</p>
                             </div>
                         )}
 
                         {data.pbRatio !== null && (
-                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                                <p className="text-xs text-green-700 dark:text-green-400 font-semibold mb-1">P/B Ratio</p>
-                                <p className="text-lg font-bold text-green-600 dark:text-green-500">{data.pbRatio.toFixed(2)}</p>
+                            <div className="p-3 bg-primary/5 rounded-lg">
+                                <p className="text-xs text-primary font-semibold mb-1">P/B Ratio</p>
+                                <p className="text-lg font-bold text-primary">{data.pbRatio.toFixed(2)}</p>
                             </div>
                         )}
 
                         {data.roe !== null && (
-                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                                <p className="text-xs text-purple-700 dark:text-purple-400 font-semibold mb-1">ROE</p>
-                                <p className="text-lg font-bold text-purple-600 dark:text-purple-500">{(data.roe * 100).toFixed(1)}%</p>
+                            <div className="p-3 bg-primary/5 rounded-lg">
+                                <p className="text-xs text-primary font-semibold mb-1">ROE</p>
+                                <p className="text-lg font-bold text-primary">{(data.roe * 100).toFixed(1)}%</p>
                             </div>
                         )}
 
                         {data.profitMargin !== null && (
-                            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                                <p className="text-xs text-indigo-700 dark:text-indigo-400 font-semibold mb-1">Margin Laba</p>
-                                <p className="text-lg font-bold text-indigo-600 dark:text-indigo-500">{(data.profitMargin * 100).toFixed(1)}%</p>
+                            <div className="p-3 bg-primary/5 rounded-lg">
+                                <p className="text-xs text-primary font-semibold mb-1">Margin Laba</p>
+                                <p className="text-lg font-bold text-primary">{(data.profitMargin * 100).toFixed(1)}%</p>
                             </div>
                         )}
 
                         {data.currentRatio !== null && (
-                            <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                                <p className="text-xs text-teal-700 dark:text-teal-400 font-semibold mb-1">Rasio Lancar</p>
-                                <p className="text-lg font-bold text-teal-600 dark:text-teal-500">{data.currentRatio.toFixed(2)}</p>
+                            <div className="p-3 bg-primary/5 rounded-lg">
+                                <p className="text-xs text-primary font-semibold mb-1">Rasio Lancar</p>
+                                <p className="text-lg font-bold text-primary">{data.currentRatio.toFixed(2)}</p>
                             </div>
                         )}
 
                         {data.debtToEquity !== null && (
-                            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                                <p className="text-xs text-orange-700 dark:text-orange-400 font-semibold mb-1">Hutang/Modal</p>
-                                <p className="text-lg font-bold text-orange-600 dark:text-orange-500">{data.debtToEquity.toFixed(2)}</p>
+                            <div className="p-3 bg-primary/5 rounded-lg">
+                                <p className="text-xs text-primary font-semibold mb-1">Hutang/Modal</p>
+                                <p className="text-lg font-bold text-primary">{data.debtToEquity.toFixed(2)}</p>
                             </div>
                         )}
                     </div>
 
                     {/* Insights */}
                     <div className="mb-8">
-                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Analisa Detail:</h4>
+                        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Analisa Detail:</h4>
                         <div className="space-y-2">
                             {analysis.insights.map((insight, index) => (
                                 <div
                                     key={index}
                                     className={cn(
                                         "p-3 rounded-lg border flex items-start gap-3",
-                                        insight.status === "good" && "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
-                                        insight.status === "warning" && "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800",
-                                        insight.status === "bad" && "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                                        insight.status === "good" && "bg-success/10 border-success/20",
+                                        insight.status === "warning" && "bg-warning/10 border-warning/20",
+                                        insight.status === "bad" && "bg-destructive/10 border-destructive/20"
                                     )}
                                 >
-                                    {insight.status === "good" && <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />}
-                                    {insight.status === "warning" && <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />}
-                                    {insight.status === "bad" && <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />}
+                                    {insight.status === "good" && <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />}
+                                    {insight.status === "warning" && <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />}
+                                    {insight.status === "bad" && <XCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />}
                                     <div className="flex-1">
-                                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{insight.category}</p>
+                                        <p className="text-xs font-semibold text-muted-foreground mb-1">{insight.category}</p>
                                         <p className={cn(
                                             "text-sm",
-                                            insight.status === "good" && "text-green-700 dark:text-green-400",
-                                            insight.status === "warning" && "text-yellow-700 dark:text-yellow-400",
-                                            insight.status === "bad" && "text-red-700 dark:text-red-400"
+                                            insight.status === "good" && "text-success",
+                                            insight.status === "warning" && "text-warning",
+                                            insight.status === "bad" && "text-destructive"
                                         )}>
                                             {insight.message}
                                         </p>
@@ -342,17 +342,17 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                     </div>
 
                     {/* Foreign Flow Analysis */}
-                    <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                    <div className="mb-6 p-5 bg-primary/5 rounded-2xl border border-primary/20">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-blue-600" />
-                                <h4 className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-wider">Analisa Foreign Flow</h4>
+                                <Users className="w-5 h-5 text-primary" />
+                                <h4 className="font-black text-foreground text-sm uppercase tracking-wider">Analisa Foreign Flow</h4>
                             </div>
                             <div className={cn(
                                 "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tight",
-                                data.foreignAccumulationStatus === "Akumulasi" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                                data.foreignAccumulationStatus === "Distribusi" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
-                                "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                                data.foreignAccumulationStatus === "Akumulasi" ? "bg-success/10 text-success" :
+                                data.foreignAccumulationStatus === "Distribusi" ? "bg-destructive/10 text-destructive" :
+                                "bg-muted text-muted-foreground"
                             )}>
                                 {data.foreignAccumulationStatus}
                             </div>
@@ -360,27 +360,27 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Net Foreign Buy/Sell (Value)</div>
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1">Net Foreign Buy/Sell (Value)</div>
                                 <div className={cn(
                                     "text-2xl font-black",
-                                    data.foreignNetBuyValue >= 0 ? "text-emerald-500" : "text-rose-500"
+                                    data.foreignNetBuyValue >= 0 ? "text-success" : "text-destructive"
                                 )}>
                                     {data.foreignNetBuyValue >= 0 ? "+" : ""}{formatCompactIDR(data.foreignNetBuyValue)}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Net Foreign Buy/Sell (Volume)</div>
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1">Net Foreign Buy/Sell (Volume)</div>
                                 <div className={cn(
                                     "text-2xl font-black",
-                                    data.foreignNetBuyVolume >= 0 ? "text-emerald-500" : "text-rose-500"
+                                    data.foreignNetBuyVolume >= 0 ? "text-success" : "text-destructive"
                                 )}>
-                                    {data.foreignNetBuyVolume >= 0 ? "+" : ""}{Intl.NumberFormat('id-ID').format(data.foreignNetBuyVolume)} <span className="text-sm font-normal text-gray-400">lot</span>
+                                    {data.foreignNetBuyVolume >= 0 ? "+" : ""}{Intl.NumberFormat('id-ID').format(data.foreignNetBuyVolume)} <span className="text-sm font-normal text-muted-foreground">lot</span>
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="mt-4 p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
-                            <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                        <div className="mt-4 p-3 bg-muted rounded-xl border border-border">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
                                 {data.foreignAccumulationStatus === "Akumulasi" 
                                     ? "Investor asing terpantau sedang melakukan akumulasi beli bersih pada saham ini. Ini merupakan sinyal positif untuk tren harga jangka menengah."
                                     : data.foreignAccumulationStatus === "Distribusi"
@@ -392,17 +392,17 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                     </div>
 
                     {/* Smart Money (Bandarmology) Analysis */}
-                    <div className="mb-6 p-5 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/10 dark:to-yellow-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                    <div className="mb-6 p-5 bg-warning/5 rounded-2xl border border-warning/20">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <Zap className="w-5 h-5 text-amber-600" />
-                                <h4 className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-wider">Analisa Smart Money</h4>
+                                <Zap className="w-5 h-5 text-warning" />
+                                <h4 className="font-black text-foreground text-sm uppercase tracking-wider">Analisa Smart Money</h4>
                             </div>
                             <div className={cn(
                                 "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tight",
-                                data.smartMoneyColor === "emerald" || data.smartMoneyColor === "green" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                                data.smartMoneyColor === "rose" || data.smartMoneyColor === "red" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
-                                "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                data.smartMoneyColor === "emerald" || data.smartMoneyColor === "green" ? "bg-success/10 text-success" :
+                                data.smartMoneyColor === "rose" || data.smartMoneyColor === "red" ? "bg-destructive/10 text-destructive" :
+                                "bg-primary/10 text-primary"
                             )}>
                                 {data.smartMoneyPhase}
                             </div>
@@ -410,20 +410,20 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">Top Buyer Brokers</div>
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-3">Top Buyer Brokers</div>
                                 <div className="flex gap-2">
                                     {data.topBuyBrokers.map(broker => (
-                                        <div key={broker} className="px-3 py-1.5 bg-white dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                        <div key={broker} className="px-3 py-1.5 bg-card border border-success/30 rounded-lg text-xs font-black text-success">
                                             {broker}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">Top Seller Brokers</div>
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-3">Top Seller Brokers</div>
                                 <div className="flex gap-2">
                                     {data.topSellBrokers.map(broker => (
-                                        <div key={broker} className="px-3 py-1.5 bg-white dark:bg-gray-900 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400">
+                                        <div key={broker} className="px-3 py-1.5 bg-card border border-destructive/30 rounded-lg text-xs font-black text-destructive">
                                             {broker}
                                         </div>
                                     ))}
@@ -434,22 +434,22 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                         <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
                             <div className="flex-1 w-full">
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase">Concentration Score</span>
-                                    <span className="text-xs font-black dark:text-white">{data.concentrationScore}/100</span>
+                                    <span className="text-[10px] text-muted-foreground font-bold uppercase">Concentration Score</span>
+                                    <span className="text-xs font-black text-foreground">{data.concentrationScore}/100</span>
                                 </div>
-                                <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                                     <div 
                                         className={cn(
                                             "h-full transition-all",
-                                            data.smartMoneyPhase.includes("Accumulation") ? "bg-emerald-500" : 
-                                            data.smartMoneyPhase.includes("Distribution") ? "bg-rose-500" : "bg-blue-500"
+                                            data.smartMoneyPhase.includes("Accumulation") ? "bg-success" : 
+                                            data.smartMoneyPhase.includes("Distribution") ? "bg-destructive" : "bg-primary"
                                         )}
                                         style={{ width: `${data.concentrationScore}%` }}
                                     />
                                 </div>
                             </div>
-                            <div className="flex-shrink-0 w-full sm:w-auto p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl border border-amber-200/50 dark:border-amber-800/50">
-                                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 italic leading-snug">
+                            <div className="flex-shrink-0 w-full sm:w-auto p-3 bg-card rounded-xl border border-warning/20">
+                                <p className="text-xs font-medium text-muted-foreground italic leading-snug">
                                     "{data.smartMoneyDescription}"
                                 </p>
                             </div>
@@ -457,96 +457,88 @@ export function FundamentalAnalysis({ portfolio }: FundamentalAnalysisProps) {
                     </div>
 
                     {/* Price Prediction & Sentiment */}
-                    <div className="bg-gray-900 dark:bg-black p-6 rounded-2xl border border-gray-800 shadow-2xl overflow-hidden relative">
-                        <div className="absolute top-0 right-0 p-4 opacity-5">
-                            <TrendingUp className="w-24 h-24 text-white" />
+                    <div className="bg-card border border-border p-6 rounded-xl">
+                        <div className="flex items-center gap-2 mb-6">
+                            <Activity className="w-5 h-5 text-primary" />
+                            <h4 className="font-black text-foreground text-base uppercase tracking-widest">Price Forecast & Sentiment</h4>
                         </div>
 
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-2 mb-6">
-                                <div className="p-2 bg-blue-500/20 rounded-lg">
-                                    <Activity className="w-5 h-5 text-blue-400" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Analyst Targets */}
+                            <div>
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-4">Konsensus Analis</div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="text-xs text-muted-foreground mb-1">Target Rata-rata</div>
+                                        <div className="text-3xl font-black text-foreground">
+                                            {data.targetMeanPrice ? formatIDR(data.targetMeanPrice) : "Data tdk tersedia"}
+                                        </div>
+                                        {data.targetMeanPrice && data.currentPrice && (
+                                            <div className={cn(
+                                                "text-sm font-bold mt-1",
+                                                data.targetMeanPrice > data.currentPrice ? "text-success" : "text-destructive"
+                                            )}>
+                                                Potensi Upside: {(((data.targetMeanPrice - data.currentPrice) / data.currentPrice) * 100).toFixed(1)}%
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 p-3 bg-muted rounded-xl border border-border">
+                                            <div className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Target Tertinggi</div>
+                                            <div className="text-sm font-black text-foreground">{data.targetHighPrice ? formatIDR(data.targetHighPrice) : "-"}</div>
+                                        </div>
+                                        <div className="flex-1 p-3 bg-muted rounded-xl border border-border">
+                                            <div className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Target Terendah</div>
+                                            <div className="text-sm font-black text-foreground">{data.targetLowPrice ? formatIDR(data.targetLowPrice) : "-"}</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <h4 className="font-black text-white text-base uppercase tracking-widest">Price Forecast & Sentiment</h4>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Analyst Targets */}
-                                <div>
-                                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Konsensus Analis</div>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <div className="text-xs text-gray-500 mb-1">Target Rata-rata</div>
-                                            <div className="text-3xl font-black text-white">
-                                                {data.targetMeanPrice ? formatIDR(data.targetMeanPrice) : "Data tdk tersedia"}
-                                            </div>
-                                            {data.targetMeanPrice && data.currentPrice && (
-                                                <div className={cn(
-                                                    "text-sm font-bold mt-1",
-                                                    data.targetMeanPrice > data.currentPrice ? "text-emerald-400" : "text-rose-400"
-                                                )}>
-                                                    Potensi Upside: {(((data.targetMeanPrice - data.currentPrice) / data.currentPrice) * 100).toFixed(1)}%
-                                                </div>
-                                            )}
-                                        </div>
+                            {/* Recommendation Trend */}
+                            <div>
+                                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-4">Sentimen Pasar</div>
+                                <div className="space-y-3">
+                                    {(() => {
+                                        const total = data.strongBuy + data.buy + data.hold + data.sell + data.strongSell;
+                                        if (total === 0) return <p className="text-sm text-muted-foreground italic">Belum ada rekomendasi dari analis.</p>;
 
-                                        <div className="flex gap-4">
-                                            <div className="flex-1 p-3 bg-gray-800/50 rounded-xl border border-gray-700">
-                                                <div className="text-[9px] text-gray-500 font-bold uppercase mb-1">Target Tertinggi</div>
-                                                <div className="text-sm font-black text-white">{data.targetHighPrice ? formatIDR(data.targetHighPrice) : "-"}</div>
+                                        const getWidth = (val: number) => (val / total * 100) + "%";
+
+                                        return (
+                                            <div className="space-y-3">
+                                                <div className="h-6 w-full flex rounded-full overflow-hidden shadow-inner bg-muted">
+                                                    <div style={{ width: getWidth(data.strongBuy) }} className="bg-success h-full" title="Strong Buy" />
+                                                    <div style={{ width: getWidth(data.buy) }} className="bg-success/60 h-full" title="Buy" />
+                                                    <div style={{ width: getWidth(data.hold) }} className="bg-warning h-full" title="Hold" />
+                                                    <div style={{ width: getWidth(data.sell) }} className="bg-destructive/60 h-full" title="Sell" />
+                                                    <div style={{ width: getWidth(data.strongSell) }} className="bg-destructive h-full" title="Strong Sell" />
+                                                </div>
+
+                                                <div className="grid grid-cols-3 gap-2 text-center">
+                                                    <div className="p-2 rounded-lg bg-success/10 border border-success/20">
+                                                        <div className="text-[10px] text-success font-black uppercase">BUY</div>
+                                                        <div className="text-lg font-black text-foreground">{data.strongBuy + data.buy}</div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-warning/10 border border-warning/20">
+                                                        <div className="text-[10px] text-warning font-black uppercase">HOLD</div>
+                                                        <div className="text-lg font-black text-foreground">{data.hold}</div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                                                        <div className="text-[10px] text-destructive font-black uppercase">SELL</div>
+                                                        <div className="text-lg font-black text-foreground">{data.sell + data.strongSell}</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 p-3 bg-gray-800/50 rounded-xl border border-gray-700">
-                                                <div className="text-[9px] text-gray-500 font-bold uppercase mb-1">Target Terendah</div>
-                                                <div className="text-sm font-black text-white">{data.targetLowPrice ? formatIDR(data.targetLowPrice) : "-"}</div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
 
-                                {/* Recommendation Trend */}
-                                <div>
-                                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Sentimen Pasar</div>
-                                    <div className="space-y-3">
-                                        {(() => {
-                                            const total = data.strongBuy + data.buy + data.hold + data.sell + data.strongSell;
-                                            if (total === 0) return <p className="text-sm text-gray-500 italic">Belum ada rekomendasi dari analis.</p>;
-
-                                            const getWidth = (val: number) => (val / total * 100) + "%";
-
-                                            return (
-                                                <div className="space-y-3">
-                                                    <div className="h-6 w-full flex rounded-full overflow-hidden shadow-inner bg-gray-800">
-                                                        <div style={{ width: getWidth(data.strongBuy) }} className="bg-emerald-600 h-full" title="Strong Buy" />
-                                                        <div style={{ width: getWidth(data.buy) }} className="bg-emerald-400 h-full" title="Buy" />
-                                                        <div style={{ width: getWidth(data.hold) }} className="bg-yellow-400 h-full" title="Hold" />
-                                                        <div style={{ width: getWidth(data.sell) }} className="bg-rose-400 h-full" title="Sell" />
-                                                        <div style={{ width: getWidth(data.strongSell) }} className="bg-rose-600 h-full" title="Strong Sell" />
-                                                    </div>
-
-                                                    <div className="grid grid-cols-3 gap-2 text-center">
-                                                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                                            <div className="text-[10px] text-emerald-400 font-black uppercase">BUY</div>
-                                                            <div className="text-lg font-black text-white">{data.strongBuy + data.buy}</div>
-                                                        </div>
-                                                        <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                                            <div className="text-[10px] text-yellow-400 font-black uppercase">HOLD</div>
-                                                            <div className="text-lg font-black text-white">{data.hold}</div>
-                                                        </div>
-                                                        <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                                                            <div className="text-[10px] text-rose-400 font-black uppercase">SELL</div>
-                                                            <div className="text-lg font-black text-white">{data.sell + data.strongSell}</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    <div className="mt-4 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                                        <p className="text-[10px] text-blue-400 font-medium leading-relaxed">
-                                            *Prediksi didasarkan pada konsensus rata-rata analis Wall Street/Regional. Gunakan sebagai referensi, bukan jaminan pasti.
-                                        </p>
-                                    </div>
+                                <div className="mt-4 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                                    <p className="text-[10px] text-primary font-medium leading-relaxed">
+                                        *Prediksi didasarkan pada konsensus rata-rata analis Wall Street/Regional. Gunakan sebagai referensi, bukan jaminan pasti.
+                                    </p>
                                 </div>
                             </div>
                         </div>

@@ -83,7 +83,7 @@ export default function HomePage() {
       recordSnapshot(summary.totalMarketValue, cash);
       lastRecordTimeRef.current = now;
     }
-  }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, lastUpdated, portfolio.length, recordSnapshot]);
+  }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, lastUpdated?.getTime(), portfolio.length, recordSnapshot]);
 
   const chartData = useMemo(() => {
     return portfolio.map((item) => ({
@@ -115,12 +115,12 @@ export default function HomePage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }} />
-            <span className="text-xs font-medium text-[var(--muted)]">Portfolio View</span>
+            <span className="text-xs font-medium text-muted-foreground">Portfolio View</span>
           </div>
-          <h1 className="text-2xl font-semibold text-[var(--fg)] tracking-tight">
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
             {currentPortfolio?.name || "Portfolio Dashboard"}
           </h1>
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-muted-foreground">
             {lastUpdated ? `Terakhir: ${lastUpdated.toLocaleTimeString('id-ID')}` : 'Memuat data...'}
           </p>
         </div>
@@ -167,13 +167,13 @@ export default function HomePage() {
       </DashboardTabs>
 
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/portfolio" className="p-4 bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition-colors text-center">
-          <div className="font-medium text-[var(--fg)] mb-1">Portfolio</div>
-          <p className="text-sm text-[var(--muted)]">{portfolio.length} saham</p>
+        <Link href="/portfolio" className="p-4 bg-card border border-border rounded-lg hover:bg-muted transition-colors text-center">
+          <div className="font-medium text-foreground mb-1">Portfolio</div>
+          <p className="text-sm text-muted-foreground">{portfolio.length} saham</p>
         </Link>
-        <Link href="/analytics" className="p-4 bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition-colors text-center">
-          <div className="font-medium text-[var(--fg)] mb-1">Analytics</div>
-          <p className="text-sm text-[var(--muted)]">Lihat growth</p>
+        <Link href="/analytics" className="p-4 bg-card border border-border rounded-lg hover:bg-muted transition-colors text-center">
+          <div className="font-medium text-foreground mb-1">Analytics</div>
+          <p className="text-sm text-muted-foreground">Lihat growth</p>
         </Link>
       </div>
     </div>

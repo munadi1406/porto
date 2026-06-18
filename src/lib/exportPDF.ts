@@ -74,18 +74,62 @@ export async function exportToImage(element: HTMLElement, options: { fileName?: 
     const { fileName = 'portfolio-share' } = options;
 
     try {
-        const canvas = await html2canvas(element, {
-            scale: 2, // Higher quality
-            useCORS: true,
-            backgroundColor: null,
-            logging: false,
+        // Disable ALL stylesheets before html2canvas to prevent oklch() parse error.
+        // Export element uses only inline styles, so page styling doesn't affect it.
+        const savedStyles: { el: HTMLElement; restore: () => void }[] = [];
+
+        document.querySelectorAll('style').forEach(el => {
+            if (el.textContent && /oklch|lch|lab/.test(el.textContent)) {
+                const orig = el.textContent;
+                el.textContent = '';
+                savedStyles.push({ el, restore: () => { el.textContent = orig; } });
+            }
         });
 
-        const image = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = image;
-        link.download = `${fileName}.png`;
-        link.click();
+        document.querySelectorAll('link[rel="stylesheet"]').forEach(el => {
+            if (el.parentNode) {
+                const placeholder = document.createElement('style');
+                placeholder.setAttribute('data-html2canvas-placeholder', '');
+                el.parentNode.insertBefore(placeholder, el.nextSibling);
+                el.parentNode.removeChild(el);
+                savedStyles.push({ el: placeholder, restore: () => {
+                    if (placeholder.parentNode) {
+                        placeholder.parentNode.insertBefore(el, placeholder.nextSibling);
+                        placeholder.parentNode.removeChild(placeholder);
+                    }
+                }});
+            }
+        });
+
+        try {
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#0f172a",
+                logging: false,
+            });
+
+            await new Promise<void>((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error("Failed to create blob"));
+                        return;
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `${fileName}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    resolve();
+                }, "image/png");
+            });
+        } finally {
+            // Restore all original stylesheets
+            savedStyles.forEach(s => s.restore());
+        }
     } catch (error) {
         console.error("Export to Image failed:", error);
         alert("Gagal mengekspor gambar. Silakan coba lagi.");

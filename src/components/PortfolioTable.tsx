@@ -3,12 +3,18 @@
 import { useMemo, useState, useRef } from "react";
 import { PortfolioItem, StockPrice } from "@/lib/types";
 import { formatIDR, formatNumber, formatPercentage, cn } from "@/lib/utils";
-import { Trash2, Edit2, TrendingUp, TrendingDown, Minus, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, ShieldOff, Target, Calculator } from "lucide-react";
+import { Trash2, Edit2, TrendingUp, TrendingDown, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, Target, Calculator } from "lucide-react";
 import { StockForm } from "./StockForm";
 import { TransactionForm } from "./TransactionForm";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { exportToPDF, exportToImage } from "@/lib/exportPDF";
 import { AvgDownModal } from "./AvgDownModal";
+import { useCompanyNames } from "@/hooks/useCompanyNames";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableFooter } from "@/components/ui/table";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface PortfolioTableProps {
     portfolio: PortfolioItem[];
@@ -28,6 +34,27 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
     const [isSummarySelected, setIsSummarySelected] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
+    const tickerList = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
+    const companyNames = useCompanyNames(tickerList);
+
+    // Random harmonious color palette for export cards
+    interface CardPalette {
+        bg: string; cardBg: string; textPrimary: string; textSecondary: string;
+        textTertiary: string; border: string; accent: string;
+        gradientFrom: string; gradientTo: string;
+    }
+    const palettes: CardPalette[] = [
+        { bg:'#ffffff', cardBg:'#fafafa', textPrimary:'#18181b', textSecondary:'#71717a', textTertiary:'#a1a1aa', border:'#f0f0f0', accent:'#18181b', gradientFrom:'#18181b', gradientTo:'#52525b' },
+        { bg:'#fefcf5', cardBg:'#faf6ed', textPrimary:'#1c1917', textSecondary:'#78716c', textTertiary:'#a8a29e', border:'#e7e5e4', accent:'#1c1917', gradientFrom:'#d97706', gradientTo:'#fbbf24' },
+        { bg:'#f8fafc', cardBg:'#f1f5f9', textPrimary:'#0f172a', textSecondary:'#64748b', textTertiary:'#94a3b8', border:'#e2e8f0', accent:'#0f172a', gradientFrom:'#3b82f6', gradientTo:'#93c5fd' },
+        { bg:'#faf5ff', cardBg:'#f3e8ff', textPrimary:'#1a1a2e', textSecondary:'#7c3aed', textTertiary:'#a78bfa', border:'#e9d5ff', accent:'#1a1a2e', gradientFrom:'#7c3aed', gradientTo:'#c084fc' },
+        { bg:'#f0fdf4', cardBg:'#dcfce7', textPrimary:'#052e16', textSecondary:'#166534', textTertiary:'#4ade80', border:'#bbf7d0', accent:'#052e16', gradientFrom:'#16a34a', gradientTo:'#86efac' },
+        { bg:'#fef2f2', cardBg:'#fee2e2', textPrimary:'#1f1315', textSecondary:'#9f1239', textTertiary:'#fb7185', border:'#fecaca', accent:'#1f1315', gradientFrom:'#e11d48', gradientTo:'#fda4af' },
+        { bg:'#f0f9ff', cardBg:'#e0f2fe', textPrimary:'#0c4a6e', textSecondary:'#0369a1', textTertiary:'#7dd3fc', border:'#bae6fd', accent:'#0c4a6e', gradientFrom:'#0284c7', gradientTo:'#60a5fa' },
+        { bg:'#fff7ed', cardBg:'#ffedd5', textPrimary:'#1a1625', textSecondary:'#9a5531', textTertiary:'#fdba74', border:'#fed7aa', accent:'#1a1625', gradientFrom:'#ea580c', gradientTo:'#fb923c' },
+    ];
+    const paletteRef = useRef<CardPalette>(palettes[Math.floor(Math.random() * palettes.length)]);
+
     const sortedPortfolio = useMemo(() => {
         return [...portfolio].sort((a, b) => a.ticker.localeCompare(b.ticker));
     }, [portfolio]);
@@ -45,79 +72,100 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
         const mask = (val: string) => hideValues ? '••••••••' : val;
 
-        // Create the export element
-        const exportEl = document.createElement('div');
+        const pal2 = paletteRef.current;
 
-        // Base styles for both formats
-        exportEl.style.width = format === 'pdf' ? '210mm' : '600px';
-        exportEl.style.padding = '48px';
-        exportEl.style.fontFamily = "'Inter', system-ui, -apple-system, sans-serif";
-        exportEl.style.background = '#0f172a';
-        exportEl.style.color = '#f8fafc';
+        const exportEl = document.createElement('div');
+        exportEl.style.width = format === 'pdf' ? '210mm' : '500px';
+        exportEl.style.padding = '0';
+        exportEl.style.fontFamily = "-apple-system, 'Helvetica Neue', system-ui, sans-serif";
+        exportEl.style.background = pal2.bg;
         exportEl.style.boxSizing = 'border-box';
         exportEl.style.position = 'relative';
+        exportEl.style.overflow = 'hidden';
+        exportEl.style.borderRadius = '24px';
+
+        const prc = isProfit ? '#059669' : '#dc2626';
+        const prcl = isProfit ? '#ecfdf5' : '#fef2f2';
 
         exportEl.innerHTML = `
-            <div style="position: relative; z-index: 10;">
-                <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px;">
-                    <div>
-                        <div style="font-size: 11px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Investment Report</div>
-                        <div style="font-size: 32px; font-weight: 900; letter-spacing: -1.5px; line-height: 1; color: #ffffff; margin-bottom: 4px;">${item.ticker}</div>
-                        <div style="font-size: 14px; color: #cbd5e1; font-weight: 500;">${quote?.name || item.name}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="display: inline-flex; align-items: center; gap: 8px; background: ${isProfit ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${isProfit ? '#10b981' : '#f87171'}; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 14px; border: 1px solid ${isProfit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'};">
-                            ${isProfit ? '▲' : '▼'} ${formatPercentage(Math.abs(gainLossPercent))}
+            <div style="display: flex; flex-direction: column;">
+                <!-- Accent bar -->
+                <div style="height: 4px; background: linear-gradient(90deg, ${pal2.gradientFrom}, ${pal2.gradientTo});"></div>
+
+                <div style="padding: 32px 32px 0 32px;">
+
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                <div style="width: 7px; height: 7px; border-radius: 50%; background: ${prc};"></div>
+                                <span style="font-size: 11px; font-weight: 500; color: ${pal2.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Asset Report</span>
+                            </div>
+                            <div style="font-size: 22px; font-weight: 700; color: ${pal2.textPrimary}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${item.ticker.replace('.JK', '')}</div>
+                            <div style="font-size: 11px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">${quote?.name || item.name}</div>
                         </div>
-                        <div style="font-size: 10px; color: #94a3b8; margin-top: 10px; font-weight: 600;">${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 22px; font-weight: 700; color: ${prc}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                                ${isProfit ? '+' : ''}${formatPercentage(gainLossPercent)}
+                            </div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        </div>
+                    </div>
+
+                    <!-- Return Hero -->
+                    <div style="background: linear-gradient(135deg, ${prcl} 0%, #ffffff 80%); border-radius: 20px; padding: 24px 20px; margin-bottom: 24px; text-align: center;">
+                        <span style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Return</span>
+                        <div style="font-size: 48px; font-weight: 700; color: ${prc}; letter-spacing: -0.03em; line-height: 1.1; margin-top: 6px; font-feature-settings: 'tnum' 1; text-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+                            ${isProfit ? '+' : ''}${formatPercentage(gainLossPercent)}
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px;">
+                        <div style="background: ${pal2.cardBg}; border-radius: 14px; padding: 16px 18px;">
+                            <div style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Market Value</div>
+                            <div style="font-size: 17px; font-weight: 600; color: ${pal2.textPrimary}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${mask(formatIDR(marketValue))}</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">Current price × shares</div>
+                        </div>
+                        <div style="background: ${pal2.cardBg}; border-radius: 14px; padding: 16px 18px;">
+                            <div style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">P/L</div>
+                            <div style="font-size: 17px; font-weight: 600; color: ${prc}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${hideValues ? '••••••••' : (isProfit ? '+' : '') + formatIDR(gainLoss)}</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">Unrealized gain</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Big Percentage (Hero) -->
-                <div style="text-align: center; margin: 32px 0; padding: 40px 24px; background: rgba(30, 41, 59, 0.3); border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                    <div style="font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 16px;">Growth Performance</div>
-                    <div style="font-size: 84px; font-weight: 950; letter-spacing: -4px; line-height: 1.1; color: ${isProfit ? '#10b981' : '#f87171'};">
-                        ${isProfit ? '+' : ''}${formatPercentage(gainLossPercent)}
-                    </div>
-                </div>
-
-                <!-- Summary Grid -->
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 32px;">
-                    <div style="padding: 20px; background: #1e293b; border: 1px solid #334155; border-radius: 20px;">
-                        <div style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">Market Value</div>
-                        <div style="font-size: 20px; font-weight: 800; color: #ffffff;">${mask(formatIDR(marketValue))}</div>
-                    </div>
-                    <div style="padding: 20px; background: #1e293b; border: 1px solid #334155; border-radius: 20px;">
-                        <div style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">Unrealized P/L</div>
-                        <div style="font-size: 20px; font-weight: 800; color: ${isProfit ? '#10b981' : '#f87171'};">${hideValues ? '••••••••' : (isProfit ? '+' : '') + formatIDR(gainLoss)}</div>
-                    </div>
-                </div>
-
-                <!-- Details List -->
-                <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 20px; padding: 4px 0; margin-bottom: 32px;">
-                    <div style="display: flex; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid #334155;">
-                        <span style="color: #cbd5e1; font-size: 13px; font-weight: 500;">Holdings</span>
-                        <span style="font-weight: 700; color: #f1f5f9; font-size: 13px;">${formatNumber(item.lots)} Lot <span style="font-size: 11px; color: #94a3b8; font-weight: 500; margin-left: 4px;">(${formatNumber(item.lots * 100)} Lbr)</span></span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid #334155;">
-                        <span style="color: #cbd5e1; font-size: 13px; font-weight: 500;">Average Buy</span>
-                        <span style="font-weight: 700; color: #f1f5f9; font-size: 13px;">${formatIDR(item.averagePrice)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid #334155;">
-                        <span style="color: #cbd5e1; font-size: 13px; font-weight: 500;">Market Price</span>
-                        <span style="font-weight: 700; color: #f1f5f9; font-size: 13px;">${formatIDR(currentPrice)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 14px 24px;">
-                        <span style="color: #cbd5e1; font-size: 13px; font-weight: 500;">Total Investment</span>
-                        <span style="font-weight: 700; color: #f1f5f9; font-size: 13px;">${mask(formatIDR(initialValue))}</span>
+                <!-- Details Section -->
+                <div style="padding: 0 32px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid ${pal2.border};">
+                            <span style="font-size: 12px; font-weight: 400; color: ${pal2.textSecondary};">Holdings</span>
+                            <span style="font-size: 13px; font-weight: 500; color: ${pal2.textPrimary}; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${formatNumber(item.lots)} lot <span style="font-weight: 400; color: ${pal2.textTertiary};">(${formatNumber(item.lots * 100)} shares)</span></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid ${pal2.border};">
+                            <span style="font-size: 12px; font-weight: 400; color: ${pal2.textSecondary};">Avg Price</span>
+                            <span style="font-size: 13px; font-weight: 500; color: ${pal2.textPrimary}; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${formatIDR(item.averagePrice)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid ${pal2.border};">
+                            <span style="font-size: 12px; font-weight: 400; color: ${pal2.textSecondary};">Current</span>
+                            <span style="font-size: 13px; font-weight: 500; color: ${pal2.textPrimary}; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${formatIDR(currentPrice)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 14px 0;">
+                            <span style="font-size: 12px; font-weight: 400; color: ${pal2.textSecondary};">Cost Basis</span>
+                            <span style="font-size: 13px; font-weight: 500; color: ${pal2.textPrimary}; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${mask(formatIDR(initialValue))}</span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Footer -->
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #334155; padding-top: 24px;">
-                    <div style="font-size: 16px; font-weight: 900; color: #60a5fa; letter-spacing: -0.5px;">ANTIGRAVITY<span style="color: #ffffff; margin-left: 4px;">PORTO</span></div>
-                    <div style="font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 1px;">PROFESSIONAL DASHBOARD</div>
+                <div style="padding: 20px 32px 32px 32px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid ${pal2.border};">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 6px; height: 6px; border-radius: 50%; background: ${pal2.textPrimary};"></div>
+                            <span style="font-size: 13px; font-weight: 600; color: ${pal2.textPrimary}; letter-spacing: -0.02em;">Porto</span>
+                        </div>
+                        <span style="font-size: 9px; font-weight: 500; color: ${pal2.textTertiary}; letter-spacing: 0.05em; text-transform: uppercase;">Asset Detail</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -155,80 +203,116 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         const isProfit = totalGainLoss >= 0;
         const mask = (val: string) => hideValues ? '••••••••' : val;
 
+        const pal = paletteRef.current;
+
         const exportEl = document.createElement('div');
         exportEl.style.width = '500px';
-        exportEl.style.padding = '48px';
-        exportEl.style.fontFamily = "'Inter', system-ui, -apple-system, sans-serif";
-        exportEl.style.background = '#0f172a';
-        exportEl.style.color = '#ffffff';
+        exportEl.style.padding = '0';
+        exportEl.style.fontFamily = "-apple-system, 'Helvetica Neue', system-ui, sans-serif";
+        exportEl.style.background = pal.bg;
         exportEl.style.boxSizing = 'border-box';
         exportEl.style.position = 'relative';
+        exportEl.style.overflow = 'hidden';
+        exportEl.style.borderRadius = '24px';
+
+        const rc = isProfit ? '#059669' : '#dc2626';
+        const rclight = isProfit ? '#ecfdf5' : '#fef2f2';
 
         exportEl.innerHTML = `
-            <div style="text-align: center;">
-                <div style="font-size: 12px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 40px;">Portfolio Summary</div>
-                
-                <div style="margin-bottom: 56px; padding: 20px 10px; display: flex; flex-direction: column; align-items: center; gap: 24px;">
-                    <div style="font-size: 72px; font-weight: 950; letter-spacing: -3px; line-height: 1.1; color: ${isProfit ? '#10b981' : '#f87171'};">
-                        ${isProfit ? '+' : ''}${formatPercentage(totalReturn)}
+            <div style="display: flex; flex-direction: column;">
+                <!-- Accent bar -->
+                <div style="height: 4px; background: linear-gradient(90deg, ${pal.gradientFrom}, ${pal.gradientTo});"></div>
+
+                <div style="padding: 36px 36px 0 36px;">
+
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 8px; height: 8px; border-radius: 50%; background: ${rc};"></div>
+                            <span style="font-size: 13px; font-weight: 500; color: ${pal.textPrimary}; letter-spacing: -0.01em;">Portfolio</span>
+                        </div>
+                            <span style="font-size: 11px; font-weight: 400; color: ${pal.textTertiary};">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
-                    <div style="font-size: 13px; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 3px;">Overall Portfolio Return</div>
+
+                    <!-- Return Hero -->
+                    <div style="background: linear-gradient(135deg, ${rclight} 0%, #ffffff 80%); border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; text-align: center;">
+                        <span style="font-size: 11px; font-weight: 500; color: ${pal.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Total Return</span>
+                        <div style="font-size: 56px; font-weight: 700; color: ${rc}; letter-spacing: -0.03em; line-height: 1.1; margin-top: 8px; font-feature-settings: 'tnum' 1; text-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+                            ${isProfit ? '+' : ''}${formatPercentage(totalReturn)}
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px;">
+                        <div style="background: ${pal.cardBg}; border-radius: 16px; padding: 18px 20px;">
+                            <div style="font-size: 10px; font-weight: 500; color: ${pal.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px;">Total Value</div>
+                            <div style="font-size: 18px; font-weight: 600; color: ${pal.textPrimary}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${mask(formatIDR(totalMarketValue))}</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; margin-top: 2px;">Market value</div>
+                        </div>
+                        <div style="background: ${pal.cardBg}; border-radius: 16px; padding: 18px 20px;">
+                            <div style="font-size: 10px; font-weight: 500; color: ${pal.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px;">P/L</div>
+                            <div style="font-size: 18px; font-weight: 600; color: ${rc}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${mask((isProfit ? '+' : '') + formatIDR(totalGainLoss))}</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; margin-top: 2px;">Unrealized</div>
+                        </div>
+                        <div style="background: ${pal.cardBg}; border-radius: 16px; padding: 18px 20px;">
+                            <div style="font-size: 10px; font-weight: 500; color: ${pal.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px;">Invested</div>
+                            <div style="font-size: 18px; font-weight: 600; color: ${pal.textPrimary}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${mask(formatIDR(totalInvested))}</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; margin-top: 2px;">Total cost basis</div>
+                        </div>
+                        <div style="background: ${pal.cardBg}; border-radius: 16px; padding: 18px 20px;">
+                            <div style="font-size: 10px; font-weight: 500; color: ${pal.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px;">Assets</div>
+                            <div style="font-size: 18px; font-weight: 600; color: ${pal.textPrimary}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${portfolioItems.length}</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; margin-top: 2px;">Total holdings</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 32px; text-align: left;">
-                    <div style="padding: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 24px;">
-                        <div style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Total Assets</div>
-                        <div style="font-size: 20px; font-weight: 800;">${mask(formatIDR(totalMarketValue))}</div>
+                <!-- Holdings Section -->
+                <div style="padding: 0 36px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding-bottom: 12px; border-bottom: 1px solid ${pal.border};">
+                        <span style="font-size: 11px; font-weight: 600; color: ${pal.textPrimary}; letter-spacing: 0.02em; text-transform: uppercase;">Holdings</span>
+                        <span style="font-size: 10px; font-weight: 500; color: ${pal.textTertiary}; text-transform: uppercase; letter-spacing: 0.03em;">Return</span>
                     </div>
-                    <div style="padding: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 24px;">
-                        <div style="font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Total P/L</div>
-                        <div style="font-size: 20px; font-weight: 800; color: ${isProfit ? '#10b981' : '#f87171'};">${mask((isProfit ? '+' : '') + formatIDR(totalGainLoss))}</div>
-                    </div>
-                </div>
 
-                <!-- Asset List -->
-                <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid #334155; border-radius: 24px; padding: 20px; text-align: left;">
-                    <div style="font-size: 10px; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 12px;">Top Performing Assets</div>
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        ${[...portfolioItems]
+                    ${[...portfolioItems]
                 .map(item => {
                     const livePrice = market[item.ticker]?.price || 0;
                     const itemPL = item.averagePrice > 0 ? (livePrice - item.averagePrice) / item.averagePrice * 100 : 0;
-                    return { ...item, gain: itemPL, name: market[item.ticker]?.name || item.name };
+                    return { ...item, gain: itemPL, name: market[item.ticker]?.name || companyNames[item.ticker] || item.name };
                 })
                 .sort((a, b) => b.gain - a.gain)
-                .slice(0, 6)
-                .map(item => {
+                .slice(0, 5)
+                .map((item, idx) => {
                     const isItemProfit = item.gain >= 0;
                     return `
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                                        <div style="display: flex; align-items: center; gap: 12px;">
-                                            <div style="width: 4px; height: 32px; background: ${isItemProfit ? '#10b981' : '#ef4444'}; border-radius: 2px;"></div>
-                                            <div>
-                                                <div style="font-weight: 900; font-size: 15px; letter-spacing: -0.5px; color: #ffffff; line-height: 1.2;">
-                                                    ${item.ticker}
-                                                    <span style="font-size: 10px; color: #94a3b8; font-weight: 700; margin-left: 8px;">
-                                                        ${mask(`${formatNumber(item.lots)} Lot`)}
-                                                        <span style="color: #cbd5e1; margin-left: 4px; opacity: 0.6;">(${mask(`${formatNumber(item.lots * 100)} Lbr`)})</span>
-                                                    </span>
-                                                </div>
-                                                <div style="font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">${item.name}</div>
-                                            </div>
-                                        </div>
-                                        <div style="text-align: right;">
-                                            <div style="font-weight: 800; font-size: 14px; color: ${isItemProfit ? '#10b981' : '#f87171'};">
-                                                ${isItemProfit ? '▲' : '▼'} ${formatPercentage(Math.abs(item.gain))}
-                                            </div>
-                                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${idx < Math.min(portfolioItems.length - 1, 4) ? 'border-bottom: 1px solid ' + pal.border : ''};">
+                            <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                                <span style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; width: 16px; flex-shrink: 0;">${idx + 1}</span>
+                                <div style="min-width: 0; flex: 1;">
+                                    <div style="font-size: 13px; font-weight: 600; color: ${pal.textPrimary}; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                                        ${item.ticker.replace('.JK', '')}
+                                        <span style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; margin-left: 6px;">${mask(`${formatNumber(item.lots)} lot`)}</span>
                                     </div>
-                                `;
+                                    <div style="font-size: 10px; font-weight: 400; color: ${pal.textTertiary}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">${item.name}</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 13px; font-weight: 600; color: ${isItemProfit ? '#059669' : '#dc2626'}; white-space: nowrap; margin-left: 12px; letter-spacing: -0.01em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                                ${isItemProfit ? '+' : ''}${formatPercentage(item.gain)}
+                            </div>
+                        </div>
+                    `;
                 }).join('')}
-                    </div>
                 </div>
 
-                <div style="margin-top: 40px; border-top: 1px solid #334155; padding-top: 24px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 18px; font-weight: 950; color: #60a5fa; letter-spacing: -0.5px;">ANTIGRAVITY<span style="color: #ffffff; margin-left: 4px;">PORTO</span></div>
-                    <div style="font-size: 11px; color: #64748b; font-weight: 700;">${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                <!-- Footer -->
+                <div style="padding: 24px 36px 36px 36px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid ${pal.border};">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 6px; height: 6px; border-radius: 50%; background: ${pal.textPrimary};"></div>
+                            <span style="font-size: 13px; font-weight: 600; color: ${pal.textPrimary}; letter-spacing: -0.02em;">Porto</span>
+                        </div>
+                        <span style="font-size: 9px; font-weight: 500; color: ${pal.textTertiary}; letter-spacing: 0.05em; text-transform: uppercase;">Portfolio Overview</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -242,140 +326,46 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         }
     };
 
-
     if (portfolio.length === 0) {
         return (
-            <div className="text-center py-12 bg-[var(--surface)] border border-[var(--border)] rounded-lg">
-                <div className="mx-auto w-10 h-10 text-[var(--muted)] mb-2 bg-[var(--surface-hover)] rounded-full flex items-center justify-center">
+            <Card className="p-12 text-center">
+                <div className="mx-auto w-10 h-10 text-muted-foreground mb-2 bg-muted rounded-full flex items-center justify-center">
                     <TrendingUp className="w-5 h-5" />
                 </div>
-                <p className="font-medium text-[var(--fg)] mb-1">Belum ada investasi</p>
-                <p className="text-sm text-[var(--muted)]">Tambahkan saham pertama Anda.</p>
-            </div>
+                <p className="font-medium mb-1">Belum ada investasi</p>
+                <p className="text-sm text-muted-foreground">Tambahkan saham pertama Anda.</p>
+            </Card>
         );
     }
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Daftar Aset</h2>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Monitoring performa per aset</p>
+                    <p className="text-lg font-bold">Daftar Aset</p>
+                    <p className="text-xs text-muted-foreground">Monitoring performa per aset</p>
                 </div>
-                <button
-                    disabled={isExporting}
-                    onClick={() => setIsSummarySelected(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap"
-                >
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    <span>Share Return</span>
-                </button>
+                <Button disabled={isExporting} onClick={() => setIsSummarySelected(true)}>
+                    <ImageIcon className="w-3.5 h-3.5 mr-1" />Share Return
+                </Button>
             </div>
 
-            <div className="overflow-x-auto bg-[var(--surface)] border border-[var(--border)] rounded-lg">
-                {/* Modal Edit */}
-                {editingId && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-md border border-[var(--border)]">
-                            <h3 className="font-medium text-[var(--fg)] mb-4">Edit Saham</h3>
-                            <StockForm
-                                initialData={portfolio.find(p => p.id === editingId)}
-                                isEdit={true}
-                                onSubmit={(data) => {
-                                    onUpdate(editingId, data);
-                                    setEditingId(null);
-                                }}
-                                onCancel={() => setEditingId(null)}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Modal Transaksi */}
-                {transactionId && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-md border border-[var(--border)]">
-                            <h3 className="font-medium text-[var(--fg)] mb-4">Beli/Jual Saham</h3>
-                            <TransactionForm
-                                item={portfolio.find(p => p.id === transactionId)!}
-                                currentPrice={marketData[portfolio.find(p => p.id === transactionId)!.ticker]?.price || 0}
-                                onConfirm={(id, type, lots, price) => {
-                                    onTransaction(id, type, lots, price);
-                                    setTransactionId(null);
-                                }}
-                                onCancel={() => setTransactionId(null)}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Modal Opsi Export Modern (Individual) */}
-                {exportTarget && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-sm border border-[var(--border)]">
-                            <h3 className="font-medium text-[var(--fg)] mb-1">Export Laporan</h3>
-                            <p className="text-sm text-[var(--muted)] mb-4">{exportTarget.ticker} — {marketData[exportTarget.ticker]?.name || exportTarget.name}</p>
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button disabled={isExporting} onClick={() => handleExportAction(exportTarget, 'pdf', false)} className="flex items-center justify-center gap-2 px-4 py-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--border)] transition-colors">
-                                        <FileText className="w-4 h-4" />
-                                        <span>PDF</span>
-                                    </button>
-                                    <button disabled={isExporting} onClick={() => handleExportAction(exportTarget, 'image', false)} className="flex items-center justify-center gap-2 px-4 py-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--border)] transition-colors">
-                                        <ImageIcon className="w-4 h-4" />
-                                        <span>Image</span>
-                                    </button>
-                                </div>
-                                <button disabled={isExporting} onClick={() => handleExportAction(exportTarget, 'image', true)} className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--surface-hover)] transition-colors">
-                                    <Shield className="w-4 h-4" />
-                                    <span>Mode Privasi</span>
-                                </button>
-                                <button disabled={isExporting} onClick={() => setExportTarget(null)} className="w-full py-2 text-sm text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
-                                    {isExporting ? 'Memproses...' : 'Batal'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Modal Opsi Export Modern (Summary) */}
-                {isSummarySelected && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-sm border border-[var(--border)]">
-                            <h3 className="font-medium text-[var(--fg)] mb-1">Portfolio Summary</h3>
-                            <p className="text-sm text-[var(--muted)] mb-4">Bagikan ringkasan performa</p>
-                            <div className="space-y-3">
-                                <button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', false); setIsSummarySelected(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--border)] transition-colors">
-                                    <ImageIcon className="w-4 h-4" />
-                                    <span>Normal Card</span>
-                                </button>
-                                <button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', true); setIsSummarySelected(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border)] rounded-lg text-sm hover:bg-[var(--surface-hover)] transition-colors">
-                                    <Shield className="w-4 h-4" />
-                                    <span>Mode Privasi</span>
-                                </button>
-                                <button disabled={isExporting} onClick={() => setIsSummarySelected(false)} className="w-full py-2 text-sm text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
-                                    {isExporting ? 'Memproses...' : 'Batal'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <table className="w-full text-sm">
-                    <thead className="border-b border-[var(--border)]">
-                        <tr>
-                            <th className="px-4 py-3 font-medium text-left text-xs text-[var(--muted)]">Saham</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Lot</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Avg Price</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Current</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Day Chg</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Value</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">P/L</th>
-                            <th className="px-4 py-3 font-medium text-right text-xs text-[var(--muted)]">Return</th>
-                            <th className="px-4 py-3 font-medium text-center text-xs text-[var(--muted)]">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border)]">
+            <Card className="overflow-hidden">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="text-left">Saham</TableHead>
+                            <TableHead className="text-right">Lot</TableHead>
+                            <TableHead className="text-right">Avg Price</TableHead>
+                            <TableHead className="text-right">Current</TableHead>
+                            <TableHead className="text-right">Day Chg</TableHead>
+                            <TableHead className="text-right">Value</TableHead>
+                            <TableHead className="text-right">P/L</TableHead>
+                            <TableHead className="text-right">Return</TableHead>
+                            <TableHead className="text-center">Aksi</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
                         {sortedPortfolio.map((item) => {
                             const quote = marketData[item.ticker];
                             const currentPrice = quote?.price || 0;
@@ -392,96 +382,50 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             const isDayLoss = dailyChangeValue < 0;
 
                             return (
-                                <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors duration-300 group">
-                                    <td className="px-4 md:px-6 py-4.5">
-                                        <div className="inline-flex font-mono font-bold tracking-tight text-blue-600 dark:text-[#3498db] bg-blue-500/10 dark:bg-[#3498db]/15 px-2 py-0.5 rounded text-xs md:text-sm mb-1">{item.ticker}</div>
-                                        <div className="text-[9px] md:text-[10px] text-slate-400 dark:text-slate-500 uppercase font-black tracking-wider line-clamp-1">{quote?.name || item.name}</div>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-700 dark:text-gray-300 text-sm">
-                                        {formatNumber(item.lots)}
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right text-gray-500 dark:text-gray-400 text-xs font-medium">
-                                        {formatIDR(item.averagePrice)}
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right">
-                                        <div className="font-bold text-gray-900 dark:text-white text-sm">
-                                            {currentPrice > 0 ? formatIDR(currentPrice) : '...'}
-                                        </div>
-                                        <div className={cn(
-                                            "sm:hidden text-[10px] font-bold mt-0.5",
-                                            isDayProfit && "text-emerald-500",
-                                            isDayLoss && "text-rose-500",
-                                            !isDayProfit && !isDayLoss && "text-gray-500"
-                                        )}>
-                                            {dailyChangePercent > 0 ? "+" : ""}{formatPercentage(dailyChangePercent)}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right">
-                                        <div className={cn(
-                                            "font-bold text-sm leading-none mb-1",
-                                            isDayProfit && "text-emerald-500",
-                                            isDayLoss && "text-rose-500",
-                                            !isDayProfit && !isDayLoss && "text-gray-500"
-                                        )}>
+                                <TableRow key={item.id}>
+                                    <TableCell>
+                                        <Badge variant="outline" className="font-mono font-bold text-primary mr-1 mb-0.5">{item.ticker}</Badge>
+                                        <div className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider truncate max-w-[150px]">{quote?.name || companyNames[item.ticker] || item.name}</div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-semibold">{formatNumber(item.lots)}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{formatIDR(item.averagePrice)}</TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="font-semibold">{currentPrice > 0 ? formatIDR(currentPrice) : '...'}</div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className={cn("font-semibold", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
                                             {dailyChangeValue > 0 ? "+" : ""}{formatIDR(dailyChangeValue)}
                                         </div>
-                                        <div className={cn(
-                                            "text-[10px] font-bold",
-                                            isDayProfit && "text-emerald-500/80",
-                                            isDayLoss && "text-rose-500/80",
-                                            !isDayProfit && !isDayLoss && "text-gray-500/80"
-                                        )}>
+                                        <div className={cn("text-[10px]", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
                                             {dailyChangePercent > 0 ? "+" : ""}{formatPercentage(dailyChangePercent)}
                                         </div>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-gray-900 dark:text-white text-sm">
-                                        {formatIDR(marketValue)}
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right">
-                                        <div className={cn(
-                                            "font-bold text-sm",
-                                            isProfit && "text-emerald-500",
-                                            isLoss && "text-rose-500",
-                                            !isProfit && !isLoss && "text-gray-500"
-                                        )}>
+                                    </TableCell>
+                                    <TableCell className="text-right font-semibold">{formatIDR(marketValue)}</TableCell>
+                                    <TableCell className="text-right">
+                                        <span className={cn("font-semibold", isProfit && "text-success", isLoss && "text-destructive")}>
                                             {gainLoss > 0 ? "+" : ""}{formatIDR(gainLoss)}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right">
-                                        <div className={cn(
-                                            "inline-flex items-center gap-1 font-black text-[10px] md:text-xs px-2 py-1 rounded-lg",
-                                            isProfit && "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
-                                            isLoss && "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
-                                        )}>
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Badge variant={isProfit ? "default" : isLoss ? "destructive" : "secondary"} className={cn("font-semibold text-xs", isProfit && "bg-success/15 text-success hover:bg-success/20 hover:text-success")}>
                                             {formatPercentage(gainLossPercent)}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center justify-center gap-0.5">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setProjectionTarget(item)} title="Proyeksi Harga"><Target className="w-3.5 h-3.5" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAvgDownTarget(item)} title="Average Down"><Calculator className="w-3.5 h-3.5" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExportTarget(item)} title="Export"><Download className="w-3.5 h-3.5" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionId(item.id)} title="Beli/Jual"><ArrowRightLeft className="w-3.5 h-3.5" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingId(item.id)} title="Edit"><Edit2 className="w-3.5 h-3.5" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteConfirm({ id: item.id, ticker: item.ticker, name: item.name })} title="Hapus"><Trash2 className="w-3.5 h-3.5" /></Button>
                                         </div>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4">
-                                        <div className="flex items-center justify-center gap-1">
-                                            <button onClick={() => setProjectionTarget(item)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all" title="Proyeksi Harga"><Target className="w-4 h-4" /></button>
-                                            <button
-                                                onClick={() => setAvgDownTarget(item)}
-                                                className={cn(
-                                                    "p-2 rounded-lg transition-all",
-                                                    isLoss
-                                                        ? "text-orange-500 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20"
-                                                        : "text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10"
-                                                )}
-                                                title="Average Down Strategy"
-                                            >
-                                                <Calculator className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => setExportTarget(item)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Export PDF/Image"><Download className="w-4 h-4" /></button>
-                                            <button onClick={() => setTransactionId(item.id)} className="p-2 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all" title="Beli/Jual"><ArrowRightLeft className="w-4 h-4" /></button>
-                                            <button onClick={() => setEditingId(item.id)} className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-all" title="Edit"><Edit2 className="w-4 h-4" /></button>
-                                            <button onClick={() => setDeleteConfirm({ id: item.id, ticker: item.ticker, name: item.name })} className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all" title="Hapus"><Trash2 className="w-4 h-4" /></button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             );
                         })}
-                    </tbody>
-                    <tfoot className="bg-[var(--surface-hover)] border-t border-[var(--border)]">
+                    </TableBody>
+                    <TableFooter>
                         {(() => {
                             const totals = sortedPortfolio.reduce((acc, item) => {
                                 const quote = marketData[item.ticker];
@@ -505,164 +449,203 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                             const isDayLoss = totals.dayChange < 0;
 
                             return (
-                                <tr>
-                                    <td className="px-4 md:px-6 py-4 font-black text-[10px] md:text-xs text-gray-400 uppercase tracking-widest">
-                                        Total Portofolio
-                                    </td>
-                                    <td colSpan={3}></td>
-                                    <td className="px-4 md:px-6 py-4 text-right">
-                                        <div className={cn(
-                                            "font-bold text-sm leading-none mb-1",
-                                            isDayProfit && "text-emerald-500",
-                                            isDayLoss && "text-rose-500",
-                                            !isDayProfit && !isDayLoss && "text-gray-500"
-                                        )}>
+                                <TableRow>
+                                    <TableCell className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Total Portofolio</TableCell>
+                                    <TableCell colSpan={3}></TableCell>
+                                    <TableCell className="text-right">
+                                        <div className={cn("font-semibold", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
                                             {totals.dayChange > 0 ? "+" : ""}{formatIDR(totals.dayChange)}
                                         </div>
-                                        <div className={cn(
-                                            "text-[10px] font-bold",
-                                            isDayProfit && "text-emerald-500/80",
-                                            isDayLoss && "text-rose-500/80",
-                                            !isDayProfit && !isDayLoss && "text-gray-500/80"
-                                        )}>
+                                        <div className={cn("text-[10px]", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
                                             {dayChangePercent > 0 ? "+" : ""}{formatPercentage(dayChangePercent)}
                                         </div>
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right font-black text-gray-900 dark:text-white text-sm">
-                                        {formatIDR(totals.marketValue)}
-                                    </td>
-                                    <td className="px-4 md:px-6 py-4 text-right font-bold text-sm">
-                                        <span className={cn(
-                                            totals.unrealizedPL > 0 ? "text-emerald-500" : totals.unrealizedPL < 0 ? "text-rose-500" : "text-gray-500"
-                                        )}>
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold">{formatIDR(totals.marketValue)}</TableCell>
+                                    <TableCell className="text-right font-semibold">
+                                        <span className={cn(totals.unrealizedPL > 0 ? "text-success" : totals.unrealizedPL < 0 ? "text-destructive" : "")}>
                                             {totals.unrealizedPL > 0 ? "+" : ""}{formatIDR(totals.unrealizedPL)}
                                         </span>
-                                    </td>
-                                    <td colSpan={2}></td>
-                                </tr>
+                                    </TableCell>
+                                    <TableCell colSpan={2}></TableCell>
+                                </TableRow>
                             );
                         })()}
-                    </tfoot>
-                </table>
+                    </TableFooter>
+                </Table>
+            </Card>
 
-                {/* Modal Average Down Strategy */}
-                {avgDownTarget && (
-                    <AvgDownModal
-                        item={avgDownTarget}
-                        currentPrice={marketData[avgDownTarget.ticker]?.price || 0}
-                        onClose={() => setAvgDownTarget(null)}
-                    />
-                )}
+            <Dialog open={editingId !== null} onOpenChange={() => setEditingId(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Saham</DialogTitle>
+                    </DialogHeader>
+                    {editingId && (
+                        <StockForm
+                            initialData={portfolio.find(p => p.id === editingId)}
+                            isEdit={true}
+                            onSubmit={(data) => {
+                                onUpdate(editingId, data);
+                                setEditingId(null);
+                            }}
+                            onCancel={() => setEditingId(null)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
 
-                {/* Modal Proyeksi Harga */}
-                {projectionTarget && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-                        <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-md border border-[var(--border)]">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="font-medium text-[var(--fg)]">Price Projection</h3>
-                                    <p className="text-sm text-[var(--muted)]">{projectionTarget.ticker} — {marketData[projectionTarget.ticker]?.name || projectionTarget.name}</p>
-                                </div>
-                                <button onClick={() => setProjectionTarget(null)} className="p-1 text-[var(--muted)] hover:text-[var(--fg)] transition-colors">
-                                    <Minus className="w-5 h-5" />
-                                </button>
-                            </div>
+            <Dialog open={transactionId !== null} onOpenChange={() => setTransactionId(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Beli/Jual Saham</DialogTitle>
+                    </DialogHeader>
+                    {transactionId && (
+                        <TransactionForm
+                            item={portfolio.find(p => p.id === transactionId)!}
+                            currentPrice={marketData[portfolio.find(p => p.id === transactionId)!.ticker]?.price || 0}
+                            onConfirm={(id, type, lots, price) => {
+                                onTransaction(id, type, lots, price);
+                                setTransactionId(null);
+                            }}
+                            onCancel={() => setTransactionId(null)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
 
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg">
-                                        <div className="text-xs text-[var(--muted)] mb-1">Avg Price</div>
-                                        <div className="font-medium text-[var(--fg)]">{formatIDR(projectionTarget.averagePrice)}</div>
-                                    </div>
-                                    <div className="p-3 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg">
-                                        <div className="text-xs text-[var(--muted)] mb-1">Current Price</div>
-                                        <div className="font-medium text-[var(--fg)]">{formatIDR(marketData[projectionTarget.ticker]?.price || 0)}</div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 max-h-80 overflow-y-auto">
-                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">Target Projections</div>
-                                    <div className="grid gap-3">
-                                        {(() => {
-                                            const current = marketData[projectionTarget.ticker]?.price || 0;
-                                            const high52 = marketData[projectionTarget.ticker]?.high52w || 0;
-
-                                            const targetPoints = [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 10000];
-                                            const targets = new Set<number>();
-
-                                            if (high52 > current) targets.add(high52);
-
-                                            // Add percentage based targets
-                                            [0.1, 0.25, 0.5, 1, 2].forEach(p => {
-                                                const pt = Math.round(current * (1 + p));
-                                                targets.add(pt);
-                                            });
-
-                                            // Add nearest round numbers from targetPoints
-                                            targetPoints.forEach(tp => {
-                                                if (tp > current && tp < current * 5) targets.add(tp);
-                                            });
-
-                                            return Array.from(targets).sort((a, b) => a - b).slice(0, 8).map(target => {
-                                                const gain = (target - projectionTarget.averagePrice) / projectionTarget.averagePrice * 100;
-                                                const profitValue = (target - projectionTarget.averagePrice) * (projectionTarget.lots * 100);
-                                                const isHigh52 = Math.abs(target - high52) < 0.01;
-
-                                                return (
-                                                    <div key={target} className={cn(
-                                                        "flex items-center justify-between p-4 rounded-2xl border transition-all",
-                                                        isHigh52 ? "bg-amber-500/5 border-amber-500/20" : "bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-800"
-                                                    )}>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={cn("w-1.5 h-10 rounded-full", gain >= 0 ? "bg-emerald-500" : "bg-rose-500")} />
-                                                            <div>
-                                                                <div className="text-lg font-black dark:text-white flex items-center gap-2">
-                                                                    {formatIDR(target)}
-                                                                    {isHigh52 && <span className="text-[9px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full uppercase tracking-widest font-bold border border-amber-500/20">52W High</span>}
-                                                                </div>
-                                                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Target Price</div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className={cn("text-lg font-black leading-tight", gain >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                                                                {gain >= 0 ? "+" : ""}{formatPercentage(gain)}
-                                                            </div>
-                                                            <div className={cn("text-[11px] font-bold mt-0.5", gain >= 0 ? "text-emerald-600/80 dark:text-emerald-400/80" : "text-rose-600/80 dark:text-rose-400/80")}>
-                                                                {gain >= 0 ? "+" : ""}{formatIDR(profitValue)}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => setProjectionTarget(null)}
-                                className="w-full mt-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:opacity-90 transition-all active:scale-[0.98]"
-                            >
-                                Tutup Proyeksi
-                            </button>
+            <Dialog open={exportTarget !== null} onOpenChange={() => setExportTarget(null)}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Export Laporan</DialogTitle>
+                        <DialogDescription>{exportTarget?.ticker} — {exportTarget && (marketData[exportTarget.ticker]?.name || companyNames[exportTarget.ticker] || exportTarget.name)}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button disabled={isExporting} onClick={() => exportTarget && handleExportAction(exportTarget, 'pdf', false)} variant="outline">
+                                <FileText className="w-4 h-4 mr-2" />PDF
+                            </Button>
+                            <Button disabled={isExporting} onClick={() => exportTarget && handleExportAction(exportTarget, 'image', false)} variant="outline">
+                                <ImageIcon className="w-4 h-4 mr-2" />Image
+                            </Button>
                         </div>
+                        <Button disabled={isExporting} onClick={() => exportTarget && handleExportAction(exportTarget, 'image', true)} variant="outline" className="w-full">
+                            <Shield className="w-4 h-4 mr-2" />Mode Privasi
+                        </Button>
                     </div>
-                )}
+                </DialogContent>
+            </Dialog>
 
-                {/* Modal Konfirmasi Hapus */}
-                <ConfirmDialog
-                    isOpen={deleteConfirm !== null}
-                    onClose={() => setDeleteConfirm(null)}
-                    onConfirm={() => {
-                        if (deleteConfirm) {
-                            onRemove(deleteConfirm.id);
-                            setDeleteConfirm(null);
-                        }
-                    }}
-                    title="Hapus Saham?"
-                    message={`Keluarkan ${deleteConfirm?.ticker} (${deleteConfirm?.name}) dari portfolio Anda?`}
+            <Dialog open={isSummarySelected} onOpenChange={() => setIsSummarySelected(false)}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Portfolio Summary</DialogTitle>
+                        <DialogDescription>Bagikan ringkasan performa</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <Button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', false); setIsSummarySelected(false); }} variant="outline" className="w-full">
+                            <ImageIcon className="w-4 h-4 mr-2" />Normal Card
+                        </Button>
+                        <Button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', true); setIsSummarySelected(false); }} variant="outline" className="w-full">
+                            <Shield className="w-4 h-4 mr-2" />Mode Privasi
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={projectionTarget !== null} onOpenChange={() => setProjectionTarget(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Price Projection</DialogTitle>
+                        <DialogDescription>{projectionTarget?.ticker} — {projectionTarget && (marketData[projectionTarget.ticker]?.name || companyNames[projectionTarget.ticker] || projectionTarget.name)}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-muted border rounded-lg">
+                                <div className="text-xs text-muted-foreground mb-1">Avg Price</div>
+                                <div className="font-medium">{projectionTarget && formatIDR(projectionTarget.averagePrice)}</div>
+                            </div>
+                            <div className="p-3 bg-muted border rounded-lg">
+                                <div className="text-xs text-muted-foreground mb-1">Current Price</div>
+                                <div className="font-medium">{projectionTarget && formatIDR(marketData[projectionTarget.ticker]?.price || 0)}</div>
+                            </div>
+                        </div>
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Target Projections</p>
+                            <div className="grid gap-3">
+                                {(() => {
+                                    if (!projectionTarget) return null;
+                                    const current = marketData[projectionTarget.ticker]?.price || 0;
+                                    const high52 = marketData[projectionTarget.ticker]?.high52w || 0;
+
+                                    const targetPoints = [50, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 10000];
+                                    const targets = new Set<number>();
+
+                                    if (high52 > current) targets.add(high52);
+
+                                    [0.1, 0.25, 0.5, 1, 2].forEach(p => {
+                                        const pt = Math.round(current * (1 + p));
+                                        targets.add(pt);
+                                    });
+
+                                    targetPoints.forEach(tp => {
+                                        if (tp > current && tp < current * 5) targets.add(tp);
+                                    });
+
+                                    return Array.from(targets).sort((a, b) => a - b).slice(0, 8).map(target => {
+                                        const gain = (target - projectionTarget.averagePrice) / projectionTarget.averagePrice * 100;
+                                        const profitValue = (target - projectionTarget.averagePrice) * (projectionTarget.lots * 100);
+                                        const isHigh52 = Math.abs(target - high52) < 0.01;
+
+                                        return (
+                                            <div key={target} className={cn("flex items-center justify-between p-4 rounded-xl border", isHigh52 ? "bg-warning/5 border-warning/20" : "")}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn("w-1.5 h-10 rounded-full", gain >= 0 ? "bg-success" : "bg-destructive")} />
+                                                    <div>
+                                                        <div className="font-bold flex items-center gap-2">
+                                                            {formatIDR(target)}
+                                                            {isHigh52 && <Badge variant="outline" className="text-[9px] text-warning border-warning/20 uppercase">52W High</Badge>}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Target Price</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className={cn("font-bold", gain >= 0 ? "text-success" : "text-destructive")}>
+                                                        {gain >= 0 ? "+" : ""}{formatPercentage(gain)}
+                                                    </div>
+                                                    <div className={cn("text-xs font-semibold", gain >= 0 ? "text-success" : "text-destructive")}>
+                                                        {gain >= 0 ? "+" : ""}{formatIDR(profitValue)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    });
+                                })()}
+                            </div>
+                        </div>
+                        <Button variant="outline" className="w-full" onClick={() => setProjectionTarget(null)}>Tutup Proyeksi</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {avgDownTarget && (
+                <AvgDownModal
+                    item={avgDownTarget}
+                    currentPrice={marketData[avgDownTarget.ticker]?.price || 0}
+                    onClose={() => setAvgDownTarget(null)}
                 />
-            </div>
+            )}
+
+            <ConfirmDialog
+                isOpen={deleteConfirm !== null}
+                onClose={() => setDeleteConfirm(null)}
+                onConfirm={() => {
+                    if (deleteConfirm) {
+                        onRemove(deleteConfirm.id);
+                        setDeleteConfirm(null);
+                    }
+                }}
+                title="Hapus Saham?"
+                message={`Keluarkan ${deleteConfirm?.ticker} (${deleteConfirm?.name}) dari portfolio Anda?`}
+            />
         </div>
     );
 }

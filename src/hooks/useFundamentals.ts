@@ -61,6 +61,9 @@ interface FundamentalData {
     lastFiscalYearEnd: Date | string | null;
     mostRecentQuarter: Date | string | null;
     lastUpdated: Date | string | null;
+    hasRealOwnership?: boolean;
+    institutionalOwnershipPct?: number;
+    dataSource?: string;
 }
 
 export function useFundamentals(ticker: string) {

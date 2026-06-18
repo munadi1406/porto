@@ -13,6 +13,19 @@ export interface PredictionMethod {
     data: { time: number; value: number }[];
 }
 
+export interface VolumeAnalysis {
+    signal: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL';
+    score: number;
+    adLine: number;
+    obvTrend: 'UP' | 'DOWN' | 'FLAT';
+    mfi: number;
+    mfioverbought: boolean;
+    mfioversold: boolean;
+    volumeSurge: boolean;
+    keySupport: number;
+    keyResistance: number;
+}
+
 export interface AnalysisResult {
     recommendation: 'BUY' | 'SELL' | 'HOLD' | 'STRONG_BUY' | 'STRONG_SELL';
     patterns: string[];
@@ -34,6 +47,7 @@ export interface AnalysisResult {
         };
         trend: 'UP' | 'DOWN' | 'SIDEWAYS';
     };
+    volume: VolumeAnalysis;
     levels: {
         scalping: { buy: number; target: number; sl: number };
         dayTrade: { buy: number; target: number; sl: number };
@@ -57,6 +71,7 @@ export function analyzeCandlesticks(data: OHLCData[]): AnalysisResult {
             patterns: [],
             markers: [],
             indicators: { rsi: 50, ma20: 0, ma50: 0, macd: { value: 0, signal: 0, histogram: 0 }, trend: 'SIDEWAYS' },
+            volume: { signal: 'NEUTRAL', score: 0, adLine: 0, obvTrend: 'FLAT', mfi: 50, mfioverbought: false, mfioversold: false, volumeSurge: false, keySupport: 0, keyResistance: 0 },
             levels: {
                 scalping: { buy: 0, target: 0, sl: 0 },
                 dayTrade: { buy: 0, target: 0, sl: 0 },
@@ -120,14 +135,27 @@ export function analyzeCandlesticks(data: OHLCData[]): AnalysisResult {
     else if (score >= 1) rec = 'BUY';
     else if (score <= -2) rec = 'SELL';
 
+    // Volume Analysis
+    const vAnalysis = calculateVolumeAnalysis(data);
+
     let advice = `Price is ${latest.close > latestMA20 ? 'above' : 'below'} MA20. `;
     advice += `MACD is ${macd.histogram > 0 ? 'Positive' : 'Negative'}. `;
+    advice += `Volume: ${vAnalysis.signal === 'ACCUMULATION' ? 'Accumulation detected' : vAnalysis.signal === 'DISTRIBUTION' ? 'Distribution detected' : 'Neutral'}. `;
+    if (vAnalysis.volumeSurge) advice += 'Volume surge detected. ';
+    if (vAnalysis.score > 0) score += 1;
+    if (vAnalysis.score < 0) score -= 1;
+
+    // Recalculate recommendation with volume
+    if (score >= 3) rec = 'STRONG_BUY';
+    else if (score >= 1) rec = 'BUY';
+    else if (score <= -2) rec = 'SELL';
 
     return {
         recommendation: rec,
         patterns,
         markers,
         indicators: { rsi, ma20: latestMA20, ma50: latestMA50, macd, trend },
+        volume: vAnalysis,
         levels: {
             scalping: { buy: latest.close * 0.995, target: latest.close * 1.015, sl: latest.close * 0.99 },
             dayTrade: { buy: latest.close * 0.985, target: latest.close * 1.04, sl: latest.close * 0.97 },
@@ -166,6 +194,99 @@ function calculateRSI(data: OHLCData[], period: number): number {
     }
     const rs = (gains / period) / (losses / period || 1);
     return 100 - (100 / (1 + rs));
+}
+
+function calculateVolumeAnalysis(data: OHLCData[]): VolumeAnalysis {
+    if (data.length < 20) {
+        return { signal: 'NEUTRAL', score: 0, adLine: 0, obvTrend: 'FLAT', mfi: 50, mfioverbought: false, mfioversold: false, volumeSurge: false, keySupport: 0, keyResistance: 0 };
+    }
+
+    // Chaikin A/D Line
+    let adLine = 0;
+    const adValues: number[] = [];
+    for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        if (d.high === d.low) continue;
+        const mfv = ((d.close - d.low) - (d.high - d.close)) / (d.high - d.low) * (d.volume || 0);
+        adLine += mfv;
+        adValues.push(adLine);
+    }
+
+    // OBV
+    let obv = 0;
+    const obvValues: number[] = [0];
+    for (let i = 1; i < data.length; i++) {
+        if (data[i].close > data[i - 1].close) obv += (data[i].volume || 0);
+        else if (data[i].close < data[i - 1].close) obv -= (data[i].volume || 0);
+        obvValues.push(obv);
+    }
+
+    // OBV Trend: compare first vs last third
+    const obvFirstThird = obvValues.length > 3 ? obvValues.slice(0, Math.floor(obvValues.length / 3)) : obvValues;
+    const obvLastThird = obvValues.length > 3 ? obvValues.slice(-Math.floor(obvValues.length / 3)) : obvValues;
+    const obvEarly = obvFirstThird.reduce((a, b) => a + b, 0) / obvFirstThird.length;
+    const obvLate = obvLastThird.reduce((a, b) => a + b, 0) / obvLastThird.length;
+    const obvTrend: 'UP' | 'DOWN' | 'FLAT' = obvLate > obvEarly * 1.02 ? 'UP' : obvLate < obvEarly * 0.98 ? 'DOWN' : 'FLAT';
+
+    // MFI (Money Flow Index) — 14-period
+    const mfiPeriod = 14;
+    const mfiData = data.slice(-mfiPeriod - 1);
+    let positiveFlow = 0, negativeFlow = 0;
+    for (let i = 1; i < mfiData.length; i++) {
+        const tp = (mfiData[i].high + mfiData[i].low + mfiData[i].close) / 3;
+        const tpPrev = (mfiData[i - 1].high + mfiData[i - 1].low + mfiData[i - 1].close) / 3;
+        const mf = tp * (mfiData[i].volume || 0);
+        if (tp > tpPrev) positiveFlow += mf; else negativeFlow += mf;
+    }
+    const mfRatio = negativeFlow > 0 ? positiveFlow / negativeFlow : 1;
+    const mfi = 100 - (100 / (1 + mfRatio));
+
+    // Volume Surge: current volume vs 20-day average
+    const recentVolumes = data.slice(-20).map(d => d.volume || 0);
+    const avgVolume = recentVolumes.reduce((a, b) => a + b, 0) / recentVolumes.length;
+    const currentVolume = data[data.length - 1].volume || 0;
+    const volumeSurge = avgVolume > 0 && currentVolume > avgVolume * 1.8;
+
+    // Volume Profile: find key price levels with highest volume
+    const priceBuckets = new Map<number, number>();
+    const bucketSize = Math.max(1, Math.round((data[data.length - 1].high - data[data.length - 1].low) / 5));
+    data.slice(-30).forEach(d => {
+        const bucket = Math.round(d.close / bucketSize) * bucketSize;
+        priceBuckets.set(bucket, (priceBuckets.get(bucket) || 0) + (d.volume || 0));
+    });
+    const sortedBuckets = Array.from(priceBuckets.entries()).sort((a, b) => b[1] - a[1]);
+    const keySupport = sortedBuckets.length > 1 ? sortedBuckets[1][0] : data[data.length - 1].low;
+    const keyResistance = sortedBuckets.length > 0 ? sortedBuckets[0][0] : data[data.length - 1].high;
+
+    // Overall signal
+    const adTrend = adValues.length > 2
+        ? adValues.slice(-3).reduce((a, b) => a + b, 0) / 3 > adValues.slice(-6, -3).reduce((a, b) => a + b, 0) / 3
+        : false;
+
+    let score = 0;
+    if (adTrend) score += 20;
+    if (obvTrend === 'UP') score += 20;
+    else if (obvTrend === 'DOWN') score -= 20;
+    if (mfi < 30) score += 15;
+    else if (mfi > 70) score -= 15;
+    if (volumeSurge && obvTrend === 'UP') score += 10;
+    else if (volumeSurge && obvTrend === 'DOWN') score -= 10;
+
+    const signal: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL' =
+        score >= 20 ? 'ACCUMULATION' : score <= -20 ? 'DISTRIBUTION' : 'NEUTRAL';
+
+    return {
+        signal,
+        score,
+        adLine,
+        obvTrend,
+        mfi: Math.round(mfi),
+        mfioverbought: mfi > 70,
+        mfioversold: mfi < 30,
+        volumeSurge,
+        keySupport,
+        keyResistance,
+    };
 }
 
 function generateMultiPredictions(latest: OHLCData, data: OHLCData[], ma20: number): PredictionMethod[] {

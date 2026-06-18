@@ -88,9 +88,9 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
 
     if (!analysis) {
         return (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Holding Period Analysis</h3>
-                <p className="text-sm text-gray-500">Tambahkan saham untuk analisis</p>
+            <div className="bg-card p-6 rounded-2xl border border-border">
+                <h3 className="text-lg font-bold text-foreground mb-2">Holding Period Analysis</h3>
+                <p className="text-sm text-muted-foreground">Tambahkan saham untuk analisis</p>
             </div>
         );
     }
@@ -104,72 +104,72 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
             <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-                    <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <div className="p-2 bg-primary/10 rounded-xl">
+                    <Clock className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Holding Period Analysis</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Analisis berdasarkan waktu holding</p>
+                    <h3 className="text-base sm:text-lg font-bold text-foreground">Holding Period Analysis</h3>
+                    <p className="text-xs text-muted-foreground">Analisis berdasarkan waktu holding</p>
                 </div>
             </div>
 
             {/* Summary Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="p-3 bg-primary/10 rounded-lg">
                     <div className="flex items-center gap-1 mb-1">
-                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                        <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Avg Period</span>
+                        <Calendar className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-semibold text-primary">Avg Period</span>
                     </div>
-                    <p className="text-lg font-bold text-blue-600 dark:text-blue-500">
+                    <p className="text-lg font-bold text-primary">
                         {formatDays(analysis.avgHoldingDays)}
                     </p>
                 </div>
 
-                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <div className="p-3 bg-warning/10 rounded-lg">
                     <div className="flex items-center gap-1 mb-1">
-                        <Clock className="w-3.5 h-3.5 text-orange-600" />
-                        <span className="text-xs font-semibold text-orange-700 dark:text-orange-400">Short Term</span>
+                        <Clock className="w-3.5 h-3.5 text-warning" />
+                        <span className="text-xs font-semibold text-warning">Short Term</span>
                     </div>
-                    <p className="text-sm font-bold text-orange-600 dark:text-orange-500">
+                    <p className="text-sm font-bold text-warning">
                         {analysis.shortTerm.length} stocks
                     </p>
                     <p className={cn(
                         "text-xs mt-0.5",
-                        analysis.avgShortReturn >= 0 ? "text-green-600" : "text-red-600"
+                        analysis.avgShortReturn >= 0 ? "text-success" : "text-destructive"
                     )}>
                         {analysis.avgShortReturn >= 0 ? "+" : ""}{analysis.avgShortReturn.toFixed(1)}% avg
                     </p>
                 </div>
 
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <div className="p-3 bg-warning/10 rounded-lg">
                     <div className="flex items-center gap-1 mb-1">
-                        <Clock className="w-3.5 h-3.5 text-yellow-600" />
-                        <span className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">Medium Term</span>
+                        <Clock className="w-3.5 h-3.5 text-warning" />
+                        <span className="text-xs font-semibold text-warning">Medium Term</span>
                     </div>
-                    <p className="text-sm font-bold text-yellow-600 dark:text-yellow-500">
+                    <p className="text-sm font-bold text-warning">
                         {analysis.mediumTerm.length} stocks
                     </p>
                     <p className={cn(
                         "text-xs mt-0.5",
-                        analysis.avgMediumReturn >= 0 ? "text-green-600" : "text-red-600"
+                        analysis.avgMediumReturn >= 0 ? "text-success" : "text-destructive"
                     )}>
                         {analysis.avgMediumReturn >= 0 ? "+" : ""}{analysis.avgMediumReturn.toFixed(1)}% avg
                     </p>
                 </div>
 
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="p-3 bg-success/10 rounded-lg">
                     <div className="flex items-center gap-1 mb-1">
-                        <Clock className="w-3.5 h-3.5 text-green-600" />
-                        <span className="text-xs font-semibold text-green-700 dark:text-green-400">Long Term</span>
+                        <Clock className="w-3.5 h-3.5 text-success" />
+                        <span className="text-xs font-semibold text-success">Long Term</span>
                     </div>
-                    <p className="text-sm font-bold text-green-600 dark:text-green-500">
+                    <p className="text-sm font-bold text-success">
                         {analysis.longTerm.length} stocks
                     </p>
                     <p className={cn(
                         "text-xs mt-0.5",
-                        analysis.avgLongReturn >= 0 ? "text-green-600" : "text-red-600"
+                        analysis.avgLongReturn >= 0 ? "text-success" : "text-destructive"
                     )}>
                         {analysis.avgLongReturn >= 0 ? "+" : ""}{analysis.avgLongReturn.toFixed(1)}% avg
                     </p>
@@ -178,24 +178,24 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
 
             {/* Best & Worst */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                <div className="p-4 bg-success/10 rounded-xl border border-success/20">
                     <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        <span className="text-xs font-semibold text-green-700 dark:text-green-400">Best Performer</span>
+                        <TrendingUp className="w-4 h-4 text-success" />
+                        <span className="text-xs font-semibold text-success">Best Performer</span>
                     </div>
-                    <p className="text-lg font-bold text-green-600 dark:text-green-500">{analysis.bestPerformer?.ticker}</p>
-                    <p className="text-sm text-green-600/80 dark:text-green-400/80">
+                    <p className="text-lg font-bold text-success">{analysis.bestPerformer?.ticker}</p>
+                    <p className="text-sm text-success/80">
                         +{analysis.bestPerformer?.returnPct.toFixed(1)}% • {formatDays(analysis.bestPerformer?.holdingDays || 0)}
                     </p>
                 </div>
 
-                <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 rounded-xl border border-red-200 dark:border-red-800">
+                <div className="p-4 bg-destructive/10 rounded-xl border border-destructive/20">
                     <div className="flex items-center gap-2 mb-2">
-                        <TrendingDown className="w-4 h-4 text-red-600" />
-                        <span className="text-xs font-semibold text-red-700 dark:text-red-400">Worst Performer</span>
+                        <TrendingDown className="w-4 h-4 text-destructive" />
+                        <span className="text-xs font-semibold text-destructive">Worst Performer</span>
                     </div>
-                    <p className="text-lg font-bold text-red-600 dark:text-red-500">{analysis.worstPerformer?.ticker}</p>
-                    <p className="text-sm text-red-600/80 dark:text-red-400/80">
+                    <p className="text-lg font-bold text-destructive">{analysis.worstPerformer?.ticker}</p>
+                    <p className="text-sm text-destructive/80">
                         {analysis.worstPerformer?.returnPct.toFixed(1)}% • {formatDays(analysis.worstPerformer?.holdingDays || 0)}
                     </p>
                 </div>
@@ -203,25 +203,25 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
 
             {/* Holdings List */}
             <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">All Holdings</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">All Holdings</h4>
                 <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
                     {analysis.holdingData.map((holding) => (
-                        <div key={`holding-${holding.ticker}`} className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                        <div key={`holding-${holding.ticker}`} className="p-3 bg-muted/50 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                                 <div>
-                                    <p className="text-sm font-bold text-gray-900 dark:text-white">{holding.ticker}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    <p className="text-sm font-bold text-foreground">{holding.ticker}</p>
+                                    <p className="text-xs text-muted-foreground">
                                         {new Date(holding.firstBuyDate).toLocaleDateString('id-ID')}
                                     </p>
                                 </div>
                                 <div className="text-right">
                                     <p className={cn(
                                         "text-sm font-bold",
-                                        holding.returnPct >= 0 ? "text-green-600" : "text-red-600"
+                                        holding.returnPct >= 0 ? "text-success" : "text-destructive"
                                     )}>
                                         {holding.returnPct >= 0 ? "+" : ""}{holding.returnPct.toFixed(1)}%
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    <p className="text-xs text-muted-foreground">
                                         {formatDays(holding.holdingDays)}
                                     </p>
                                 </div>
@@ -229,9 +229,9 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
                             <div className="flex items-center gap-2">
                                 <div className={cn(
                                     "px-2 py-0.5 rounded text-xs font-semibold",
-                                    holding.category === "short" && "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400",
-                                    holding.category === "medium" && "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
-                                    holding.category === "long" && "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                                    holding.category === "short" && "bg-warning/10 text-warning",
+                                    holding.category === "medium" && "bg-warning/10 text-warning",
+                                    holding.category === "long" && "bg-success/10 text-success"
                                 )}>
                                     {holding.category === "short" && "< 1 month"}
                                     {holding.category === "medium" && "1-12 months"}

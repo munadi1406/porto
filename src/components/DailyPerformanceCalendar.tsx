@@ -123,31 +123,31 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-xl shadow-gray-200/20 dark:shadow-none overflow-hidden relative">
+        <div className="bg-card p-6 rounded-3xl border border-border shadow-xl overflow-hidden relative">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl">
-                        <CalendarIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                    <div className="p-2.5 bg-primary/10 rounded-2xl">
+                        <CalendarIcon className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Kalender Performa</h3>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Daily Performance Tracker</p>
+                        <h3 className="text-xl font-black text-foreground tracking-tight">Kalender Performa</h3>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Daily Performance Tracker</p>
                     </div>
                 </div>
 
-                <div className="flex items-center bg-gray-50 dark:bg-gray-900/50 p-1.5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border border-border">
                     <button
                         onClick={prevMonth}
-                        className="p-2 hover:bg-white dark:hover:bg-gray-800 rounded-xl transition-all text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                        className="p-2 hover:bg-muted rounded-xl transition-all text-muted-foreground hover:text-primary"
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <span className="px-4 text-sm font-black text-gray-900 dark:text-white min-w-[140px] text-center">
+                    <span className="px-4 text-sm font-black text-foreground min-w-[140px] text-center">
                         {months[viewDate.getMonth()]} {viewDate.getFullYear()}
                     </span>
                     <button
                         onClick={nextMonth}
-                        className="p-2 hover:bg-white dark:hover:bg-gray-800 rounded-xl transition-all text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                        className="p-2 hover:bg-muted rounded-xl transition-all text-muted-foreground hover:text-primary"
                     >
                         <ChevronRight className="w-5 h-5" />
                     </button>
@@ -156,7 +156,7 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
 
             <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
                 {daysOfWeek.map(day => (
-                    <div key={day} className="text-center py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    <div key={day} className="text-center py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                         {day}
                     </div>
                 ))}
@@ -175,16 +175,16 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
                             key={date.toISOString()}
                             className={cn(
                                 "aspect-square rounded-2xl p-1.5 sm:p-2 flex flex-col items-center justify-between transition-all duration-300 border relative group",
-                                _isToday ? "ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-800" : "",
-                                !hasPerf ? "bg-gray-50/50 dark:bg-gray-900/20 border-gray-100 dark:border-gray-800/50 text-gray-300 dark:text-gray-700" :
-                                    perf > 0 ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/30 text-emerald-600 dark:text-emerald-400" :
-                                        perf < 0 ? "bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/30 text-rose-600 dark:text-rose-400" :
-                                            "bg-gray-50 dark:bg-gray-900/30 border-gray-100 dark:border-gray-800 text-gray-500"
+                                _isToday ? "ring-2 ring-primary ring-offset-2" : "",
+                                !hasPerf ? "bg-muted/50 bg-muted/20 border-border/50 text-muted-foreground" :
+                                    perf > 0 ? "bg-success/10 border-success/20 text-success" :
+                                        perf < 0 ? "bg-destructive/10 border-destructive/20 text-destructive" :
+                                            "bg-muted/50 border-border text-muted-foreground"
                             )}
                         >
                             <span className={cn(
                                 "text-[10px] font-black absolute top-1.5 left-2",
-                                _isToday ? "text-indigo-600 dark:text-indigo-400" : ""
+                                _isToday ? "text-primary" : ""
                             )}>
                                 {date.getDate()}
                             </span>
@@ -200,13 +200,13 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
                                         </span>
                                     </>
                                 ) : (
-                                    <div className="w-1 h-1 rounded-full bg-gray-200 dark:bg-gray-800 mt-2"></div>
+                                    <div className="w-1 h-1 rounded-full bg-muted mt-2"></div>
                                 )}
                             </div>
 
                             {/* Hover Tooltip - simple implementation */}
-                            <div className="absolute inset-0 z-10 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity bg-white/90 dark:bg-gray-900/90 rounded-2xl flex items-center justify-center p-2 text-center shadow-lg border border-gray-200 dark:border-gray-700">
-                                <span className="text-[10px] font-bold text-gray-900 dark:text-white">
+                            <div className="absolute inset-0 z-10 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity bg-background/90 rounded-2xl flex items-center justify-center p-2 text-center shadow-lg border border-border">
+                                <span className="text-[10px] font-bold text-foreground">
                                     {date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
                                     <br />
                                     {hasPerf ? `${perf > 0 ? '+' : ''}${perf.toFixed(2)}%` : 'No Data'}
@@ -218,22 +218,22 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
             </div>
 
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                    <Info className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
-                        Persentase harian dihitung dari perbandingan <span className="font-bold text-gray-700 dark:text-gray-300">Total Equity</span> (Saham + Cash)
+                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-2xl border border-border">
+                    <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
+                        Persentase harian dihitung dari perbandingan <span className="font-bold text-muted-foreground">Total Equity</span> (Saham + Cash)
                         antara penutupan hari ini dengan penutupan hari sebelumnya.
                     </p>
                 </div>
 
                 <div className="flex items-center justify-end gap-4 px-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/40"></div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Profit</span>
+                        <div className="w-3 h-3 rounded bg-success/20 border border-success/40"></div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Profit</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded bg-rose-500/20 border border-rose-500/40"></div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Loss</span>
+                        <div className="w-3 h-3 rounded bg-destructive/20 border border-destructive/40"></div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Loss</span>
                     </div>
                 </div>
             </div>

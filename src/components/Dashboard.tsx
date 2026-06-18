@@ -221,19 +221,19 @@ export default function Dashboard() {
             </div>
 
             {/* Add Stock Form */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
                 <div className="flex items-center gap-2 mb-4">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <Plus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                        <Plus className="w-5 h-5 text-primary" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Tambah / Beli Saham</h3>
+                    <h3 className="text-lg font-bold text-foreground">Tambah / Beli Saham</h3>
                 </div>
                 <StockForm onSubmit={handleAddStock} />
             </div>
 
             {/* Bottom: Table */}
             <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Detail Portofolio</h2>
+                <h2 className="text-xl font-bold text-foreground mb-4">Detail Portofolio</h2>
                 <PortfolioTable
                     portfolio={portfolio}
                     marketData={prices}

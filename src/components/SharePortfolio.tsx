@@ -35,15 +35,42 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
         try {
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            const canvas = await html2canvas(exportRef.current, {
-                backgroundColor: "#0a0e27",
-                scale: 1, // 1080x1920 is native, 1 is enough
-                logging: false,
-                useCORS: true,
-                allowTaint: true,
-                width: 1080,
-                height: 1920,
+            // Disable ALL stylesheets with oklch/lch/lab before html2canvas
+            const savedStyles: { restore: () => void }[] = [];
+
+            document.querySelectorAll('style').forEach(el => {
+                if (el.textContent && /oklch|lch|lab/.test(el.textContent)) {
+                    const orig = el.textContent;
+                    el.textContent = '';
+                    savedStyles.push({ restore: () => { el.textContent = orig; } });
+                }
             });
+
+            document.querySelectorAll('link[rel="stylesheet"]').forEach(el => {
+                if (el.parentNode) {
+                    const placeholder = document.createElement('style');
+                    placeholder.setAttribute('data-html2canvas-placeholder', '');
+                    el.parentNode.insertBefore(placeholder, el.nextSibling);
+                    el.parentNode.removeChild(el);
+                    savedStyles.push({ restore: () => {
+                        if (placeholder.parentNode) {
+                            placeholder.parentNode.insertBefore(el, placeholder.nextSibling);
+                            placeholder.parentNode.removeChild(placeholder);
+                        }
+                    }});
+                }
+            });
+
+            try {
+                const canvas = await html2canvas(exportRef.current, {
+                    backgroundColor: "#0a0e27",
+                    scale: 1,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true,
+                    width: 1080,
+                    height: 1920,
+                });
 
             canvas.toBlob((blob) => {
                 if (!blob) throw new Error("Gagal membuat blob gambar");
@@ -57,6 +84,9 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                 toast.success("Gambar berhasil diunduh!", { id: toastId });
                 setIsExporting(false);
             }, "image/png", 1.0);
+            } finally {
+                savedStyles.forEach(s => s.restore());
+            }
         } catch (error) {
             console.error("Export error:", error);
             toast.error("Gagal mengekspor gambar", { id: toastId });
@@ -72,8 +102,8 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
             <button
                 onClick={() => setIsOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm
-          bg-[var(--accent)] text-white
-          border border-green-600 shadow-md hover:from-green-600 hover:to-emerald-700
+          bg-primary text-primary-foreground
+          border border-primary shadow-md
           active:scale-95 transition-all duration-200"
             >
                 <Share2 className="w-4 h-4" />
@@ -87,20 +117,20 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#1e293b]">
                             <div>
                                 <h2 className="text-xl font-bold text-white">Pratinjau Portofolio</h2>
-                                <p className="text-sm text-gray-400">Siap untuk di-share ke Story!</p>
+                                <p className="text-sm text-muted-foreground">Siap untuk di-share ke Story!</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={togglePrivacyMode}
                                     className={cn(
                                         "p-2.5 rounded-xl transition-all",
-                                        isPrivacyMode ? "bg-purple-500/20 text-purple-400" : "bg-white/5 text-gray-400 hover:bg-white/10"
+                                        isPrivacyMode ? "bg-primary/20 text-primary" : "bg-muted/50 text-muted-foreground hover:bg-muted"
                                     )}
                                     title={isPrivacyMode ? "Sembunyikan Nilai" : "Tampilkan Nilai"}
                                 >
                                     {isPrivacyMode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                 </button>
-                                <button onClick={() => setIsOpen(false)} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-all">
+                                <button onClick={() => setIsOpen(false)} className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl text-muted-foreground hover:text-white transition-all">
                                     <X className="w-6 h-6" />
                                 </button>
                             </div>
@@ -112,19 +142,19 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                             {/* Visual Preview (Responsive UI) */}
                             <div className="relative w-full max-w-[320px] aspect-[9/16] bg-[#0a0e27] rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 flex flex-col p-6 pointer-events-none">
                                 <div className="text-center mb-6">
-                                    <div className="inline-block px-3 py-1 rounded-full border border-green-500/30 text-green-500 text-[8px] font-black uppercase tracking-widest mb-3">Live Performance</div>
+                                    <div className="inline-block px-3 py-1 rounded-full border border-success/30 text-success text-[8px] font-black uppercase tracking-widest mb-3">Live Performance</div>
                                     <h3 className="text-xl font-black text-white leading-none tracking-tighter uppercase mb-1">Portfolio<br />Snapshot</h3>
-                                    <p className="text-gray-500 text-[10px] font-bold">{consolidatedItems.length} Securities Assets</p>
+                                    <p className="text-muted-foreground text-[10px] font-bold">{consolidatedItems.length} Securities Assets</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
-                                        <p className="text-[7px] text-gray-500 uppercase font-black mb-1">Total Value</p>
+                                    <div className="bg-muted/50 p-3 rounded-2xl border border-border/50">
+                                        <p className="text-[7px] text-muted-foreground uppercase font-black mb-1">Total Value</p>
                                         <p className="text-[11px] font-black text-white truncate"><PrivacyWrapper isPrivate={isPrivacyMode}>{formatIDR(totals.grandTotal)}</PrivacyWrapper></p>
                                     </div>
-                                    <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
-                                        <p className="text-[7px] text-gray-500 uppercase font-black mb-1">Total Return</p>
-                                        <p className={cn("text-[13px] font-black", totals.profitLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                                    <div className="bg-muted/50 p-3 rounded-2xl border border-border/50">
+                                        <p className="text-[7px] text-muted-foreground uppercase font-black mb-1">Total Return</p>
+                                        <p className={cn("text-[13px] font-black", totals.profitLoss >= 0 ? "text-success" : "text-destructive")}>
                                             {formatPercentage(totals.returnPercent)}
                                         </p>
                                     </div>
@@ -132,28 +162,28 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
 
                                 <div className="flex-1 grid grid-cols-2 gap-2 content-start">
                                     {topHoldings.slice(0, 10).map((item, idx) => (
-                                        <div key={item.ticker} className="bg-white/5 p-3 rounded-xl border border-white/5 relative overflow-hidden h-20 flex flex-col justify-between">
+                                        <div key={item.ticker} className="bg-muted/50 p-3 rounded-xl border border-border/50 relative overflow-hidden h-20 flex flex-col justify-between">
                                             <span className="absolute -right-1 -bottom-2 text-3xl font-black text-white/5 italic select-none">{idx + 1}</span>
                                             <div className="relative z-10">
                                                 <p className="text-[10px] font-black text-white leading-none">{cleanTicker(item.ticker)}</p>
-                                                <p className="text-[6px] text-gray-500 truncate mt-0.5">{item.name}</p>
+                                                <p className="text-[6px] text-muted-foreground truncate mt-0.5">{item.name}</p>
                                             </div>
                                             <div className="relative z-10">
-                                                <p className={cn("text-xs font-black", item.profitLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                                                <p className={cn("text-xs font-black", item.profitLoss >= 0 ? "text-success" : "text-destructive")}>
                                                     {formatPercentage(item.returnPercent)}
                                                 </p>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-4 pt-3 border-t border-white/5 text-center text-[8px] text-gray-600 font-bold uppercase tracking-widest italic">Analysis Done Right • Porto Hub</div>
+                                <div className="mt-4 pt-3 border-t border-border/50 text-center text-[8px] text-muted-foreground font-bold uppercase tracking-widest italic">Analysis Done Right • Porto Hub</div>
                             </div>
 
                             {/* Info Section */}
                             <div className="flex-1 flex flex-col gap-6 text-white max-w-sm">
                                 <div className="space-y-2">
                                     <h4 className="text-3xl font-bold tracking-tight text-white italic">PORTO<br />STORY</h4>
-                                    <p className="text-gray-400 text-sm leading-relaxed">Layout 2-kolom yang optimal memastikan sisi kanan tidak kosong dan memenuhi layar Story Anda dengan sempurna.</p>
+                                    <p className="text-muted-foreground text-sm leading-relaxed">Layout 2-kolom yang optimal memastikan sisi kanan tidak kosong dan memenuhi layar Story Anda dengan sempurna.</p>
                                 </div>
 
                                 <div className="space-y-4">
@@ -162,9 +192,9 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                                         { icon: "📸", text: "Ultra High Resolution (1080p)" },
                                         { icon: "🔒", text: "Privacy Mode Protected" }
                                     ].map((feat, i) => (
-                                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 transition-hover hover:border-white/10">
+                                        <div key={i} className="flex items-center gap-4 bg-muted/50 p-4 rounded-2xl border border-border/50 transition-hover hover:border-white/10">
                                             <span className="text-2xl">{feat.icon}</span>
-                                            <span className="text-sm font-bold text-gray-200 tracking-wide">{feat.text}</span>
+                                            <span className="text-sm font-bold text-muted-foreground tracking-wide">{feat.text}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -172,7 +202,7 @@ export function SharePortfolio({ consolidatedItems, totals }: SharePortfolioProp
                                 <button
                                     onClick={handleShare}
                                     disabled={isExporting}
-                                    className="w-full mt-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] p-4 rounded-lg font-medium text-lg flex items-center justify-center gap-3 disabled:opacity-50 transition-colors"
+                                    className="w-full mt-4 bg-primary hover:bg-primary/80 text-primary-foreground p-4 rounded-lg font-medium text-lg flex items-center justify-center gap-3 disabled:opacity-50 transition-colors"
                                 >
                                     {isExporting ? (
                                         <>

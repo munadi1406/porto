@@ -68,8 +68,8 @@ export default function PortfolioPage() {
         return (
             <div>
                 <div className="mb-4 space-y-2">
-                    <div className="h-6 w-32 bg-[var(--border)] rounded animate-pulse" />
-                    <div className="h-4 w-48 bg-[var(--border)] rounded animate-pulse" />
+                    <div className="h-6 w-32 bg-muted rounded animate-pulse" />
+                    <div className="h-4 w-48 bg-muted rounded animate-pulse" />
                 </div>
                 <PortfolioTableSkeleton />
             </div>
@@ -80,11 +80,11 @@ export default function PortfolioPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold text-[var(--fg)] tracking-tight flex items-center gap-2">
+                    <h1 className="text-2xl font-semibold text-foreground tracking-tight flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }} />
                         {currentPortfolio?.name || "Portfolio"}
                     </h1>
-                    <p className="text-sm text-[var(--muted)]">{portfolio.length} holdings</p>
+                    <p className="text-sm text-muted-foreground">{portfolio.length} holdings</p>
                 </div>
                 <ExportPDFButton onClick={handleExportPDF} size="md" />
             </div>
@@ -95,7 +95,7 @@ export default function PortfolioPage() {
 
             <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors"
             >
                 <Plus className="w-4 h-4" />
                 Tambah Saham
@@ -103,10 +103,10 @@ export default function PortfolioPage() {
 
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
-                    <div className="bg-[var(--surface)] p-6 rounded-lg w-full max-w-lg border border-[var(--border)]">
+                    <div className="bg-card p-6 rounded-lg w-full max-w-lg border border-border">
                         <div className="mb-4">
-                            <h3 className="font-medium text-[var(--fg)]">Tambah Saham</h3>
-                            <p className="text-sm text-[var(--muted)]">Beli aset baru ke portfolio</p>
+                            <h3 className="font-medium text-foreground">Tambah Saham</h3>
+                            <p className="text-sm text-muted-foreground">Beli aset baru ke portfolio</p>
                         </div>
                         <StockForm
                             onSubmit={handleAddStock}

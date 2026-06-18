@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { PortfolioItem } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface TransactionFormProps {
     item: PortfolioItem;
@@ -26,40 +29,28 @@ export function TransactionForm({ item, currentPrice, onConfirm, onCancel }: Tra
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex gap-2 p-1 bg-[var(--surface-hover)] rounded-lg">
-                <button type="button" onClick={() => setType('buy')}
-                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${type === 'buy' ? 'bg-[var(--surface)] text-[var(--success)] shadow-sm border border-[var(--border)]' : 'text-[var(--muted)]'}`}>
-                    Beli
-                </button>
-                <button type="button" onClick={() => setType('sell')}
-                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${type === 'sell' ? 'bg-[var(--surface)] text-[var(--danger)] shadow-sm border border-[var(--border)]' : 'text-[var(--muted)]'}`}>
-                    Jual
-                </button>
+            <div className="flex gap-2">
+                <Button type="button" variant={type === 'buy' ? "default" : "outline"} className="flex-1" onClick={() => setType('buy')}>Beli</Button>
+                <Button type="button" variant={type === 'sell' ? "destructive" : "outline"} className="flex-1" onClick={() => setType('sell')}>Jual</Button>
             </div>
-
             <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><label className="block text-xs text-[var(--muted)] mb-1">Saham</label><span className="font-medium text-[var(--fg)]">{item.ticker}</span></div>
-                <div><label className="block text-xs text-[var(--muted)] mb-1">Lot Dimiliki</label><span className="font-medium text-[var(--fg)]">{item.lots} Lot</span></div>
+                <div><Label>Saham</Label><p className="font-medium">{item.ticker}</p></div>
+                <div><Label>Lot Dimiliki</Label><p className="font-medium">{item.lots} Lot</p></div>
             </div>
-
-            <div>
-                <label className="block text-sm text-[var(--muted-fg)] mb-1">Jumlah Lot</label>
-                <input type="number" value={lots} onChange={(e) => setLots(e.target.value)} placeholder="5" min="1" max={type === 'sell' ? item.lots : undefined} className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]" required />
+            <div className="space-y-2">
+                <Label>Jumlah Lot</Label>
+                <Input type="number" value={lots} onChange={(e) => setLots(e.target.value)} placeholder="5" min="1" max={type === 'sell' ? item.lots : undefined} required />
                 {type === 'sell' && item.lots > 0 && (
-                    <p className="text-xs text-right mt-1 text-[var(--accent)] cursor-pointer" onClick={() => setLots(item.lots.toString())}>Jual Semua</p>
+                    <p className="text-xs text-right text-primary cursor-pointer" onClick={() => setLots(item.lots.toString())}>Jual Semua</p>
                 )}
             </div>
-
-            <div>
-                <label className="block text-sm text-[var(--muted-fg)] mb-1">Harga per Lembar</label>
-                <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Harga" className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-[var(--accent)]" required />
+            <div className="space-y-2">
+                <Label>Harga per Lembar</Label>
+                <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Harga" required />
             </div>
-
             <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={onCancel} className="px-4 py-2 border border-[var(--border)] rounded-lg text-sm text-[var(--muted-fg)] hover:bg-[var(--surface-hover)] transition-colors">Batal</button>
-                <button type="submit" className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${type === 'buy' ? 'bg-[var(--success)] hover:opacity-90' : 'bg-[var(--danger)] hover:opacity-90'}`}>
-                    Konfirmasi {type === 'buy' ? 'Beli' : 'Jual'}
-                </button>
+                <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
+                <Button type="submit" variant={type === 'buy' ? "default" : "destructive"}>Konfirmasi {type === 'buy' ? 'Beli' : 'Jual'}</Button>
             </div>
         </form>
     );

@@ -15,13 +15,8 @@ function ProgressContent() {
 
         const timer1 = setTimeout(() => setProgress(60), 100);
         const timer2 = setTimeout(() => setProgress(90), 400);
-        const timer3 = setTimeout(() => {
-            setProgress(100);
-        }, 600);
-        const timer4 = setTimeout(() => {
-            setVisible(false);
-            setProgress(0);
-        }, 1000);
+        const timer3 = setTimeout(() => { setProgress(100); }, 600);
+        const timer4 = setTimeout(() => { setVisible(false); setProgress(0); }, 1000);
 
         return () => {
             clearTimeout(timer1);
@@ -36,7 +31,7 @@ function ProgressContent() {
     return (
         <div className="fixed top-0 left-0 right-0 z-[9999] h-1 bg-transparent pointer-events-none">
             <div
-                className="h-full bg-[var(--accent)] transition-all duration-300 ease-out"
+                className="h-full bg-primary transition-all duration-300 ease-out"
                 style={{
                     width: `${progress}%`,
                     opacity: progress >= 100 ? 0 : 1,
