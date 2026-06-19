@@ -489,4 +489,81 @@ export async function getAggregateHistory() {
     }
 }
 
+// ============================================
+// Screener Result Model
+// ============================================
+interface ScreenerResultAttributes {
+    id: string;
+    name: string;
+    label: string;
+    resultsCount: number;
+    buyCount: number;
+    sellCount: number;
+    results: string; // JSON string
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+
+interface ScreenerResultCreationAttributes extends Optional<ScreenerResultAttributes, 'id' | 'createdAt' | 'updatedAt'> { }
+
+export class ScreenerResult extends Model<ScreenerResultAttributes, ScreenerResultCreationAttributes> implements ScreenerResultAttributes {
+    declare id: string;
+    declare name: string;
+    declare label: string;
+    declare resultsCount: number;
+    declare buyCount: number;
+    declare sellCount: number;
+    declare results: string;
+    declare readonly createdAt: Date;
+    declare readonly updatedAt: Date;
+}
+
+ScreenerResult.init(
+    {
+        id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            primaryKey: true,
+        },
+        name: {
+            type: DataTypes.STRING(100),
+            allowNull: false,
+        },
+        label: {
+            type: DataTypes.STRING(255),
+            allowNull: false,
+        },
+        resultsCount: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
+        buyCount: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
+        sellCount: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
+        results: {
+            type: DataTypes.TEXT('long'),
+            allowNull: false,
+        },
+    },
+    {
+        sequelize,
+        tableName: 'screener_results',
+        timestamps: true,
+        indexes: [
+            {
+                fields: ['createdAt'],
+                name: 'screener_created_at_idx'
+            }
+        ]
+    }
+);
+
 export { sequelize };

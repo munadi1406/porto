@@ -263,14 +263,20 @@ function calculateVolumeAnalysis(data: OHLCData[]): VolumeAnalysis {
         ? adValues.slice(-3).reduce((a, b) => a + b, 0) / 3 > adValues.slice(-6, -3).reduce((a, b) => a + b, 0) / 3
         : false;
 
+    const lastPrice = data[data.length - 1].close;
+    const priceAboveMA20 = data.length > 20 && lastPrice > data.slice(-20).reduce((a, b) => a + b.close, 0) / 20;
+
     let score = 0;
-    if (adTrend) score += 20;
-    if (obvTrend === 'UP') score += 20;
-    else if (obvTrend === 'DOWN') score -= 20;
-    if (mfi < 30) score += 15;
-    else if (mfi > 70) score -= 15;
-    if (volumeSurge && obvTrend === 'UP') score += 10;
-    else if (volumeSurge && obvTrend === 'DOWN') score -= 10;
+    if (adTrend && obvTrend === 'UP') score += 35;
+    else if (adTrend || obvTrend === 'UP') score += 15;
+    if (!adTrend && obvTrend === 'DOWN') score -= 35;
+    else if (!adTrend || obvTrend === 'DOWN') score -= 15;
+    if (mfi < 30) score += 10;
+    else if (mfi > 70) score -= 10;
+    if (volumeSurge && obvTrend === 'UP') score += 15;
+    else if (volumeSurge && obvTrend === 'DOWN') score -= 15;
+    if (priceAboveMA20) score += 10;
+    else score -= 10;
 
     const signal: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL' =
         score >= 20 ? 'ACCUMULATION' : score <= -20 ? 'DISTRIBUTION' : 'NEUTRAL';

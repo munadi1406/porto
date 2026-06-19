@@ -46,6 +46,10 @@ interface ScreenerResult {
     stopLoss: number;
     takeProfit: number;
     reason: string;
+    accumulationPercent: number;
+    netFlow: number;
+    divergence: string;
+    investorIndication: string;
 }
 
 function calculateIndicators(data: any[]): Partial<ScreenerResult> {
@@ -76,6 +80,8 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     }
     const rs = (gains / 14) / (losses / 14 || 1);
     const rsi = Math.round(100 - (100 / (1 + rs)));
+    const rsiOversold = rsi < 30;
+    const rsiOverbought = rsi > 70;
 
     // Volume Analysis
     const avgVol = volumes.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
@@ -105,7 +111,12 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     }
     const mfi = Math.round(100 - (100 / (1 + (negFlow > 0 ? posFlow / negFlow : 1))));
 
-    // Chaikin A/D trend
+    // Price trend context
+    const lastClose = closes[closes.length - 1];
+    const priceAboveMA20 = lastClose > ma20;
+    const priceAboveMA50 = lastClose > ma50;
+
+    // Chaikin A/D trend (10 days)
     let adLine = 0;
     const adSlice = data.slice(-10);
     adSlice.forEach((d: any) => {
@@ -114,23 +125,101 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
         }
     });
     const adTrend = adLine > 0;
+    const obvUp = obvTrend === 'UP';
+    const obvDown = obvTrend === 'DOWN';
 
-    // Accumulation / Distribution
-    const accumulation = (obvTrend === 'UP' || adTrend) && rsi < 60 && !volumeSurge;
-    const distribution = (obvTrend === 'DOWN' || !adTrend) && rsi > 40 && !volumeSurge;
+    // Accumulation estimation: net money flow in IDR + percentage
+    let netFlow = 0;
+    const netFlowValues: number[] = [];
+    data.slice(-20).forEach((d: any) => {
+        if (d.high !== d.low) {
+            const mfv = ((d.close - d.low) - (d.high - d.close)) / (d.high - d.low);
+            const rp = mfv * (d.volume || 0) * d.close;
+            netFlow += rp;
+            netFlowValues.push(netFlow);
+        }
+    });
+    const netFlowAbs = Math.abs(netFlow);
+    const maxFlow = netFlowValues.length > 0
+        ? Math.max(...netFlowValues.map(Math.abs), 1)
+        : 1;
+    const accumulationPercent = Math.min(100, Math.round((netFlow / maxFlow) * 50 + 50));
 
+    // Accumulation: both OBV AND A/D must confirm + bullish context
+    const accumulation = (obvUp && adTrend) && rsi >= 30 && rsi < 65 && priceAboveMA20;
+    const strongAccumulation = accumulation && (volumeSurge || goldenCross);
+
+    // Distribution: both OBV AND A/D must confirm + bearish context
+    const distribution = (obvDown && !adTrend) && rsi > 35 && rsi <= 70 && !priceAboveMA20;
+    const strongDistribution = distribution && (volumeSurge || deathCross);
+
+    // Neutral accumulation/distribution (less confident - only one indicator confirms)
+    const weakAccumulation = !accumulation && (obvUp || adTrend) && rsi < 60;
+    const weakDistribution = !distribution && (obvDown || !adTrend) && rsi > 40;
+
+    // Divergence patterns: price vs volume (14 days)
+    const priceSlice14 = closes.slice(-14);
+    const priceUp14 = priceSlice14[priceSlice14.length - 1] > priceSlice14[0];
+    const obvSlice14 = obvValues.slice(-14);
+    const obvUp14 = obvSlice14[obvSlice14.length - 1] > obvSlice14[0];
+    const priceDown14 = !priceUp14;
+    const obvDown14 = !obvUp14;
+
+    const bullishDivergence = priceDown14 && obvUp14 && adTrend;
+    const bearishDivergence = priceUp14 && obvDown14 && !adTrend;
+
+    let divergence: string;
+    let investorIndication: string;
+    if (bullishDivergence) {
+        divergence = 'BULLISH_DIVERGENCE';
+        investorIndication = 'Potential smart money accumulation. Price declining but volume flowing in.';
+    } else if (bearishDivergence) {
+        divergence = 'BEARISH_DIVERGENCE';
+        investorIndication = 'Potential distribution. Price rising but volume declining.';
+    } else if (volumeSurge && rsiOverbought && priceUp14) {
+        divergence = 'RETAIL_FOMO';
+        investorIndication = 'Potential retail FOMO. High volume + price spike + overbought.';
+    } else if (volumeSurge && rsiOversold && priceDown14) {
+        divergence = 'PANIC_SELLING';
+        investorIndication = 'Potential panic selling. Volume surge + price drop + oversold.';
+    } else if (accumulation) {
+        divergence = 'STEADY_ACCUMULATION';
+        investorIndication = 'Steady accumulation. Volume confirms uptrend.';
+    } else if (distribution) {
+        divergence = 'STEADY_DISTRIBUTION';
+        investorIndication = 'Steady distribution. Volume confirms downtrend.';
+    } else if (obvUp && !priceUp14) {
+        divergence = 'EARLY_ACCUMULATION';
+        investorIndication = 'Possible early accumulation. OBV rising ahead of price.';
+    } else if (obvDown && !priceDown14) {
+        divergence = 'EARLY_DISTRIBUTION';
+        investorIndication = 'Possible early distribution. OBV declining ahead of price.';
+    } else {
+        divergence = 'NEUTRAL';
+        investorIndication = 'No clear divergence pattern.';
+    }
+
+    // Composite score
     let score = 0;
-    if (goldenCross) score += 30;
-    if (deathCross) score -= 30;
-    if (nearGoldenCross) score += 10;
-    if (accumulation) score += 20;
-    if (distribution) score -= 20;
-    if (rsi < 30) score += 15;
-    if (rsi > 70) score -= 15;
-    if (obvTrend === 'UP') score += 10;
-    if (obvTrend === 'DOWN') score -= 10;
-    if (volumeSurge && obvTrend === 'UP') score += 15;
-    if (volumeSurge && obvTrend === 'DOWN') score -= 15;
+    if (goldenCross) score += 25;
+    if (deathCross) score -= 25;
+    if (nearGoldenCross) score += 8;
+    if (strongAccumulation) score += 35;
+    else if (accumulation) score += 20;
+    else if (weakAccumulation) score += 8;
+    if (strongDistribution) score -= 35;
+    else if (distribution) score -= 20;
+    else if (weakDistribution) score -= 8;
+    if (priceAboveMA20) score += 10;
+    else score -= 10;
+    if (rsi >= 30 && rsi <= 40) score += 10;
+    else if (rsi > 70) score -= 10;
+    if (mfi < 30) score += 10;
+    else if (mfi > 70) score -= 10;
+    if (volumeSurge && obvUp) score += 10;
+    else if (volumeSurge && obvDown) score -= 10;
+    if (obvUp && adTrend) score += 10;
+    else if (obvDown && !adTrend) score -= 10;
 
     const signal = score >= 20 ? 'BUY' : score <= -20 ? 'SELL' : 'NEUTRAL';
 
@@ -141,7 +230,6 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     const keyResistance = Math.max(recentH, ma50);
 
     // Entry / SL / TP
-    const lastClose = closes[closes.length - 1];
     const entryPrice = Math.round(lastClose);
     const stopLoss = signal === 'SELL'
         ? Math.round(keyResistance * 1.03)
@@ -151,27 +239,32 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
         : Math.round(keyResistance * 0.97);
 
     // Generate reason
-    const oversold = rsi < 30;
-    const overbought = rsi > 70;
-
     const reasons: string[] = [];
-    if (goldenCross) reasons.push('Golden Cross (MA20 x MA50)');
-    if (deathCross) reasons.push('Death Cross (MA20 x MA50)');
-    if (nearGoldenCross) reasons.push('Near Golden Cross');
-    if (accumulation) reasons.push('OBV + A/D accumulation');
-    if (distribution) reasons.push('OBV + A/D distribution');
-    if (oversold) reasons.push(`RSI ${rsi} oversold`);
-    if (overbought) reasons.push(`RSI ${rsi} overbought`);
-    if (volumeSurge && obvTrend === 'UP') reasons.push('Volume surge + OBV up');
-    if (volumeSurge && obvTrend === 'DOWN') reasons.push('Volume surge + OBV down');
-    if (reasons.length === 0) reasons.push('Mixed signals');
-    const reason = reasons.join(', ');
+    if (goldenCross) reasons.push('Golden Cross confirmed');
+    if (deathCross) reasons.push('Death Cross confirmed');
+    if (strongAccumulation) reasons.push('Strong accumulation (OBV↑ A/D↑ price↑)');
+    else if (accumulation) reasons.push('Accumulation (OBV↑ A/D↑)');
+    else if (weakAccumulation) reasons.push('Weak accumulation signals');
+    if (strongDistribution) reasons.push('Strong distribution (OBV↓ A/D↓ price↓)');
+    else if (distribution) reasons.push('Distribution (OBV↓ A/D↓)');
+    else if (weakDistribution) reasons.push('Weak distribution signals');
+    if (priceAboveMA20 && priceAboveMA50) reasons.push('Price above MA20 & MA50');
+    if (!priceAboveMA20) reasons.push('Price below MA20');
+    if (rsi >= 30 && rsi <= 40) reasons.push(`RSI ${rsi} near oversold`);
+    else if (rsi < 30) reasons.push(`RSI ${rsi} oversold`);
+    else if (rsi > 70) reasons.push(`RSI ${rsi} overbought`);
+    if (mfi < 30) reasons.push(`MFI ${mfi} oversold`);
+    else if (mfi > 70) reasons.push(`MFI ${mfi} overbought`);
+    if (volumeSurge) reasons.push(`Volume ${obvUp ? 'surge + bullish' : 'surge + bearish'}`);
+    if (reasons.length === 0) reasons.push('Mixed signals, no clear edge');
+    const reason = reasons.join(' · ');
 
     return {
         ma20, ma50, goldenCross, deathCross, nearGoldenCross,
-        rsi, rsiOversold: oversold, rsiOverbought: overbought,
+        rsi, rsiOversold: rsi < 30, rsiOverbought: rsi > 70,
         volumeSurge,
-        accumulation, distribution,
+        accumulation: strongAccumulation || accumulation || weakAccumulation,
+        distribution: strongDistribution || distribution || weakDistribution,
         adSignal: adTrend ? 'BULLISH' : 'BEARISH',
         obvTrend,
         mfi,
@@ -183,6 +276,10 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
         stopLoss,
         takeProfit,
         reason,
+        accumulationPercent,
+        netFlow: Math.round(netFlow),
+        divergence,
+        investorIndication,
     };
 }
 
@@ -222,6 +319,13 @@ export async function GET(request: Request) {
 
                     const indicators = calculateIndicators(history);
 
+                    // Use real quote price for entry/SL/TP
+                    const realPrice = Math.round(price || 0);
+                    const ind = indicators as any;
+                    const keyS = ind.keySupport || Math.round(price * 0.95);
+                    const keyR = ind.keyResistance || Math.round(price * 1.05);
+                    const isSell = ind.signal === 'SELL';
+
                     return {
                         error: false,
                         ticker,
@@ -232,6 +336,9 @@ export async function GET(request: Request) {
                             change,
                             changePercent,
                             ...indicators,
+                            entryPrice: realPrice,
+                            stopLoss: isSell ? Math.round(keyR * 1.03) : Math.round(keyS * 0.95),
+                            takeProfit: isSell ? Math.round(keyS * 0.95) : Math.round(keyR * 0.97),
                         } as ScreenerResult,
                     };
                 } catch {

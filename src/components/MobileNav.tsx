@@ -102,44 +102,52 @@ export function MobileNav() {
 
                 <SheetContent side="bottom" className="rounded-t-xl max-h-[80vh] overflow-y-auto pb-8">
                     <div className="space-y-6 pt-2">
-                        {navGroups.map((group, idx) => (
-                            <div key={idx}>
-                                <p className="text-sm font-medium text-muted-foreground mb-2">{group.title}</p>
-                                <div className="space-y-1">
-                                    {group.items.map((item) => {
-                                        const isActive = pathname === item.href;
-                                        return (
-                                            <Link
-                                                key={item.name}
-                                                href={item.href}
-                                                onClick={() => setOpen(false)}
-                                                className={cn(
-                                                    "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors",
-                                                    isActive
-                                                        ? "bg-accent text-accent-foreground font-medium"
-                                                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                                )}
-                                            >
-                                                <item.icon className="w-4 h-4" />
-                                                <span>{item.name}</span>
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                    ))}
-                </div>
+                        {/* Portfolio selector for mobile */}
+                        <div className="px-1">
+                            <p className="text-sm font-medium text-muted-foreground mb-2">Portfolio</p>
+                            <SidebarPortfolios />
+                        </div>
 
-                <div className="mt-6 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                        <Button variant="ghost" size="sm" onClick={toggle} className="gap-2">
-                            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                            {theme === "dark" ? "Terang" : "Gelap"}
-                        </Button>
-                        <span className="text-xs text-muted-foreground">v2.0.4</span>
+                        <div className="border-t border-border pt-4">
+                            {navGroups.map((group, idx) => (
+                                <div key={idx} className="mb-6">
+                                    <p className="text-sm font-medium text-muted-foreground mb-2">{group.title}</p>
+                                    <div className="space-y-1">
+                                        {group.items.map((item) => {
+                                            const isActive = pathname === item.href;
+                                            return (
+                                                <Link
+                                                    key={item.name}
+                                                    href={item.href}
+                                                    onClick={() => setOpen(false)}
+                                                    className={cn(
+                                                        "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors",
+                                                        isActive
+                                                            ? "bg-accent text-accent-foreground font-medium"
+                                                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                                                    )}
+                                                >
+                                                    <item.icon className="w-4 h-4" />
+                                                    <span>{item.name}</span>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            </SheetContent>
+
+                    <div className="mt-6 pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                            <Button variant="ghost" size="sm" onClick={toggle} className="gap-2">
+                                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                                {theme === "dark" ? "Terang" : "Gelap"}
+                            </Button>
+                            <span className="text-xs text-muted-foreground">v2.0.4</span>
+                        </div>
+                    </div>
+                </SheetContent>
             </Sheet>
 
             {/* Desktop sidebar */}

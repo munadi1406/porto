@@ -1,7 +1,7 @@
 "use client";
 
 import { usePortfolios } from "@/hooks/usePortfolios";
-import { Plus, Check, Trash2 } from "lucide-react";
+import { Plus, Check, Trash2, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -38,13 +38,14 @@ export function PortfolioSelector() {
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="flex w-full items-center justify-between gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm shadow-sm hover:bg-accent hover:text-accent-foreground">
+            <DropdownMenuTrigger className="flex w-full items-center justify-between gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm shadow-sm hover:bg-accent hover:text-accent-foreground cursor-pointer">
                 <div className="flex items-center gap-2 overflow-hidden min-w-0">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: currentPortfolio?.color || '#3b82f6' }} />
                     <span className="truncate text-xs font-normal">{currentPortfolio?.name || "Pilih"}</span>
                 </div>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="center" side="bottom" sideOffset={6} className="w-56 z-[200]">
                 {portfolios.map((p) => (
                     <DropdownMenuItem key={p.id} className="flex items-center gap-2" onSelect={() => setSelectedPortfolioId(p.id)}>
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || '#3b82f6' }} />

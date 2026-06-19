@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { formatIDR, formatPercentage, cn } from "@/lib/utils";
 import {
     TrendingUp, TrendingDown, Zap, Activity, BarChart3,
-    Search, ArrowUp, ArrowDown, Loader2, Play, AlertCircle, Info
+    Search, ArrowUp, ArrowDown, Loader2, Play, AlertCircle, Info, Save, Clock
 } from "lucide-react";
 import Link from "next/link";
 import stockData from "../../../stocks-idx.json";
@@ -37,6 +37,10 @@ interface ScreenerItem {
     stopLoss: number;
     takeProfit: number;
     reason: string;
+    accumulationPercent: number;
+    netFlow: number;
+    divergence: string;
+    investorIndication: string;
 }
 
 type SortKey = 'score' | 'ticker' | 'changePercent' | 'rsi' | 'signal';
@@ -54,6 +58,11 @@ export default function ScreenerPage() {
     const [sortAsc, setSortAsc] = useState(false);
     const [filter, setFilter] = useState<FilterKey>('all');
     const [search, setSearch] = useState('');
+    const [showHistory, setShowHistory] = useState(false);
+    const [savedScreens, setSavedScreens] = useState<any[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [saveLabel, setSaveLabel] = useState('');
+    const [showSaveDialog, setShowSaveDialog] = useState(false);
     const abortRef = useRef(false);
 
     const filterDescriptions: Record<FilterKey, { title: string; desc: string }> = {
@@ -105,6 +114,44 @@ export default function ScreenerPage() {
 
         setScanning(false);
     }, [allTickers]);
+
+    // Load saved screens
+    useEffect(() => {
+        fetch('/api/screener/history')
+            .then(r => r.json())
+            .then(j => { if (j.success) setSavedScreens(j.data); })
+            .catch(() => {});
+    }, []);
+
+    const handleSave = async () => {
+        if (!saveLabel.trim()) return;
+        setSaving(true);
+        try {
+            const res = await fetch('/api/screener/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: saveLabel.trim(), label: saveLabel.trim(), results }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                setSavedScreens(prev => [json.data, ...prev]);
+                setShowSaveDialog(false);
+                setSaveLabel('');
+            }
+        } catch {}
+        setSaving(false);
+    };
+
+    const handleLoadSaved = async (id: string) => {
+        try {
+            const res = await fetch(`/api/screener/history/${id}`);
+            const json = await res.json();
+            if (json.success && json.data.results) {
+                setResults(json.data.results);
+                setShowHistory(false);
+            }
+        } catch {}
+    };
 
     const handleStop = () => {
         abortRef.current = true;
@@ -206,13 +253,31 @@ export default function ScreenerPage() {
                         </div>
                     )}
                     {!scanning ? (
-                        <button
-                            onClick={handleScreen}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/80 transition-all shadow-lg"
-                        >
-                            <Play className="w-4 h-4" />
-                            Screen Stocks
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {results.length > 0 && (
+                                <button
+                                    onClick={() => { setSaveLabel(''); setShowSaveDialog(true); }}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border text-muted-foreground rounded-xl text-sm font-bold hover:bg-muted transition-all"
+                                >
+                                    <Save className="w-4 h-4" />
+                                    Save
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowHistory(true)}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border text-muted-foreground rounded-xl text-sm font-bold hover:bg-muted transition-all"
+                            >
+                                <Clock className="w-4 h-4" />
+                                History
+                            </button>
+                            <button
+                                onClick={handleScreen}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/80 transition-all shadow-lg"
+                            >
+                                <Play className="w-4 h-4" />
+                                Screen Stocks
+                            </button>
+                        </div>
                     ) : (
                         <button
                             onClick={handleStop}
@@ -267,8 +332,33 @@ export default function ScreenerPage() {
                                             <span>SL: <span className="font-semibold text-destructive">{formatIDR(item.stopLoss)}</span></span>
                                             <span>TP: <span className="font-semibold text-success">{formatIDR(item.takeProfit)}</span></span>
                                             <span className="text-[9px]">R:R <span className="font-semibold text-foreground">1:{(Math.abs(item.takeProfit - item.entryPrice) / Math.abs(item.stopLoss - item.entryPrice)).toFixed(1)}</span></span>
+                                            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", item.accumulationPercent >= 60 ? "bg-success/10 text-success" : item.accumulationPercent >= 40 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground")}>
+                                                {item.signal === 'SELL' ? 100 - item.accumulationPercent : item.accumulationPercent}% flow
+                                            </span>
                                         </div>
-                                        <div className="ml-6 mt-1 text-[8px] text-muted-foreground leading-tight">{item.reason}</div>
+                                        <div className="flex items-center gap-2 ml-6 mt-1">
+                                            <span className={cn("text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider",
+                                                item.divergence === 'BULLISH_DIVERGENCE' ? "bg-success/10 text-success" :
+                                                item.divergence === 'BEARISH_DIVERGENCE' ? "bg-destructive/10 text-destructive" :
+                                                item.divergence === 'RETAIL_FOMO' ? "bg-warning/10 text-warning" :
+                                                item.divergence === 'PANIC_SELLING' ? "bg-destructive/10 text-destructive" :
+                                                item.divergence === 'STEADY_ACCUMULATION' ? "bg-success/10 text-success" :
+                                                item.divergence === 'EARLY_ACCUMULATION' ? "bg-primary/10 text-primary" :
+                                                item.divergence === 'EARLY_DISTRIBUTION' ? "bg-destructive/10 text-destructive" :
+                                                "bg-muted text-muted-foreground"
+                                            )}>
+                                                {item.divergence === 'BULLISH_DIVERGENCE' ? '🔍 Smart Money Acc' :
+                                                 item.divergence === 'BEARISH_DIVERGENCE' ? '🔍 Distribution' :
+                                                 item.divergence === 'RETAIL_FOMO' ? '⚠️ Retail FOMO' :
+                                                 item.divergence === 'PANIC_SELLING' ? '⚠️ Panic Sell' :
+                                                 item.divergence === 'STEADY_ACCUMULATION' ? '📈 Accumulation' :
+                                                 item.divergence === 'STEADY_DISTRIBUTION' ? '📉 Distribution' :
+                                                 item.divergence === 'EARLY_ACCUMULATION' ? '🔎 Early Acc' :
+                                                 item.divergence === 'EARLY_DISTRIBUTION' ? '🔎 Early Dist' :
+                                                 '➖ Neutral'}
+                                            </span>
+                                        </div>
+                                        <div className="ml-6 mt-0.5 text-[8px] text-muted-foreground leading-tight">{item.reason}</div>
                                     </div>
                                 ))}
                             </div>
@@ -296,8 +386,33 @@ export default function ScreenerPage() {
                                             <span>SL: <span className="font-semibold text-success">{formatIDR(item.stopLoss)}</span></span>
                                             <span>TP: <span className="font-semibold text-destructive">{formatIDR(item.takeProfit)}</span></span>
                                             <span className="text-[9px]">R:R <span className="font-semibold text-foreground">1:{(Math.abs(item.takeProfit - item.entryPrice) / Math.abs(item.stopLoss - item.entryPrice)).toFixed(1)}</span></span>
+                                            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", item.accumulationPercent >= 60 ? "bg-success/10 text-success" : item.accumulationPercent >= 40 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground")}>
+                                                {item.signal === 'SELL' ? 100 - item.accumulationPercent : item.accumulationPercent}% flow
+                                            </span>
                                         </div>
-                                        <div className="ml-6 mt-1 text-[8px] text-muted-foreground leading-tight">{item.reason}</div>
+                                        <div className="flex items-center gap-2 ml-6 mt-1">
+                                            <span className={cn("text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider",
+                                                item.divergence === 'BULLISH_DIVERGENCE' ? "bg-success/10 text-success" :
+                                                item.divergence === 'BEARISH_DIVERGENCE' ? "bg-destructive/10 text-destructive" :
+                                                item.divergence === 'RETAIL_FOMO' ? "bg-warning/10 text-warning" :
+                                                item.divergence === 'PANIC_SELLING' ? "bg-destructive/10 text-destructive" :
+                                                item.divergence === 'STEADY_ACCUMULATION' ? "bg-success/10 text-success" :
+                                                item.divergence === 'EARLY_ACCUMULATION' ? "bg-primary/10 text-primary" :
+                                                item.divergence === 'EARLY_DISTRIBUTION' ? "bg-destructive/10 text-destructive" :
+                                                "bg-muted text-muted-foreground"
+                                            )}>
+                                                {item.divergence === 'BULLISH_DIVERGENCE' ? '🔍 Smart Money Acc' :
+                                                 item.divergence === 'BEARISH_DIVERGENCE' ? '🔍 Distribution' :
+                                                 item.divergence === 'RETAIL_FOMO' ? '⚠️ Retail FOMO' :
+                                                 item.divergence === 'PANIC_SELLING' ? '⚠️ Panic Sell' :
+                                                 item.divergence === 'STEADY_ACCUMULATION' ? '📈 Accumulation' :
+                                                 item.divergence === 'STEADY_DISTRIBUTION' ? '📉 Distribution' :
+                                                 item.divergence === 'EARLY_ACCUMULATION' ? '🔎 Early Acc' :
+                                                 item.divergence === 'EARLY_DISTRIBUTION' ? '🔎 Early Dist' :
+                                                 '➖ Neutral'}
+                                            </span>
+                                        </div>
+                                        <div className="ml-6 mt-0.5 text-[8px] text-muted-foreground leading-tight">{item.reason}</div>
                                     </div>
                                 ))}
                             </div>
@@ -352,6 +467,65 @@ export default function ScreenerPage() {
                             <div>
                                 <p className="text-xs font-bold text-foreground">{filterDescriptions[filter].title}</p>
                                 <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{filterDescriptions[filter].desc}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Save Dialog */}
+                    {showSaveDialog && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowSaveDialog(false)}>
+                            <div className="bg-card p-6 rounded-xl w-full max-w-md border border-border shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <h3 className="font-bold text-foreground mb-1">Save Screener Results</h3>
+                                <p className="text-xs text-muted-foreground mb-4">{results.length} stocks — {topPicks.buys.length} buy, {topPicks.sells.length} sell</p>
+                                <input
+                                    type="text"
+                                    value={saveLabel}
+                                    onChange={e => setSaveLabel(e.target.value)}
+                                    placeholder="e.g. IDX Scan 19 Jun 2026"
+                                    className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    autoFocus
+                                    onKeyDown={e => e.key === 'Enter' && handleSave()}
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <button onClick={() => setShowSaveDialog(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+                                    <button onClick={handleSave} disabled={saving || !saveLabel.trim()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:bg-primary/80 disabled:opacity-50 transition-all">
+                                        {saving ? 'Saving...' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* History Panel */}
+                    {showHistory && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowHistory(false)}>
+                            <div className="bg-card p-6 rounded-xl w-full max-w-lg border border-border shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-foreground">Saved Screens</h3>
+                                    <button onClick={() => setShowHistory(false)} className="text-muted-foreground hover:text-foreground text-sm font-medium">Close</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-2">
+                                    {savedScreens.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground text-center py-8">No saved screens yet</p>
+                                    ) : (
+                                        savedScreens.map((s: any) => (
+                                            <div key={s.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border hover:bg-muted/60 transition-colors">
+                                                <div>
+                                                    <p className="text-sm font-medium text-foreground">{s.label}</p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {s.resultsCount} stocks &middot; {s.buyCount} buy &middot; {s.sellCount} sell &middot; {new Date(s.createdAt).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleLoadSaved(s.id)}
+                                                    className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors"
+                                                >
+                                                    Load
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
