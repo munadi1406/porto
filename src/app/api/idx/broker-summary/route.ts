@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getBrokerSummary } from '@/lib/idxApi';
+import { getTopGainer, getTopLoser } from '@/lib/idxApi';
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
-        const { searchParams } = new URL(request.url);
-        const date = searchParams.get('date') || undefined;
-        const data = await getBrokerSummary(date);
-        return NextResponse.json({ success: true, data, total: data.length });
+        const [gainers, losers] = await Promise.all([
+            getTopGainer().catch(() => []),
+            getTopLoser().catch(() => []),
+        ]);
+        return NextResponse.json({ success: true, gainers, losers });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 502 });
     }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
-import { getBrokerSummary, getForeignFlow } from '@/lib/idxApi';
+import { getSmartMoneyData } from '@/lib/idxApi';
 
 interface FundamentalCacheItem {
     data: any;
@@ -14,53 +14,44 @@ const yahooFinance = new YahooFinance();
 
 async function fetchSmartMoneyData(ticker?: string) {
     try {
-        const [brokers, foreignFlow] = await Promise.all([
-            getBrokerSummary().catch(() => [] as any[]),
-            getForeignFlow().catch(() => [] as any[]),
-        ]);
+        const smartData = await getSmartMoneyData();
 
-        if (!brokers || brokers.length === 0) throw new Error('IDX API unavailable');
+        const topBuy = smartData.topBuyBrokers || [];
+        const topSell = smartData.topSellBrokers || [];
+        const foreignFlow = smartData.foreignFlow || [];
 
-        const topBuy = [...brokers]
-            .sort((a, b) => b.NET_BUY_VALUE - a.NET_BUY_VALUE)
-            .slice(0, 5);
-
-        const topSell = [...brokers]
-            .sort((a, b) => a.NET_BUY_VALUE - b.NET_BUY_VALUE)
-            .slice(0, 5);
-
-        const totalBuy = brokers.reduce((s, b) => s + b.BUY_VALUE, 0);
-        const totalSell = brokers.reduce((s, b) => s + b.SELL_VALUE, 0);
-        const netValue = totalBuy - totalSell;
+        const totalBuyValue = smartData.summary?.totalBuyValue || 0;
+        const totalSellValue = smartData.summary?.totalSellValue || 0;
+        const netValue = totalBuyValue - totalSellValue;
 
         const foreign = foreignFlow.find(f => f.investor === 'Foreign');
         const domestic = foreignFlow.find(f => f.investor === 'Domestic');
 
         let phase = 'Neutral';
         let phaseColor = 'gray';
-        let description = `Total transaksi: ${(totalBuy + totalSell).toLocaleString()} nilai.`;
+        let description = `Market scan from ${smartData.summary?.brokerCount || 0} institutions.`;
 
         if (foreign && foreign.netValue > 0) {
             phase = 'Foreign Net Buy';
             phaseColor = 'green';
-            description = `Asing net buy Rp${(foreign.netValue / 1e9).toFixed(1)}M. ${topBuy[0]?.BRK_NAME || ''} top buyer.`;
+            description = `Institutional accumulation detected. Top holder: ${topBuy[0]?.name || 'N/A'}.`;
         } else if (foreign && foreign.netValue < 0) {
             phase = 'Foreign Net Sell';
             phaseColor = 'red';
-            description = `Asing net sell Rp${(Math.abs(foreign.netValue) / 1e9).toFixed(1)}M. ${topSell[0]?.BRK_NAME || ''} top seller.`;
+            description = `Institutional distribution detected.`;
         } else if (netValue > 0) {
-            phase = 'Market Net Buy';
+            phase = 'Institutional Accumulation';
             phaseColor = 'blue';
-            description = `Market net buy Rp${(netValue / 1e9).toFixed(1)}M.`;
+            description = `Positive institutional flow across ${smartData.summary?.brokerCount || 0} tracked institutions.`;
         } else if (netValue < 0) {
-            phase = 'Market Net Sell';
+            phase = 'Institutional Distribution';
             phaseColor = 'red';
-            description = `Market net sell Rp${(Math.abs(netValue) / 1e9).toFixed(1)}M.`;
+            description = `Negative institutional flow.`;
         }
 
         return {
             foreignNetBuyValue: foreign?.netValue || 0,
-            foreignNetBuyVolume: foreign?.buyVolume || 0,
+            foreignNetBuyVolume: foreign?.netValue || 0,
             foreignBuyValue: foreign?.buyValue || 0,
             foreignSellValue: foreign?.sellValue || 0,
             foreignAccumulationStatus: foreign && foreign.netValue > 0 ? 'Akumulasi' : foreign && foreign.netValue < 0 ? 'Distribusi' : 'Netral',
@@ -70,10 +61,10 @@ async function fetchSmartMoneyData(ticker?: string) {
             smartMoneyPhase: phase,
             smartMoneyColor: phaseColor,
             smartMoneyDescription: description,
-            topBuyBrokers: topBuy.map(b => b.BRK_NAME || b.BRK_CODE),
-            topSellBrokers: topSell.map(b => b.BRK_NAME || b.BRK_CODE),
-            concentrationScore: Math.min(100, Math.round((topBuy.reduce((s, b) => s + b.BUY_VALUE, 0) / (totalBuy || 1)) * 100)),
-            dataSource: 'idx',
+            topBuyBrokers: topBuy.map(b => b.name),
+            topSellBrokers: topSell.map(b => b.name),
+            concentrationScore: Math.min(100, Math.round((totalBuyValue / ((totalBuyValue + totalSellValue) || 1)) * 100)),
+            dataSource: 'yahoo_institutions',
             hasRealOwnership: true,
             institutionalOwnershipPct: 0,
         };

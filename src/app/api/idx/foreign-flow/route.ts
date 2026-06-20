@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getForeignFlow } from '@/lib/idxApi';
+import { getSmartMoneyData } from '@/lib/idxApi';
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
-        const { searchParams } = new URL(request.url);
-        const date = searchParams.get('date') || undefined;
-        const data = await getForeignFlow(date);
-        return NextResponse.json({ success: true, data });
+        const data = await getSmartMoneyData();
+        return NextResponse.json({ success: true, data: data.foreignFlow });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 502 });
     }
