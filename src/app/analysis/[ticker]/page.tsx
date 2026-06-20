@@ -313,7 +313,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                         )}
 
                         {/* Smart Money Flow — real data from IDX */}
-                        {smartMoney && (smartMoney.dataSource === 'yahoo_institutions' || smartMoney.dataSource === 'idx') && (
+                        {smartMoney && (smartMoney.dataSource === 'yahoo_institutions' || smartMoney.dataSource === 'idx' || smartMoney.dataSource === 'firecrawl') && (
                             <div className="bg-card p-6 rounded-[2.5rem] border border-border shadow-2xl space-y-5">
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2rem] text-muted-foreground flex items-center gap-2 text-left">
                                     <Users className="w-4 h-4 text-warning" /> Smart Money Flow

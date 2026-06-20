@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
-import { getSmartMoneyData } from '@/lib/idxApi';
+import { getSmartMoneyData } from '@/lib/idxFirecrawl';
 
 interface FundamentalCacheItem {
     data: any;
