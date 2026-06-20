@@ -32,6 +32,26 @@ export default function StocksPage() {
         async function fetchData() {
             setLoading(true);
             setError(false);
+
+            // Try direct IDX via CORS proxy
+            try {
+                const { getBrokerSummaryFromIDX, getForeignFlowFromIDX } = await import('@/lib/idxClient');
+                const brokers = await getBrokerSummaryFromIDX();
+                if (brokers && brokers.length > 0) {
+                    const topBuy = [...brokers].sort((a, b) => (b.NET_BUY_VALUE || 0) - (a.NET_BUY_VALUE || 0)).slice(0, 5);
+                    const topSell = [...brokers].sort((a, b) => (a.NET_BUY_VALUE || 0) - (b.NET_BUY_VALUE || 0)).slice(0, 5);
+                    const flow = await getForeignFlowFromIDX(brokers);
+                    setBrokers({
+                        topBuy: topBuy.map(b => ({ name: b.BRK_NAME || '', code: b.BRK_CODE || '', netValue: b.NET_BUY_VALUE || 0 })),
+                        topSell: topSell.map(b => ({ name: b.BRK_NAME || '', code: b.BRK_CODE || '', netValue: b.NET_BUY_VALUE || 0 })),
+                    });
+                    setForeignFlow(flow);
+                    setLoading(false);
+                    return;
+                }
+            } catch { /* IDX failed, try internal API */ }
+
+            // Fallback: internal Yahoo-based API
             try {
                 const res = await fetch('/api/idx/smart-money');
                 const json = await res.json();
