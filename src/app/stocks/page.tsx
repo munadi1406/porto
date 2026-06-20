@@ -24,6 +24,8 @@ interface ForeignFlowItem {
 export default function StocksPage() {
     const [brokers, setBrokers] = useState<{ topBuy: BrokerItem[]; topSell: BrokerItem[] }>({ topBuy: [], topSell: [] });
     const [foreignFlow, setForeignFlow] = useState<ForeignFlowItem[]>([]);
+    const [gainers, setGainers] = useState<any[]>([]);
+    const [losers, setLosers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const retryRef = useRef(0);
@@ -70,6 +72,12 @@ export default function StocksPage() {
             setLoading(false);
         }
         fetchData();
+
+        // Fetch top gainers/losers
+        fetch('/api/idx/stock-summary')
+            .then(r => r.json())
+            .then(j => { if (j.success) { setGainers(j.gainers || []); setLosers(j.losers || []); } })
+            .catch(() => {});
     }, []);
 
     const foreign = foreignFlow.find(f => f.investor === 'Foreign');
@@ -177,7 +185,7 @@ export default function StocksPage() {
                                         <div key={i} className="flex items-center justify-between px-4 py-2.5">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}</span>
-                                                <span className="text-xs font-medium text-foreground truncate">{b.name}</span>
+                                                <span className="text-xs font-mono font-bold text-foreground">{b.code || b.name.substring(0, 4).toUpperCase()}</span>
                                             </div>
                                             <span className="text-xs font-bold text-success flex-shrink-0">
                                                 +Rp{formatCompactIDR(b.netValue)}
@@ -200,7 +208,7 @@ export default function StocksPage() {
                                         <div key={i} className="flex items-center justify-between px-4 py-2.5">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}</span>
-                                                <span className="text-xs font-medium text-foreground truncate">{b.name}</span>
+                                                <span className="text-xs font-mono font-bold text-foreground">{b.code || b.name.substring(0, 4).toUpperCase()}</span>
                                             </div>
                                             <span className="text-xs font-bold text-destructive flex-shrink-0">
                                                 -Rp{formatCompactIDR(Math.abs(b.netValue))}
@@ -211,6 +219,56 @@ export default function StocksPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Top Gainers / Losers */}
+                    {(gainers.length > 0 || losers.length > 0) && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {gainers.length > 0 && (
+                                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                                    <div className="px-4 py-3 bg-success/5 border-b border-border flex items-center gap-2">
+                                        <TrendingUp className="w-4 h-4 text-success" />
+                                        <span className="text-[10px] font-black text-success uppercase tracking-wider">Top Gainers</span>
+                                    </div>
+                                    <div className="divide-y divide-border">
+                                        {gainers.slice(0, 8).map((s: any, i: number) => (
+                                            <Link key={s.KODE_SAHAM || i} href={`/analysis/${s.KODE_SAHAM}.JK`} className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/40 transition-colors">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}</span>
+                                                    <span className="text-xs font-mono font-bold text-foreground">{s.KODE_SAHAM}</span>
+                                                    <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{s.NAMA_SAHAM}</span>
+                                                </div>
+                                                <span className="text-xs font-bold text-success">
+                                                    +{formatPercentage(s.PERSEN_PERUBAHAN)}
+                                                </span>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {losers.length > 0 && (
+                                <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                                    <div className="px-4 py-3 bg-destructive/5 border-b border-border flex items-center gap-2">
+                                        <TrendingDown className="w-4 h-4 text-destructive" />
+                                        <span className="text-[10px] font-black text-destructive uppercase tracking-wider">Top Losers</span>
+                                    </div>
+                                    <div className="divide-y divide-border">
+                                        {losers.slice(0, 8).map((s: any, i: number) => (
+                                            <Link key={s.KODE_SAHAM || i} href={`/analysis/${s.KODE_SAHAM}.JK`} className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/40 transition-colors">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}</span>
+                                                    <span className="text-xs font-mono font-bold text-foreground">{s.KODE_SAHAM}</span>
+                                                    <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">{s.NAMA_SAHAM}</span>
+                                                </div>
+                                                <span className="text-xs font-bold text-destructive">
+                                                    {formatPercentage(s.PERSEN_PERUBAHAN)}
+                                                </span>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
         </div>

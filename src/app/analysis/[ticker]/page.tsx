@@ -368,8 +368,8 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                     <div>
                                         <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2">Top Net Buy Brokers</p>
                                         <div className="flex flex-wrap gap-1.5">
-                                            {smartMoney.topBuyBrokers.slice(0, 5).map((b: string, i: number) => (
-                                                <span key={i} className="px-2 py-0.5 bg-success/10 border border-success/20 rounded text-[9px] font-bold text-success">{b}</span>
+                                            {smartMoney.topBuyBrokers.slice(0, 5).map((b: any, i: number) => (
+                                                <span key={i} className="px-2 py-0.5 bg-success/10 border border-success/20 rounded text-[9px] font-bold text-success font-mono">{b.code || b.name?.substring(0, 4).toUpperCase() || b}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -379,8 +379,8 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                     <div>
                                         <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2">Top Net Sell Brokers</p>
                                         <div className="flex flex-wrap gap-1.5">
-                                            {smartMoney.topSellBrokers.slice(0, 5).map((b: string, i: number) => (
-                                                <span key={i} className="px-2 py-0.5 bg-destructive/10 border border-destructive/20 rounded text-[9px] font-bold text-destructive">{b}</span>
+                                            {smartMoney.topSellBrokers.slice(0, 5).map((b: any, i: number) => (
+                                                <span key={i} className="px-2 py-0.5 bg-destructive/10 border border-destructive/20 rounded text-[9px] font-bold text-destructive font-mono">{b.code || b.name?.substring(0, 4).toUpperCase() || b}</span>
                                             ))}
                                         </div>
                                     </div>
