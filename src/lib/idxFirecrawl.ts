@@ -11,10 +11,7 @@ async function fcScrape<T>(url: string): Promise<T> {
         },
         body: JSON.stringify({
             url,
-            formats: ['json'],
-            jsonOptions: {
-                prompt: 'Extract all data fields from this JSON response. Return the complete data array with all fields.',
-            },
+            formats: ['rawHtml'],
             onlyMainContent: false,
         }),
         signal: AbortSignal.timeout(30000),
@@ -27,7 +24,26 @@ async function fcScrape<T>(url: string): Promise<T> {
 
     const result = await res.json();
     if (!result.success) throw new Error(`Firecrawl: ${result.error}`);
-    return result.data.json as T;
+
+    // Try rawHtml (IDX returns JSON, Firecrawl wraps it)
+    const raw = result.data?.rawHtml || result.data?.markdown || '';
+    
+    // Find JSON content in the raw response
+    try { return JSON.parse(raw.trim()) as T; } catch {}
+
+    // Try extracting from HTML
+    const preMatch = raw.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
+    if (preMatch) {
+        try { return JSON.parse(preMatch[1].trim()) as T; } catch {}
+    }
+
+    // Try code block
+    const codeMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeMatch) {
+        try { return JSON.parse(codeMatch[1].trim()) as T; } catch {}
+    }
+
+    throw new Error(`Could not parse Firecrawl response as JSON. Response starts with: ${raw.substring(0, 100)}`);
 }
 
 export interface BrokerItem {
@@ -41,23 +57,45 @@ export interface BrokerItem {
     FREQUENCY: number;
 }
 
-// 1. Broker Summary
+// 1. Broker Summary (auto-fallback to last trading day)
 export async function getBrokerSummary(date?: string): Promise<BrokerItem[]> {
-    const d = date || new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const data = await fcScrape<any>(
-        `https://www.idx.co.id/primary/TradingSummary/GetBrokerSummary?length=20&start=0&date=${d}`
-    );
-    const items: any[] = data?.data || data?.Data || [];
-    return items.map(i => ({
-        BRK_NAME: i.BRK_NAME || '',
-        BRK_CODE: i.BRK_CODE || '',
-        BUY_VALUE: i.BUY_VALUE || 0,
-        SELL_VALUE: i.SELL_VALUE || 0,
-        NET_BUY_VALUE: i.NET_BUY_VALUE || 0,
-        BUY_VOLUME: i.BUY_VOLUME || 0,
-        SELL_VOLUME: i.SELL_VOLUME || 0,
-        FREQUENCY: i.FREQUENCY || 0,
-    }));
+    const tryDates: string[] = [];
+    if (date) tryDates.push(date);
+    
+    // Generate last 14 days as candidates
+    for (let i = 0; i < 14; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        tryDates.push(
+            `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+        );
+    }
+
+    let lastError: any;
+    for (const d of tryDates) {
+        try {
+            const data = await fcScrape<any>(
+                `https://www.idx.co.id/primary/TradingSummary/GetBrokerSummary?length=20&start=0&date=${d}`
+            );
+            const items: any[] = data?.data || data?.Data || data?.brokerSummaries || data?.BrokerSummaries || [];
+            if (items.length > 0) {
+                // Handle both original keys and any AI-renamed keys
+                return items.map(i => ({
+                    BRK_NAME: i.FirmName || i.BRK_NAME || i.brokerName || i.name || '',
+                    BRK_CODE: i.IDFirm || i.BRK_CODE || i.brokerCode || i.code || '',
+                    BUY_VALUE: i.Value || i.BUY_VALUE || i.buyValue || 0,
+                    SELL_VALUE: i.SELL_VALUE || i.sellValue || 0,
+                    NET_BUY_VALUE: (i.Value || i.BUY_VALUE || i.buyValue || 0) - (i.SELL_VALUE || i.sellValue || 0),
+                    BUY_VOLUME: i.Volume || i.BUY_VOLUME || i.buyVolume || 0,
+                    SELL_VOLUME: i.SELL_VOLUME || i.sellVolume || 0,
+                    FREQUENCY: i.Frequency || i.FREQUENCY || i.frequency || 0,
+                }));
+            }
+        } catch (e) {
+            lastError = e;
+        }
+    }
+    throw lastError || new Error('No trading data found for last 14 days');
 }
 
 // 2. Smart Money Data
