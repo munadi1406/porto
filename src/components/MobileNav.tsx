@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, PieChart, TrendingUp, History, Building2, Layers, Menu, Activity, Moon, Sun, Search } from "lucide-react";
+import { Home, PieChart, TrendingUp, History, Building2, Layers, Menu, Activity, Moon, Sun, Search, BarChart3 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,8 @@ import { PortfolioSelector } from "./PortfolioSelector";
 import { SidebarPortfolios } from "./SidebarPortfolios";
 
 const primaryNav = [
-    { name: "Ringkasan", href: "/", icon: Layers },
-    { name: "Dashboard", href: "/dashboard", icon: Home },
+    { name: "Portfolio", href: "/", icon: Layers },
+    { name: "Stocks", href: "/stocks", icon: BarChart3 },
     { name: "Portofolio", href: "/portfolio", icon: PieChart },
 ];
 
@@ -25,22 +25,18 @@ const navGroups = [
             { name: "Dashboard", href: "/dashboard", icon: Home },
             { name: "Portofolio", href: "/portfolio", icon: PieChart },
             { name: "History", href: "/history", icon: History },
-        ]
-    },
-    {
-        title: "Analysis",
-        items: [
-            { name: "Teknikal", href: "/analysis/BBCA.JK", icon: Activity },
-            { name: "Fundamental", href: "/fundamentals", icon: Building2 },
-            { name: "Screener", href: "/screener", icon: Search },
-        ]
-    },
-    {
-        title: "Lainnya",
-        items: [
             { name: "Analytics", href: "/analytics", icon: TrendingUp },
         ]
-    }
+    },
+    {
+        title: "Stocks",
+        items: [
+            { name: "Market", href: "/stocks", icon: BarChart3 },
+            { name: "Screener", href: "/screener", icon: Search },
+            { name: "Teknikal", href: "/analysis/BBCA.JK", icon: Activity },
+            { name: "Fundamental", href: "/fundamentals", icon: Building2 },
+        ]
+    },
 ];
 
 export function MobileNav() {
