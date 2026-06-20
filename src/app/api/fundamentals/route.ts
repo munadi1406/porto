@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
+import { getBrokerSummary, getForeignFlow } from '@/lib/idxApi';
 
 interface FundamentalCacheItem {
     data: any;
@@ -11,111 +12,94 @@ const cache: Record<string, FundamentalCacheItem> = {};
 
 const yahooFinance = new YahooFinance();
 
-// NOTE: Yahoo Finance does NOT provide real-time foreign flow data for IDX stocks.
-// The institutionOwnership module provides institution ownership percentages,
-// but foreign buy/sell flow data requires IDX-specific APIs.
-// We provide what Yahoo Finance CAN give, and clearly mark missing data.
-async function fetchRealOwnershipData(ticker: string) {
+async function fetchSmartMoneyData() {
     try {
-        const result = await yahooFinance.quoteSummary(ticker, {
-            modules: ['institutionOwnership', 'insiderTransactions', 'fundOwnership']
-        });
+        const [brokers, foreignFlow] = await Promise.all([
+            getBrokerSummary(),
+            getForeignFlow(),
+        ]);
 
-        const institutionOwnership = result?.institutionOwnership?.ownershipList || [];
-        const fundOwnership = result?.fundOwnership?.ownershipList || [];
-        const insiderTransactions = result?.insiderTransactions?.transactions || [];
+        const topBuy = [...brokers]
+            .sort((a, b) => b.NET_BUY_VALUE - a.NET_BUY_VALUE)
+            .slice(0, 5);
 
-        // Build top holders list from real institution names
-        const topBuyBrokers = institutionOwnership
-            .slice(0, 3)
-            .map((i: any) => {
-                const name = i.organization || '';
-                return name.length > 3 ? name.substring(0, 3).toUpperCase() : name.toUpperCase();
-            })
-            .filter(Boolean);
+        const topSell = [...brokers]
+            .sort((a, b) => a.NET_BUY_VALUE - b.NET_BUY_VALUE)
+            .slice(0, 5);
 
-        // Recent insider sellers as "top sellers"
-        const topSellBrokers = insiderTransactions
-            .filter((t: any) => t.transactionType === 'Sale' || t.shares < 0)
-            .slice(0, 3)
-            .map((t: any) => {
-                const name = t.filerName || '';
-                return name.length > 3 ? name.substring(0, 3).toUpperCase() : name.toUpperCase();
-            })
-            .filter(Boolean);
+        const totalBuy = brokers.reduce((s, b) => s + b.BUY_VALUE, 0);
+        const totalSell = brokers.reduce((s, b) => s + b.SELL_VALUE, 0);
+        const netValue = totalBuy - totalSell;
 
-        // Institution concentration indicates smart money interest
-        const totalOwnership = institutionOwnership.reduce((sum: number, i: any) => {
-            return sum + ((i.pctHeld?.raw || i.pctHeld || 0) * 100);
-        }, 0);
+        const foreign = foreignFlow.find(f => f.investor === 'Foreign');
+        const domestic = foreignFlow.find(f => f.investor === 'Domestic');
 
-        const concentrationScore = Math.min(Math.round(totalOwnership), 100);
-        const totalInstitutions = institutionOwnership.length + fundOwnership.length;
+        let phase = 'Neutral';
+        let phaseColor = 'gray';
+        let description = `Total transaksi: ${(totalBuy + totalSell).toLocaleString()} nilai.`;
 
-        let phase = "Netral";
-        let phaseColor = "gray";
-        let description = `Terdeteksi ${totalInstitutions} institusi pemegang saham.`;
-
-        if (concentrationScore > 50) {
-            phase = "High Concentration";
-            phaseColor = "emerald";
-            description = `${totalInstitutions} institusi memegang ~${concentrationScore}% saham. Konsentrasi kepemilikan tinggi.`;
-        } else if (concentrationScore > 20) {
-            phase = "Moderate";
-            phaseColor = "blue";
-            description = `${totalInstitutions} institusi memegang ~${concentrationScore}% saham. Kepemilikan tersebar moderat.`;
-        } else if (totalInstitutions > 0) {
-            description = `${totalInstitutions} institusi memegang ~${concentrationScore}% saham. Kepemilikan institusi rendah.`;
-        }
-
-        // Insider selling activity
-        const insiderSellers = insiderTransactions.filter((t: any) => t.transactionType === 'Sale' || t.shares < 0).length;
-        if (insiderSellers > 0) {
-            phase = "Insider Selling";
-            phaseColor = "rose";
-            description += ` Terdeteksi ${insiderSellers} transaksi jual insider.`;
+        if (foreign && foreign.netValue > 0) {
+            phase = 'Foreign Net Buy';
+            phaseColor = 'green';
+            description = `Asing net buy Rp${(foreign.netValue / 1e9).toFixed(1)}M. ${topBuy[0]?.BRK_NAME || ''} top buyer.`;
+        } else if (foreign && foreign.netValue < 0) {
+            phase = 'Foreign Net Sell';
+            phaseColor = 'red';
+            description = `Asing net sell Rp${(Math.abs(foreign.netValue) / 1e9).toFixed(1)}M. ${topSell[0]?.BRK_NAME || ''} top seller.`;
+        } else if (netValue > 0) {
+            phase = 'Market Net Buy';
+            phaseColor = 'blue';
+            description = `Market net buy Rp${(netValue / 1e9).toFixed(1)}M.`;
+        } else if (netValue < 0) {
+            phase = 'Market Net Sell';
+            phaseColor = 'red';
+            description = `Market net sell Rp${(Math.abs(netValue) / 1e9).toFixed(1)}M.`;
         }
 
         return {
-            foreignNetBuyValue: 0,
-            foreignNetBuyVolume: 0,
-            foreignBuyValue: 0,
-            foreignSellValue: 0,
-            foreignAccumulationStatus: "Data IDX Diperlukan",
-            domesticNetBuyValue: 0,
-            domesticBuyValue: 0,
-            domesticSellValue: 0,
+            foreignNetBuyValue: foreign?.netValue || 0,
+            foreignNetBuyVolume: foreign?.buyVolume || 0,
+            foreignBuyValue: foreign?.buyValue || 0,
+            foreignSellValue: foreign?.sellValue || 0,
+            foreignAccumulationStatus: foreign && foreign.netValue > 0 ? 'Akumulasi' : foreign && foreign.netValue < 0 ? 'Distribusi' : 'Netral',
+            domesticNetBuyValue: domestic?.netValue || 0,
+            domesticBuyValue: domestic?.buyValue || 0,
+            domesticSellValue: domestic?.sellValue || 0,
             smartMoneyPhase: phase,
             smartMoneyColor: phaseColor,
             smartMoneyDescription: description,
-            topBuyBrokers: topBuyBrokers.length > 0 ? topBuyBrokers : [],
-            topSellBrokers: topSellBrokers.length > 0 ? topSellBrokers : [],
-            concentrationScore,
-            dataSource: 'yahoo_institutions',
-            hasRealOwnership: totalInstitutions > 0,
-            institutionalOwnershipPct: concentrationScore
+            topBuyBrokers: topBuy.map(b => b.BRK_NAME || b.BRK_CODE),
+            topSellBrokers: topSell.map(b => b.BRK_NAME || b.BRK_CODE),
+            concentrationScore: Math.min(100, Math.round((topBuy.reduce((s, b) => s + b.BUY_VALUE, 0) / (totalBuy || 1)) * 100)),
+            dataSource: 'idx',
+            hasRealOwnership: true,
+            institutionalOwnershipPct: 0,
         };
     } catch (e) {
-        return {
-            foreignNetBuyValue: 0,
-            foreignNetBuyVolume: 0,
-            foreignBuyValue: 0,
-            foreignSellValue: 0,
-            foreignAccumulationStatus: "Data Tidak Tersedia",
-            domesticNetBuyValue: 0,
-            domesticBuyValue: 0,
-            domesticSellValue: 0,
-            smartMoneyPhase: "Data Tidak Tersedia",
-            smartMoneyColor: "gray",
-            smartMoneyDescription: "Data foreign flow IDX tidak tersedia melalui Yahoo Finance. Diperlukan integrasi API khusus bursa efek Indonesia.",
-            topBuyBrokers: [],
-            topSellBrokers: [],
-            concentrationScore: 0,
-            dataSource: 'unavailable',
-            hasRealOwnership: false,
-            institutionalOwnershipPct: 0
-        };
+        return getFallbackSmartMoneyData();
     }
+}
+
+function getFallbackSmartMoneyData() {
+    return {
+        foreignNetBuyValue: 0,
+        foreignNetBuyVolume: 0,
+        foreignBuyValue: 0,
+        foreignSellValue: 0,
+        foreignAccumulationStatus: 'Data Tidak Tersedia',
+        domesticNetBuyValue: 0,
+        domesticBuyValue: 0,
+        domesticSellValue: 0,
+        smartMoneyPhase: 'Data Tidak Tersedia',
+        smartMoneyColor: 'gray',
+        smartMoneyDescription: 'Data IDX tidak dapat dijangkau. Coba lagi nanti.',
+        topBuyBrokers: [],
+        topSellBrokers: [],
+        concentrationScore: 0,
+        dataSource: 'unavailable',
+        hasRealOwnership: false,
+        institutionalOwnershipPct: 0,
+    };
 }
 
 export async function GET(request: Request) {
@@ -169,8 +153,8 @@ export async function GET(request: Request) {
         const profile = result?.assetProfile || {};
         const recommendations = result?.recommendationTrend?.trend?.[0] || {};
 
-        // 3. Fetch real ownership/flow data
-        const ownershipData = await fetchRealOwnershipData(ticker);
+        // 3. Fetch real IDX smart money data (broker summary + foreign flow)
+        const ownershipData = await fetchSmartMoneyData();
 
         const fundamentalData = {
             // Valuation Metrics

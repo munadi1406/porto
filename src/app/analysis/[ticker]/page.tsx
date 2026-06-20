@@ -4,9 +4,10 @@ import { useEffect, useState, use } from "react";
 import dynamic from "next/dynamic";
 import { analyzeCandlesticks, AnalysisResult } from "@/lib/analysis-utils";
 import { formatIDR, cn } from "@/lib/utils";
-import { ArrowLeft, TrendingUp, TrendingDown, Zap, Target, Rocket, Activity, Brain, BarChart3, Repeat } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Zap, Target, Rocket, Activity, Brain, BarChart3, Repeat, Users, Building2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useFundamentals } from "@/hooks/useFundamentals";
 
 const StockChart = dynamic(() => import("@/components/StockChart"), {
     ssr: false,
@@ -27,6 +28,8 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState("3mo");
     const [selectedPredictionIndex, setSelectedPredictionIndex] = useState(0);
+
+    const { data: smartMoney, loading: smartMoneyLoading } = useFundamentals(ticker);
 
     // Auto redirect: /analysis/BBCA → /analysis/BBCA.JK
     useEffect(() => {
@@ -69,6 +72,10 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
     }, [ticker, period]);
 
     const activePrediction = analysis?.predictions[selectedPredictionIndex];
+
+    const smStatus = smartMoney?.foreignAccumulationStatus || '';
+    const smIsBuy = smStatus === 'Akumulasi';
+    const smIsSell = smStatus === 'Distribusi';
 
     return (
         <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6 min-h-screen bg-background text-foreground">
@@ -301,6 +308,87 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                     )}>
                                         {analysis.volume.score > 0 ? 'Bullish' : analysis.volume.score < 0 ? 'Bearish' : 'Flat'}
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Smart Money Flow — real data from IDX */}
+                        {smartMoney && smartMoney.dataSource === 'idx' && (
+                            <div className="bg-card p-6 rounded-[2.5rem] border border-border shadow-2xl space-y-5">
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2rem] text-muted-foreground flex items-center gap-2 text-left">
+                                    <Users className="w-4 h-4 text-warning" /> Smart Money Flow
+                                </h3>
+
+                                <div className={cn(
+                                    "p-4 rounded-2xl border flex items-center gap-3",
+                                    smIsBuy ? "bg-success/10 border-success/20" :
+                                    smIsSell ? "bg-destructive/10 border-destructive/20" :
+                                    "bg-muted/5 border-border/30"
+                                )}>
+                                    <div className={cn(
+                                        "p-1.5 rounded-lg",
+                                        smIsBuy ? "bg-success/20" : smIsSell ? "bg-destructive/20" : "bg-muted"
+                                    )}>
+                                        <TrendingUp className={cn(
+                                            "w-4 h-4",
+                                            smIsBuy ? "text-success" : smIsSell ? "text-destructive" : "text-muted-foreground"
+                                        )} />
+                                    </div>
+                                    <div>
+                                        <p className={cn(
+                                            "text-xs font-black uppercase tracking-wider",
+                                            smIsBuy ? "text-success" : smIsSell ? "text-destructive" : "text-muted-foreground"
+                                        )}>
+                                            {smartMoney.smartMoneyPhase || 'Neutral'}
+                                        </p>
+                                        <p className="text-[9px] font-medium text-muted-foreground mt-0.5 leading-snug">
+                                            {smartMoney.smartMoneyDescription}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Foreign Flow */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 bg-success/5 rounded-2xl border border-success/20">
+                                        <p className="text-[8px] font-black text-success uppercase tracking-wider mb-1">Foreign Buy</p>
+                                        <p className="text-sm font-black text-success">
+                                            Rp{(smartMoney.foreignBuyValue / 1e9).toFixed(1)}M
+                                        </p>
+                                    </div>
+                                    <div className="p-3 bg-destructive/5 rounded-2xl border border-destructive/20">
+                                        <p className="text-[8px] font-black text-destructive uppercase tracking-wider mb-1">Foreign Sell</p>
+                                        <p className="text-sm font-black text-destructive">
+                                            Rp{(smartMoney.foreignSellValue / 1e9).toFixed(1)}M
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Top Brokers */}
+                                {smartMoney.topBuyBrokers?.length > 0 && (
+                                    <div>
+                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2">Top Net Buy Brokers</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {smartMoney.topBuyBrokers.slice(0, 5).map((b: string, i: number) => (
+                                                <span key={i} className="px-2 py-0.5 bg-success/10 border border-success/20 rounded text-[9px] font-bold text-success">{b}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {smartMoney.topSellBrokers?.length > 0 && (
+                                    <div>
+                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2">Top Net Sell Brokers</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {smartMoney.topSellBrokers.slice(0, 5).map((b: string, i: number) => (
+                                                <span key={i} className="px-2 py-0.5 bg-destructive/10 border border-destructive/20 rounded text-[9px] font-bold text-destructive">{b}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center gap-2 text-[8px] font-bold text-muted-foreground/60 uppercase tracking-wider justify-center">
+                                    <Building2 className="w-3 h-3" />
+                                    <span>Data real-time dari IDX</span>
                                 </div>
                             </div>
                         )}
