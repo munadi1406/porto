@@ -1,17 +1,29 @@
 // IDX API Service - Unofficial endpoints from www.idx.co.id
 // Source: https://github.com/NeaByteLab/IDX-API
-const IDX_BASE = 'https://www.idx.co.id';
+const IDX_BASE = process.env.NODE_ENV === 'development'
+    ? 'http://localhost:3000/api/idx-proxy/primary'
+    : 'https://www.idx.co.id/primary';
 
 const HEADERS = {
     'Referer': 'https://www.idx.co.id/',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, { headers: HEADERS });
-    if (!res.ok) throw new Error(`IDX API ${res.status}: ${res.statusText}`);
-    return res.json();
+async function fetchJson<T>(url: string, timeout = 10000): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const res = await fetch(url, {
+            headers: HEADERS,
+            signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`IDX API ${res.status}: ${res.statusText}`);
+        return res.json();
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 function todayStr(): string {

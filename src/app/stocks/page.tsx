@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatIDR, formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
 import {
     TrendingUp, TrendingDown, Activity, BarChart3, LineChart,
@@ -26,9 +26,12 @@ export default function StocksPage() {
     const [foreignFlow, setForeignFlow] = useState<ForeignFlowItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const retryRef = useRef(0);
 
     useEffect(() => {
         async function fetchData() {
+            setLoading(true);
+            setError(false);
             try {
                 const res = await fetch('/api/idx/smart-money');
                 const json = await res.json();
@@ -38,6 +41,8 @@ export default function StocksPage() {
                         topSell: json.data.topSellBrokers?.slice(0, 5) || [],
                     });
                     setForeignFlow(json.data.foreignFlow || []);
+                } else {
+                    setError(true);
                 }
             } catch {
                 setError(true);
@@ -94,7 +99,10 @@ export default function StocksPage() {
             ) : error ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
                     <BarChart3 className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
-                    Market data unavailable (IDX API might be unreachable)
+                    <p>Market data unavailable (IDX API might be unreachable).</p>
+                    <button onClick={() => window.location.reload()} className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/80 transition-colors">
+                        Retry
+                    </button>
                 </div>
             ) : (
                 <>

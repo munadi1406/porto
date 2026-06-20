@@ -12,12 +12,14 @@ const cache: Record<string, FundamentalCacheItem> = {};
 
 const yahooFinance = new YahooFinance();
 
-async function fetchSmartMoneyData() {
+async function fetchSmartMoneyData(ticker?: string) {
     try {
         const [brokers, foreignFlow] = await Promise.all([
-            getBrokerSummary(),
-            getForeignFlow(),
+            getBrokerSummary().catch(() => [] as any[]),
+            getForeignFlow().catch(() => [] as any[]),
         ]);
+
+        if (!brokers || brokers.length === 0) throw new Error('IDX API unavailable');
 
         const topBuy = [...brokers]
             .sort((a, b) => b.NET_BUY_VALUE - a.NET_BUY_VALUE)
@@ -76,29 +78,51 @@ async function fetchSmartMoneyData() {
             institutionalOwnershipPct: 0,
         };
     } catch (e) {
-        return getFallbackSmartMoneyData();
+        return getFallbackSmartMoneyData(ticker);
     }
 }
 
-function getFallbackSmartMoneyData() {
+async function getFallbackSmartMoneyData(ticker?: string) {
+    // Try Yahoo institutional ownership as fallback
+    if (ticker) {
+        try {
+            const result = await yahooFinance.quoteSummary(ticker, {
+                modules: ['institutionOwnership', 'insiderTransactions', 'fundOwnership']
+            });
+            const institutionOwnership = result?.institutionOwnership?.ownershipList || [];
+            const fundOwnership = result?.fundOwnership?.ownershipList || [];
+            const totalInstitutions = institutionOwnership.length + fundOwnership.length;
+            const concentrationScore = Math.min(100, Math.round(
+                institutionOwnership.reduce((sum: number, i: any) => sum + ((i.pctHeld?.raw || i.pctHeld || 0) * 100), 0)
+            ));
+
+            let phase = 'Netral', phaseColor = 'gray';
+            let description = `${totalInstitutions} institusi pemegang saham. Konsentrasi ${concentrationScore}%.`;
+            if (concentrationScore > 50) { phase = 'High Concentration'; phaseColor = 'green'; }
+            else if (concentrationScore > 20) { phase = 'Moderate'; phaseColor = 'blue'; }
+
+            return {
+                foreignNetBuyValue: 0, foreignNetBuyVolume: 0, foreignBuyValue: 0, foreignSellValue: 0,
+                foreignAccumulationStatus: 'Data IDX diperlukan',
+                domesticNetBuyValue: 0, domesticBuyValue: 0, domesticSellValue: 0,
+                smartMoneyPhase: phase, smartMoneyColor: phaseColor,
+                smartMoneyDescription: description,
+                topBuyBrokers: institutionOwnership.slice(0, 3).map((i: any) => (i.organization || '').substring(0, 6).toUpperCase()).filter(Boolean),
+                topSellBrokers: [],
+                concentrationScore, dataSource: 'yahoo', hasRealOwnership: totalInstitutions > 0,
+                institutionalOwnershipPct: concentrationScore,
+            };
+        } catch { /* yahoo also failed */ }
+    }
+
     return {
-        foreignNetBuyValue: 0,
-        foreignNetBuyVolume: 0,
-        foreignBuyValue: 0,
-        foreignSellValue: 0,
+        foreignNetBuyValue: 0, foreignNetBuyVolume: 0, foreignBuyValue: 0, foreignSellValue: 0,
         foreignAccumulationStatus: 'Data Tidak Tersedia',
-        domesticNetBuyValue: 0,
-        domesticBuyValue: 0,
-        domesticSellValue: 0,
-        smartMoneyPhase: 'Data Tidak Tersedia',
-        smartMoneyColor: 'gray',
-        smartMoneyDescription: 'Data IDX tidak dapat dijangkau. Coba lagi nanti.',
-        topBuyBrokers: [],
-        topSellBrokers: [],
-        concentrationScore: 0,
-        dataSource: 'unavailable',
-        hasRealOwnership: false,
-        institutionalOwnershipPct: 0,
+        domesticNetBuyValue: 0, domesticBuyValue: 0, domesticSellValue: 0,
+        smartMoneyPhase: 'IDX API Tidak Terjangkau', smartMoneyColor: 'gray',
+        smartMoneyDescription: 'IDX API sedang tidak dapat dijangkau. Data institutional dari Yahoo Finance juga tidak tersedia.',
+        topBuyBrokers: [], topSellBrokers: [], concentrationScore: 0,
+        dataSource: 'unavailable', hasRealOwnership: false, institutionalOwnershipPct: 0,
     };
 }
 
@@ -154,7 +178,7 @@ export async function GET(request: Request) {
         const recommendations = result?.recommendationTrend?.trend?.[0] || {};
 
         // 3. Fetch real IDX smart money data (broker summary + foreign flow)
-        const ownershipData = await fetchSmartMoneyData();
+        const ownershipData = await fetchSmartMoneyData(ticker);
 
         const fundamentalData = {
             // Valuation Metrics
