@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, PieChart, TrendingUp, History, Building2, Layers, Menu, Activity, Moon, Sun, Search, BarChart3, SwitchCamera } from "lucide-react";
+import { Home, PieChart, TrendingUp, History, Building2, Layers, Menu, Activity, Moon, Sun, Search, BarChart3, FileText, SwitchCamera } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ const stocksNav = [
     { name: "Screener", href: "/screener", icon: Search, desc: "959 stocks scanned" },
     { name: "Teknikal", href: "/analysis/BBCA.JK", icon: Activity, desc: "Chart & indicators" },
     { name: "Fundamental", href: "/fundamentals", icon: Building2, desc: "PER, PBV, ROE" },
+    { name: "Prospektus", href: "/stocks/prospectus", icon: FileText, desc: "IPO Analysis" },
 ];
 
 const isPortfolioPage = (path: string) =>
