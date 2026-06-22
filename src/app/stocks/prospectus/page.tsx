@@ -1,52 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { formatIDR, formatPercentage, cn } from "@/lib/utils";
-import { Upload, FileText, TrendingUp, TrendingDown, BarChart3, Plus, Trash2, Loader2, AlertCircle, Target, Scale, Brain, Zap, ArrowRight } from "lucide-react";
+import { Upload, FileText, TrendingUp, TrendingDown, BarChart3, Plus, Trash2, Loader2, AlertCircle, Target, Scale, Brain, Zap, File, X, Check } from "lucide-react";
 import Link from "next/link";
 import type { ProspectusAnalysis } from "@/lib/prospectusAnalyzer";
-
-const initialText = `Tempel teks prospektus di sini, atau upload PDF via URL di atas.
-
-Contoh format yang bisa diproses:
-- Nama emiten, kode saham, harga IPO
-- Data keuangan (EPS, PER, PBV, ROE, DER)
-- Jumlah saham ditawarkan, jadwal listing
-
-Atau berikan URL PDF prospektus dari IDX.`;
 
 export default function ProspectusPage() {
     const [analyses, setAnalyses] = useState<ProspectusAnalysis[]>([]);
     const [url, setUrl] = useState('');
     const [text, setText] = useState('');
     const [name, setName] = useState('');
+    const [file, setFile] = useState<File | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState('');
+    const fileRef = useRef<HTMLInputElement>(null);
 
     const handleAnalyze = async () => {
-        if (!text && !url) { setError('Masukkan URL PDF atau teks prospektus'); return; }
+        if (!file && !text && !url) { setError('Upload PDF, masukkan URL, atau tempel teks prospektus'); return; }
         setAnalyzing(true);
         setError('');
         try {
-            const res = await fetch('/api/analyze/prospectus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: url || undefined, text: text || undefined, fileName: name || `Prospektus ${analyses.length + 1}` }),
-            });
-            const json = await res.json();
-            if (json.success) {
-                setAnalyses(prev => [...prev, json.data]);
-                setUrl('');
-                setText('');
-                setName('');
+            let json: any;
+
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('fileName', name || file.name);
+                const res = await fetch('/api/analyze/prospectus', { method: 'POST', body: formData });
+                json = await res.json();
             } else {
-                throw new Error(json.error);
+                const res = await fetch('/api/analyze/prospectus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url || undefined, text: text || undefined, fileName: name || `Prospektus ${analyses.length + 1}` }),
+                });
+                json = await res.json();
             }
+
+            if (!json.success) throw new Error(json.error);
+            setAnalyses(prev => [...prev, json.data]);
+            resetForm();
         } catch (e: any) {
             setError(e.message || 'Gagal menganalisis prospektus');
         }
         setAnalyzing(false);
     };
+
+    const resetForm = () => { setUrl(''); setText(''); setName(''); setFile(null); };
 
     const removeAnalysis = (id: string) => setAnalyses(prev => prev.filter(a => a.id !== id));
 
@@ -58,32 +59,66 @@ export default function ProspectusPage() {
 
     return (
         <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
-            {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold text-foreground tracking-tight">Analisis Prospektus</h1>
-                <p className="text-sm text-muted-foreground">Analisis IPO & rekomendasi berbasis AI — komparasi multiple emiten</p>
+                <p className="text-sm text-muted-foreground">Upload PDF prospektus IPO — analisis fundamental, ARA, fair value & rekomendasi AI. Multi-emiten komparasi.</p>
             </div>
 
-            {/* Input */}
+            {/* Upload Area */}
             <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+                {/* File Upload Dropzone */}
+                <div
+                    onClick={() => fileRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-primary'); }}
+                    onDragLeave={e => e.currentTarget.classList.remove('border-primary')}
+                    onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-primary'); const f = e.dataTransfer.files[0]; if (f && f.type === 'application/pdf') setFile(f); }}
+                    className={cn(
+                        "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all hover:bg-muted/30",
+                        file ? "border-success bg-success/5" : "border-border hover:border-primary/30"
+                    )}
+                >
+                    <input ref={fileRef} type="file" accept=".pdf,application/pdf" onChange={e => setFile(e.target.files?.[0] || null)} className="hidden" />
+                    {file ? (
+                        <div className="flex items-center justify-center gap-3">
+                            <FileText className="w-8 h-8 text-success" />
+                            <div className="text-left">
+                                <p className="text-sm font-bold text-foreground">{file.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB &middot; <span className="text-success">Siap dianalisis</span></p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); setFile(null); }} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button>
+                        </div>
+                    ) : (
+                        <div>
+                            <Upload className="w-10 h-10 text-muted-foreground/50 mx-auto mb-3" />
+                            <p className="text-sm font-medium text-foreground">Upload PDF Prospektus</p>
+                            <p className="text-xs text-muted-foreground mt-1">Drag & drop atau klik untuk pilih file</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Name + URL */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Nama / Label</label>
-                        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. BBCA IPO 2026" className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Label Analisis</label>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. BBCA IPO" className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">URL PDF Prospektus</label>
-                        <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.idx.co.id/...pdf" className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Atau URL PDF</label>
+                        <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                 </div>
+
+                {/* Or paste text */}
                 <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Atau tempel teks prospektus</label>
-                    <textarea value={text} onChange={e => setText(e.target.value)} rows={5}
+                    <textarea value={text} onChange={e => setText(e.target.value)} rows={4}
                         className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                        placeholder={initialText} />
+                        placeholder={file ? `File "${file.name}" siap. Klik "Analisis Prospektus" untuk mulai.` : 'Tempel teks prospektus di sini...'} />
                 </div>
+
                 {error && <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-xl text-xs text-destructive font-medium"><AlertCircle className="w-4 h-4" />{error}</div>}
-                <button onClick={handleAnalyze} disabled={analyzing}
+
+                <button onClick={handleAnalyze} disabled={analyzing || (!file && !text && !url)}
                     className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/80 disabled:opacity-50 transition-all">
                     {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Menganalisis...</> : <><Brain className="w-4 h-4" /> Analisis Prospektus</>}
                 </button>
@@ -97,7 +132,6 @@ export default function ProspectusPage() {
                         const aPrices = ara(a);
                         return (
                             <div key={a.id} className="bg-card border border-border rounded-2xl overflow-hidden">
-                                {/* Header */}
                                 <div className={cn("px-5 py-4 flex items-center justify-between border-b", isBuy ? "bg-success/5 border-success/20" : "bg-destructive/5 border-destructive/20")}>
                                     <div className="flex items-center gap-3">
                                         <div className={cn("p-2 rounded-xl", isBuy ? "bg-success/20" : "bg-destructive/20")}>
@@ -113,14 +147,11 @@ export default function ProspectusPage() {
                                             <p className={cn("text-lg font-black", isBuy ? "text-success" : "text-destructive")}>{a.recommendation}</p>
                                             <p className="text-xs text-muted-foreground">Score: {a.score}/100</p>
                                         </div>
-                                        <button onClick={() => removeAnalysis(a.id)} className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-destructive transition-colors">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <button onClick={() => removeAnalysis(a.id)} className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
                                     </div>
                                 </div>
 
                                 <div className="p-5 space-y-5">
-                                    {/* Ringkasan */}
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                         <div className="p-3 bg-muted/30 rounded-xl">
                                             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">IPO Price</p>
@@ -140,7 +171,6 @@ export default function ProspectusPage() {
                                         </div>
                                     </div>
 
-                                    {/* ARA Projection */}
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <Zap className="w-4 h-4 text-warning" />
@@ -157,7 +187,6 @@ export default function ProspectusPage() {
                                         <p className="text-[10px] text-muted-foreground mt-2">{a.araProjection.description}</p>
                                     </div>
 
-                                    {/* Financials */}
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <BarChart3 className="w-4 h-4 text-primary" />
@@ -166,10 +195,10 @@ export default function ProspectusPage() {
                                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                                             {[
                                                 { label: 'EPS', value: formatIDR(a.financials.eps) },
-                                                { label: 'PER', value: `${a.financials.per.toFixed(1)}x` },
-                                                { label: 'PBV', value: `${a.financials.pbv.toFixed(2)}x` },
+                                                { label: 'PER', value: a.financials.per > 0 ? `${a.financials.per.toFixed(1)}x` : '-' },
+                                                { label: 'PBV', value: a.financials.pbv > 0 ? `${a.financials.pbv.toFixed(2)}x` : '-' },
                                                 { label: 'ROE', value: `${a.financials.roe.toFixed(1)}%` },
-                                                { label: 'DER', value: `${a.financials.der.toFixed(2)}x` },
+                                                { label: 'DER', value: a.financials.der > 0 ? `${a.financials.der.toFixed(2)}x` : '-' },
                                                 { label: 'Rev Growth', value: `${a.financials.revenueGrowth.toFixed(1)}%` },
                                             ].map(m => (
                                                 <div key={m.label} className="p-2 bg-muted/20 rounded-lg text-center">
@@ -180,7 +209,6 @@ export default function ProspectusPage() {
                                         </div>
                                     </div>
 
-                                    {/* Price Target */}
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <Target className="w-4 h-4 text-primary" />
@@ -192,11 +220,11 @@ export default function ProspectusPage() {
                                                 { label: '3 Bulan', value: a.priceTarget.month3 },
                                                 { label: '1 Tahun', value: a.priceTarget.year1 },
                                             ].map(t => {
-                                                const vsIpo = t.value > 0 ? ((t.value - a.emitent.ipoPrice) / a.emitent.ipoPrice) * 100 : 0;
+                                                const vsIpo = t.value > 0 && a.emitent.ipoPrice > 0 ? ((t.value - a.emitent.ipoPrice) / a.emitent.ipoPrice) * 100 : 0;
                                                 return (
                                                     <div key={t.label} className="p-3 bg-muted/30 rounded-xl text-center">
                                                         <p className="text-[9px] font-bold text-muted-foreground uppercase">{t.label}</p>
-                                                        <p className="text-sm font-black text-foreground">{formatIDR(t.value)}</p>
+                                                        <p className="text-sm font-black text-foreground">{t.value > 0 ? formatIDR(t.value) : '-'}</p>
                                                         <p className={cn("text-[10px] font-bold", vsIpo >= 0 ? "text-success" : "text-destructive")}>
                                                             {vsIpo >= 0 ? '+' : ''}{formatPercentage(vsIpo)} vs IPO
                                                         </p>
@@ -206,13 +234,11 @@ export default function ProspectusPage() {
                                         </div>
                                     </div>
 
-                                    {/* Reasoning */}
                                     <div className="p-4 bg-muted/20 rounded-2xl border border-border/50">
                                         <p className="text-[10px] font-bold text-muted-foreground mb-2">Analisis & Rekomendasi</p>
                                         <p className="text-xs text-foreground leading-relaxed">{a.reasoning}</p>
                                     </div>
 
-                                    {/* Strengths & Risks */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {a.strength.length > 0 && (
                                             <div className="p-3 bg-success/5 rounded-xl border border-success/20">
@@ -248,7 +274,7 @@ export default function ProspectusPage() {
                                     <thead>
                                         <tr className="border-b border-border bg-muted/30 text-muted-foreground text-[10px] font-black uppercase tracking-wider">
                                             <th className="px-4 py-3 text-left">Indikator</th>
-                                            {analyses.map(a => <th key={a.id} className="px-4 py-3 text-right">{a.emitent.ticker}</th>)}
+                                            {analyses.map(a => <th key={a.id} className="px-4 py-3 text-right">{a.emitent.ticker || `#${analyses.indexOf(a) + 1}`}</th>)}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
@@ -287,19 +313,19 @@ export default function ProspectusPage() {
                 </div>
             )}
 
-            {/* Empty state */}
             {analyses.length === 0 && !analyzing && (
                 <div className="p-16 text-center">
                     <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
                     <h2 className="text-lg font-bold text-foreground mb-2">Analisis Prospektus IPO</h2>
                     <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed mb-6">
-                        Upload PDF prospektus dari IDX atau tempel teks prospektus untuk mendapatkan analisis fundamental,
-                        proyeksi ARA, fair value, dan rekomendasi berbasis AI. Bisa multiple emiten untuk perbandingan.
+                        Upload PDF prospektus dari IDX atau tempel teks untuk analisis fundamental,
+                        proyeksi ARA, fair value, dan rekomendasi berbasis AI.
                     </p>
                     <div className="flex flex-wrap justify-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5"><Brain className="w-4 h-4 text-primary" /> AI Analysis via DeepSeek</div>
-                        <div className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-warning" /> ARA Projection</div>
-                        <div className="flex items-center gap-1.5"><Scale className="w-4 h-4 text-primary" /> Multi-Comparison</div>
+                        <span className="flex items-center gap-1.5"><File className="w-4 h-4 text-primary" /> Upload PDF</span>
+                        <span className="flex items-center gap-1.5"><Brain className="w-4 h-4 text-primary" /> DeepSeek AI</span>
+                        <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-warning" /> ARA Projection</span>
+                        <span className="flex items-center gap-1.5"><Scale className="w-4 h-4 text-primary" /> Multi-Compare</span>
                     </div>
                 </div>
             )}

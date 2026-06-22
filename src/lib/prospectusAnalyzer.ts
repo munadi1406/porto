@@ -1,47 +1,51 @@
-// Prospectus Analyzer Service
-// Parses PDF prospektus via Firecrawl or fallback, then analyzes via DeepSeek
+// Prospectus Analyzer Service — Batched AI calls for token efficiency
+const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || '';
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+// Load system prompt from skill file (server-side only)
+function loadSystemPrompt(): string {
+    try {
+        const fs = require('fs') as typeof import('fs');
+        const path = require('path') as typeof import('path');
+        const skillPath = path.join(process.cwd(), '.agents', 'skills', 'prospectus-analysis', 'SKILL.md');
+        if (fs.existsSync(skillPath)) {
+            return fs.readFileSync(skillPath, 'utf-8');
+        }
+    } catch { /* fallback */ }
+    return 'You are an IPO prospectus analyst for IDX. Extract structured data. Respond ONLY with valid JSON, no markdown, no code blocks.';
+}
 
-async function callAI(prompt: string): Promise<string> {
-    const model = 'deepseek/deepseek-chat';
-    const apiKey = OPENROUTER_API_KEY || DEEPSEEK_API_KEY;
-    const baseUrl = OPENROUTER_API_KEY
-        ? 'https://openrouter.ai/api/v1/chat/completions'
-        : 'https://api.deepseek.com/v1/chat/completions';
+const SYSTEM_PROMPT = loadSystemPrompt();
 
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-    };
-    if (OPENROUTER_API_KEY) {
-        headers['HTTP-Referer'] = 'https://porto.app';
-        headers['X-Title'] = 'Porto Prospectus Analyzer';
-    }
-
-    const res = await fetch(baseUrl, {
+async function callAI(prompt: string, maxTokens = 1500): Promise<string> {
+    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${DEEPSEEK_KEY}` },
         body: JSON.stringify({
-            model,
+            model: 'deepseek-chat',
             messages: [
-                { role: 'system', content: 'You are a professional IPO prospectus analyst for Indonesia Stock Exchange (IDX). Analyze the prospectus text and provide structured data.' },
+                { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: prompt },
             ],
-            temperature: 0.1,
-            max_tokens: 4000,
+            temperature: 0.05,
+            max_tokens: maxTokens,
         }),
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
         const err = await res.text().catch(() => '');
-        throw new Error(`AI API ${res.status}: ${err}`);
+        throw new Error(`DeepSeek ${res.status}: ${err}`);
     }
 
     const data = await res.json();
     return data.choices?.[0]?.message?.content || '';
+}
+
+function extractJSFromResponse(raw: string): any {
+    let clean = raw.trim();
+    const match = clean.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) clean = match[1].trim();
+    return JSON.parse(clean);
 }
 
 export interface ProspectusAnalysis {
@@ -75,7 +79,7 @@ export interface ProspectusAnalysis {
         day3: number;
         day4: number;
         day5: number;
-        maxGain: number;
+        maxGain: string;
         description: string;
     };
     fairValue: number;
@@ -92,122 +96,174 @@ export interface ProspectusAnalysis {
     risk: string[];
 }
 
+// Extract relevant text chunks from prospectus
+function extractChunks(text: string): { summary: string; financial: string; risk: string } {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // Find key sections by keywords
+    const summaryEnd = Math.min(
+        text.length,
+        ...['LAPORAN KEUANGAN', 'NERACA', 'LAPORAN LABA RUGI', 'ARUS KAS', 'RISIKO', 'KETENTUAN']
+            .map(k => { const i = text.indexOf(k); return i > 0 ? i : text.length; })
+    );
+
+    const summary = text.substring(0, Math.min(summaryEnd, 4000));
+
+    // Financial section: find balance sheet / income statement area
+    const finStart = Math.max(
+        0,
+        ...['LAPORAN KEUANGAN', 'NERACA', 'LABA RUGI', 'RASIO KEUANGAN', 'EPS', 'PER']
+            .map(k => { const i = text.indexOf(k); return i > 0 ? i : -1; })
+    );
+    const financial = finStart > 0 ? text.substring(finStart, finStart + 4000) : '';
+
+    // Risk section
+    const riskStart = Math.max(
+        0,
+        ...['RISIKO USAHA', 'RISIKO INVESTASI', 'FAKTOR RISIKO']
+            .map(k => { const i = text.indexOf(k); return i > 0 ? i : -1; })
+    );
+    const risk = riskStart > 0 ? text.substring(riskStart, riskStart + 3000) : '';
+
+    return { summary, financial, risk };
+}
+
 export async function analyzeProspectus(text: string, fileName: string): Promise<ProspectusAnalysis> {
-    const prompt = `Anda adalah analis prospektus saham Indonesia profesional.
-Analisis teks prospektus berikut dan berikan output JSON **TANPA MARKDOWN, TANPA \`\`\`json, hanya JSON murni**:
+    const chunks = extractChunks(text);
 
----
+    // Pass 1: Extract company info & IPO details (small prompt)
+    const infoPrompt = `Dari teks prospektus berikut, ekstrak data JSON ini (hanya JSON):
+{
+  "name": "Nama perusahaan",
+  "ticker": "Kode saham",
+  "sector": "Sektor",
+  "business": "Deskripsi bisnis utama (1 kalimat)",
+  "ipoPrice": Harga IPO (angka, contoh: 4500),
+  "sharesOffered": Jumlah saham ditawarkan (angka),
+  "listingDate": "Tanggal listing atau perkiraan",
+  "board": "Papan pencatatan (Utama/Pengembangan/Akselerasi)"
+}
 
-${text.substring(0, 15000)}
+TEKS:
+${chunks.summary}`;
 
----
+    const infoRaw = await callAI(infoPrompt, 800);
+    const info = extractJSFromResponse(infoRaw);
+
+    const ipoPrice = info.ipoPrice || 0;
+    const board = info.board || 'Utama';
+    const araRate = board === 'Akselerasi' ? 0.20 : 0.35;
+
+    // Pass 2: Extract financial data (only if financial section exists)
+    let financials = { eps: 0, per: 0, pbv: 0, roe: 0, der: 0, revenueGrowth: 0, profitGrowth: 0, totalAssets: 0, totalEquity: 0 };
+    if (chunks.financial) {
+        try {
+            const finPrompt = `Dari data keuangan berikut, ekstrak JSON (hanya angka, tanpa satuan):
+{
+  "eps": Laba per saham,
+  "per": PER (angka),
+  "pbv": PBV (angka),
+  "roe": ROE dalam persen (contoh: 18.5),
+  "der": DER (angka),
+  "revenueGrowth": Pertumbuhan pendapatan dalam %,
+  "profitGrowth": Pertumbuhan laba dalam %,
+  "totalAssets": Total aset,
+  "totalEquity": Total ekuitas
+}
+
+DATA KEUANGAN:
+${chunks.financial}`;
+            const finRaw = await callAI(finPrompt, 800);
+            financials = extractJSFromResponse(finRaw);
+        } catch { /* use defaults */ }
+    }
+
+    // Pass 3: Recommendation (compact context)
+    const recContext = [
+        `Nama: ${info.name || ''}`,
+        `Ticker: ${info.ticker || ''}`,
+        `Sektor: ${info.sector || ''}`,
+        `Bisnis: ${info.business || ''}`,
+        `IPO: Rp${ipoPrice}`,
+        `Saham ditawarkan: ${info.sharesOffered || 0}`,
+        `Papan: ${board}`,
+        `EPS: ${financials.eps}, PER: ${financials.per}, PBV: ${financials.pbv}`,
+        `ROE: ${financials.roe}%, DER: ${financials.der}`,
+        `Revenue Growth: ${financials.revenueGrowth}%`,
+        `Risk section: ${chunks.risk.substring(0, 2000)}`,
+    ].join('\n');
+
+    const recPrompt = `Berdasarkan data prospektus IPO berikut, berikan rekomendasi dalam JSON:
+
+${recContext}
 
 {
-  "emitent": {
-    "name": "Nama perusahaan",
-    "ticker": "Kode saham (BBCA, BBRI, dll)",
-    "sector": "Sektor",
-    "business": "Deskripsi bisnis utama",
-    "ipoPrice": Harga IPO dalam Rupiah (angka, tanpa Rp),
-    "sharesOffered": Jumlah saham ditawarkan,
-    "listingDate": "Tanggal listing (DD/MM/YYYY)",
-    "board": "Papan pencatatan (Utama/Pengembangan/Akselerasi)"
-  },
-  "financials": {
-    "eps": Laba per saham (angka),
-    "per": Price to Earnings Ratio (angka),
-    "pbv": Price to Book Value (angka),
-    "roe": Return on Equity dalam persen (angka, contoh: 18.5 berarti 18.5%),
-    "der": Debt to Equity Ratio (angka),
-    "revenueGrowth": Pertumbuhan pendapatan dalam persen,
-    "profitGrowth": Pertumbuhan laba dalam persen,
-    "totalAssets": Total aset dalam Rupiah,
-    "totalEquity": Total ekuitas dalam Rupiah
-  },
-  "araProjection": {
-    "day1": Harga setelah ARA hari 1,
-    "day2": Harga setelah ARA hari 2 (jika ARA berturut-turut),
-    "day3": Harga setelah ARA hari 3,
-    "day4": Harga setelah ARA hari 4,
-    "day5": Harga setelah ARA hari 5,
-    "maxGain": "Persentase gain maksimum dalam %",
-    "description": "Penjelasan proyeksi ARA dalam 1-2 kalimat"
-  },
-  "fairValue": Harga wajar dalam Rupiah berdasarkan analisis fundamental (angka),
-  "upside": Persentase upside/downside dari harga IPO ke fair value (angka),
-  "priceTarget": {
-    "month1": Target harga 1 bulan,
-    "month3": Target harga 3 bulan,
-    "year1": Target harga 1 tahun
-  },
-  "recommendation": "BUY atau HOLD atau SELL",
-  "score": Skor numerik 0-100,
-  "reasoning": "Penjelasan rekomendasi dalam 3-4 kalimat",
+  "fairValue": Harga wajar dalam Rupiah,
+  "upside": Persentase upside/downside (angka, contoh: 25.5),
+  "priceTarget": { "month1": 0, "month3": 0, "year1": 0 },
+  "recommendation": "BUY/HOLD/SELL",
+  "score": Skor 0-100,
+  "reasoning": "Penjelasan 3-4 kalimat",
   "strength": ["Kekuatan 1", "Kekuatan 2", "Kekuatan 3"],
   "risk": ["Risiko 1", "Risiko 2", "Risiko 3"]
 }`;
 
-    const raw = await callAI(prompt);
+    let rec = { fairValue: 0, upside: 0, priceTarget: { month1: 0, month3: 0, year1: 0 },
+        recommendation: 'HOLD' as const, score: 50, reasoning: '', strength: [] as string[], risk: [] as string[] };
 
-    // Clean response: remove markdown code blocks if any
-    let clean = raw.trim();
-    const jsonMatch = clean.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) clean = jsonMatch[1].trim();
+    try {
+        const recRaw = await callAI(recPrompt, 1500);
+        rec = extractJSFromResponse(recRaw);
+    } catch { /* use defaults */ }
 
-    const parsed = JSON.parse(clean);
+    // Calculate ARA locally
+    const araProjection = {
+        day1: Math.round(ipoPrice * (1 + araRate)),
+        day2: Math.round(ipoPrice * (1 + araRate) ** 2),
+        day3: Math.round(ipoPrice * (1 + araRate) ** 3),
+        day4: Math.round(ipoPrice * (1 + araRate) ** 4),
+        day5: Math.round(ipoPrice * (1 + araRate) ** 5),
+        maxGain: `${((1 + araRate) ** 5 - 1) * 100 > 100 ? '100+' : (((1 + araRate) ** 5 - 1) * 100).toFixed(0)}%`,
+        description: `Papan ${board} — estimasi ${(araRate * 100).toFixed(0)}% ARA per hari. 5 hari ARA berturut-turut: Rp${Math.round(ipoPrice * (1 + araRate) ** 5).toLocaleString()}.`,
+    };
 
-    // Build ARA projection with IDX rules (35%)
-    const ipo = parsed.emitent?.ipoPrice || 0;
-    const ara = parsed.araProjection || {};
-    const araRate = parsed.emitent?.board === 'Akselerasi' ? 0.20 : 0.35;
-
-    const analysis: ProspectusAnalysis = {
+    return {
         id: Math.random().toString(36).substr(2, 9),
         fileName,
         timestamp: Date.now(),
         emitent: {
-            name: parsed.emitent?.name || '',
-            ticker: parsed.emitent?.ticker || '',
-            sector: parsed.emitent?.sector || '',
-            business: parsed.emitent?.business || '',
-            ipoPrice: ipo,
-            sharesOffered: parsed.emitent?.sharesOffered || 0,
-            listingDate: parsed.emitent?.listingDate || '',
-            board: parsed.emitent?.board || 'Utama',
+            name: info.name || fileName,
+            ticker: info.ticker || '',
+            sector: info.sector || '',
+            business: info.business || '',
+            ipoPrice,
+            sharesOffered: info.sharesOffered || 0,
+            listingDate: info.listingDate || '',
+            board,
         },
         financials: {
-            eps: parsed.financials?.eps || 0,
-            per: parsed.financials?.per || 0,
-            pbv: parsed.financials?.pbv || 0,
-            roe: parsed.financials?.roe || 0,
-            der: parsed.financials?.der || 0,
-            revenueGrowth: parsed.financials?.revenueGrowth || 0,
-            profitGrowth: parsed.financials?.profitGrowth || 0,
-            totalAssets: parsed.financials?.totalAssets || 0,
-            totalEquity: parsed.financials?.totalEquity || 0,
+            eps: financials.eps || 0,
+            per: financials.per || 0,
+            pbv: financials.pbv || 0,
+            roe: financials.roe || 0,
+            der: financials.der || 0,
+            revenueGrowth: financials.revenueGrowth || 0,
+            profitGrowth: financials.profitGrowth || 0,
+            totalAssets: financials.totalAssets || 0,
+            totalEquity: financials.totalEquity || 0,
         },
-        araProjection: {
-            day1: ara.day1 || Math.round(ipo * (1 + araRate)),
-            day2: ara.day2 || Math.round(ipo * (1 + araRate) ** 2),
-            day3: ara.day3 || Math.round(ipo * (1 + araRate) ** 3),
-            day4: ara.day4 || Math.round(ipo * (1 + araRate) ** 4),
-            day5: ara.day5 || Math.round(ipo * (1 + araRate) ** 5),
-            maxGain: ara.maxGain || `${(araRate * 5 * 100).toFixed(0)}%`,
-            description: ara.description || `Estimasi ${araRate * 100}% ARA per hari (papan ${parsed.emitent?.board || 'Utama'})`,
-        },
-        fairValue: parsed.fairValue || 0,
-        upside: parsed.upside || 0,
+        araProjection,
+        fairValue: rec.fairValue || 0,
+        upside: rec.upside || 0,
         priceTarget: {
-            month1: parsed.priceTarget?.month1 || 0,
-            month3: parsed.priceTarget?.month3 || 0,
-            year1: parsed.priceTarget?.year1 || 0,
+            month1: rec.priceTarget?.month1 || 0,
+            month3: rec.priceTarget?.month3 || 0,
+            year1: rec.priceTarget?.year1 || 0,
         },
-        recommendation: parsed.recommendation || 'HOLD',
-        score: parsed.score || 50,
-        reasoning: parsed.reasoning || '',
-        strength: parsed.strength || [],
-        risk: parsed.risk || [],
+        recommendation: rec.recommendation || 'HOLD',
+        score: rec.score || 50,
+        reasoning: rec.reasoning || '',
+        strength: rec.strength || [],
+        risk: rec.risk || [],
     };
-
-    return analysis;
 }
