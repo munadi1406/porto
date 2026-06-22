@@ -128,8 +128,21 @@ function extractChunks(text: string): { summary: string; financial: string; risk
     return { summary, financial, risk };
 }
 
-export async function analyzeProspectus(text: string, fileName: string): Promise<ProspectusAnalysis> {
+export async function analyzeProspectus(
+    text: string,
+    fileName: string,
+    onProgress?: (step: string, progress: number, eta: number) => void
+): Promise<ProspectusAnalysis> {
+    const startTime = Date.now();
+    const reportProgress = (step: string, progress: number) => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const speed = progress / Math.max(elapsed, 1);
+        const remaining = speed > 0 ? (100 - progress) / speed : 30;
+        onProgress?.(step, progress, Math.round(remaining));
+    };
+
     const chunks = extractChunks(text);
+    reportProgress('Mengekstrak informasi emiten...', 10);
 
     // Pass 1: Extract company info & IPO details (small prompt)
     const infoPrompt = `Dari teks prospektus berikut, ekstrak data JSON ini (hanya JSON):
@@ -149,6 +162,7 @@ ${chunks.summary}`;
 
     const infoRaw = await callAI(infoPrompt, 800);
     const info = extractJSFromResponse(infoRaw);
+    reportProgress('Data emiten terkumpul. Menganalisis keuangan...', 35);
 
     const ipoPrice = info.ipoPrice || 0;
     const board = info.board || 'Utama';
@@ -177,6 +191,7 @@ ${chunks.financial}`;
             financials = extractJSFromResponse(finRaw);
         } catch { /* use defaults */ }
     }
+    reportProgress('Data keuangan terkumpul. Menyusun rekomendasi...', 60);
 
     // Pass 3: Recommendation (compact context)
     const recContext = [

@@ -14,33 +14,68 @@ export default function ProspectusPage() {
     const [file, setFile] = useState<File | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState('');
+    const [progress, setProgress] = useState({ step: '', progress: 0, eta: 0 });
     const fileRef = useRef<HTMLInputElement>(null);
 
     const handleAnalyze = async () => {
         if (!file && !text && !url) { setError('Upload PDF, masukkan URL, atau tempel teks prospektus'); return; }
         setAnalyzing(true);
         setError('');
-        try {
-            let json: any;
+        setProgress({ step: 'Memulai analisis...', progress: 0, eta: 40 });
 
-            if (file) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('fileName', name || file.name);
-                const res = await fetch('/api/analyze/prospectus', { method: 'POST', body: formData });
-                json = await res.json();
-            } else {
-                const res = await fetch('/api/analyze/prospectus', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url || undefined, text: text || undefined, fileName: name || `Prospektus ${analyses.length + 1}` }),
-                });
-                json = await res.json();
+        try {
+            const body = file
+                ? (() => {
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      fd.append('fileName', name || file.name);
+                      return fd;
+                  })()
+                : JSON.stringify({ url: url || undefined, text: text || undefined, fileName: name || `Prospektus ${analyses.length + 1}` });
+
+            const headers: Record<string, string> = {};
+            if (!file) headers['Content-Type'] = 'application/json';
+
+            const res = await fetch('/api/analyze/prospectus', { method: 'POST', body, headers });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(err.error || 'Gagal menganalisis');
             }
 
-            if (!json.success) throw new Error(json.error);
-            setAnalyses(prev => [...prev, json.data]);
-            resetForm();
+            if (!res.body) throw new Error('No response body');
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        const eventType = line.slice(7).trim();
+                        continue;
+                    }
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.step) {
+                                setProgress({ step: data.step, progress: data.progress, eta: data.eta });
+                            }
+                            if (data.data) {
+                                setAnalyses(prev => [...prev, data.data]);
+                                resetForm();
+                            }
+                        } catch {}
+                    }
+                }
+            }
         } catch (e: any) {
             setError(e.message || 'Gagal menganalisis prospektus');
         }
@@ -120,7 +155,7 @@ export default function ProspectusPage() {
 
                 <button onClick={handleAnalyze} disabled={analyzing || (!file && !text && !url)}
                     className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/80 disabled:opacity-50 transition-all">
-                    {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Menganalisis...</> : <><Brain className="w-4 h-4" /> Analisis Prospektus</>}
+                    {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {progress.step || 'Menganalisis...'} ({progress.progress}%)</> : <><Brain className="w-4 h-4" /> Analisis Prospektus</>}
                 </button>
             </div>
 
@@ -333,8 +368,27 @@ export default function ProspectusPage() {
             {analyzing && analyses.length === 0 && (
                 <div className="p-16 text-center">
                     <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-                    <p className="text-sm font-medium text-foreground">Menganalisis prospektus dengan DeepSeek...</p>
-                    <p className="text-xs text-muted-foreground mt-1">Estimasi 20-40 detik</p>
+                    <p className="text-sm font-medium text-foreground">{progress.step || 'Menganalisis prospektus...'}</p>
+
+                    {/* Progress bar */}
+                    <div className="max-w-md mx-auto mt-4">
+                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-primary rounded-full transition-all duration-500"
+                                style={{ width: `${progress.progress}%` }}
+                            />
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                            <span>{progress.progress}%</span>
+                            <span>Estimasi sisa: ~{progress.eta} detik</span>
+                        </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto leading-relaxed">
+                        Pass 1: Ekstraksi data emiten & IPO<br />
+                        Pass 2: Analisis keuangan<br />
+                        Pass 3: Rekomendasi & fair value
+                    </p>
                 </div>
             )}
         </div>
