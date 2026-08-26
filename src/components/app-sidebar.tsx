@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { usePortfolios } from "@/hooks/usePortfolios"
 import { useTheme } from "@/hooks/useTheme"
+import { useWatchlist } from "@/hooks/useWatchlist"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { getMarketStatus, type MarketSession } from "@/lib/market-hours"
 
@@ -42,6 +43,8 @@ import {
   Layers,
   CandlestickChart,
   SlidersHorizontal,
+  Star,
+  X,
 } from "lucide-react"
 
 const MENU_GROUPS = [
@@ -131,6 +134,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { portfolios, selectedPortfolioId, setSelectedPortfolioId } = usePortfolios()
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
+  const watchlist = useWatchlist()
   const [session, setSession] = useState<MarketSession>("closed")
 
   useEffect(() => {
@@ -213,6 +217,46 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarGroup>
           </div>
         ))}
+
+        {/* ── Watchlist ── */}
+        {watchlist.items.length > 0 && (
+          <>
+            <SidebarSeparator className="mx-2 my-1 opacity-50" />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/45 px-3 mb-1">
+                <Star className="size-3 mr-1 fill-amber-500 text-amber-500" /> Watchlist
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0.5">
+                  {watchlist.items.map((code) => {
+                    const url = `/analysis/${code}.JK`
+                    const active = pathname === url
+                    return (
+                      <SidebarMenuItem key={code}>
+                        <SidebarMenuButton
+                          isActive={active}
+                          render={<Link href={url} />}
+                          tooltip={code}
+                          className="h-8 group/witem"
+                        >
+                          <Star className={cn("size-3.5 shrink-0 fill-amber-500 text-amber-500")} />
+                          <span className="text-[13px] font-bold truncate">{code}</span>
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); watchlist.remove(code) }}
+                            className="ml-auto opacity-0 group-hover/witem:opacity-100 text-muted-foreground hover:text-destructive transition-opacity cursor-pointer"
+                            title="Hapus"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
 
         {/* ── Portofolio saya ── */}
         {portfolios.length > 0 && (

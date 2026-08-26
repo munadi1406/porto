@@ -59,6 +59,21 @@ export default function BrokerSummaryPanel() {
     const [loading, setLoading] = useState(true);
     const [secs, setSecs] = useState(60);
     const [subTab, setSubTab] = useState<"all" | "ticker">("all");
+    // Net Foreign resmi (IDX Daily Trading by Investor Type) — lebih akurat dari proxy broker
+    const [officialNet, setOfficialNet] = useState<number | null>(null);
+    const [officialSrc, setOfficialSrc] = useState(false);
+
+    useEffect(() => {
+        fetch("/api/idx/foreign-flow")
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && res.source === "indexalpha" && res.netValue != null) {
+                    setOfficialNet(res.netValue);
+                    setOfficialSrc(true);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     const load = useCallback(async () => {
         try {
@@ -202,11 +217,24 @@ export default function BrokerSummaryPanel() {
                     {/* Statistik utama — Net Foreign dikembalikan agar terlihat jelas */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <StatCard label="Total Nilai" value={formatCompactIDR(data.summary.totalBuyValue)} cls="text-foreground" />
-                        <StatCard
-                            label="Net Foreign"
-                            value={`${(ff.Foreign?.netValue ?? 0) >= 0 ? "+" : ""}${formatCompactIDR(ff.Foreign?.netValue ?? 0)}`}
-                            cls={(ff.Foreign?.netValue ?? 0) >= 0 ? "text-success" : "text-destructive"}
-                        />
+                        <div className="bg-card border border-border rounded-lg p-3 relative">
+                            {officialSrc && (
+                                <span className="absolute top-1.5 right-1.5 text-[8px] font-black uppercase tracking-wider rounded-full bg-success/10 text-success px-1.5 py-0.5">Resmi IDX</span>
+                            )}
+                            <p className="card-title">Net Foreign</p>
+                            <p className={cn(
+                                "text-base font-black tabular-nums mt-0.5",
+                                officialNet != null
+                                    ? (officialNet >= 0 ? "text-success" : "text-destructive")
+                                    : ((ff.Foreign?.netValue ?? 0) >= 0 ? "text-success" : "text-destructive")
+                            )}>
+                                {(() => {
+                                    const v = officialNet ?? ff.Foreign?.netValue ?? 0;
+                                    return `${v >= 0 ? "+" : ""}${formatCompactIDR(v)}`;
+                                })()}
+                            </p>
+                            {!officialSrc && <p className="text-[8px] text-muted-foreground/60 mt-0.5">≈ proxy broker asing</p>}
+                        </div>
                         <StatCard label="Frekuensi" value={(data.summary.totalFreq ?? 0).toLocaleString("id-ID")} cls="text-chart-3" />
                         <StatCard label="Jumlah Broker" value={String(data.summary.brokerCount)} />
                     </div>

@@ -13,6 +13,8 @@ import BrokerSummaryPanel from "@/components/BrokerSummaryPanel";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCountUp } from "@/hooks/useCountUp";
+import { AlertChecker, AlertBadge } from "@/components/AlertChecker";
+import { useAlerts } from "@/hooks/useAlerts";
 
 const IHSGChart = dynamic(() => import("@/components/IHSGChart"), { ssr: false, loading: () => <div className="h-[300px] bg-muted animate-pulse rounded-lg" /> });
 
@@ -82,13 +84,18 @@ function MarketBreadthSection({ breadth, total }: { breadth: { advancing: number
     );
 }
 
-function ForeignFlowCard({ foreignFlow }: { foreignFlow: ForeignFlowItem[] }) {
+function ForeignFlowCard({ foreignFlow, official }: { foreignFlow: ForeignFlowItem[]; official?: boolean }) {
     const foreign = foreignFlow.find(f => f.investor === "Foreign");
     if (!foreign) return null;
     const max = Math.max(Math.abs(foreign.buyValue), Math.abs(foreign.sellValue), 1);
     return (
         <div className="bg-card border border-border rounded-lg p-4">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Foreign Flow (All Market)</h3>
+            <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Foreign Flow (All Market)</h3>
+                {official && (
+                    <span className="text-[8px] font-black uppercase tracking-wider rounded-full bg-success/10 text-success px-1.5 py-0.5">Resmi IDX</span>
+                )}
+            </div>
             <div className="flex items-baseline gap-2">
                 <span className="text-xs text-muted-foreground">Net {foreign.netValue >= 0 ? "Buy" : "Sell"}</span>
                 <span className={cn("text-lg font-bold tabular-nums", foreign.netValue >= 0 ? "text-success" : "text-destructive")}>
@@ -226,6 +233,8 @@ export default function MarketPage() {
     const [totalStocks, setTotalStocks] = useState(0);
     const [allStocks, setAllStocks] = useState<any[]>([]);
     const [foreignFlow, setForeignFlow] = useState<ForeignFlowItem[]>([]);
+    // Payload foreign-flow: {source:'indexalpha', netValue...} atau {source:'idx-monthly', participationValue...}
+    const [officialFF, setOfficialFF] = useState<any>(null);
     const [search, setSearch] = useState("");
     const [idxLoading, setIdxLoading] = useState(true);
     const [activeLoading, setActiveLoading] = useState(true);
@@ -266,6 +275,8 @@ export default function MarketPage() {
         [tapeTickers, moverTickers]
     );
     const { prices: livePrices } = useMarketData(liveTickers);
+    const { alerts } = useAlerts();
+    const activeAlertCount = alerts.filter(a => !a.triggeredAt).length;
 
     // Fetch market index dari Yahoo Finance (cepat)
     useEffect(() => {
@@ -319,6 +330,12 @@ export default function MarketPage() {
             .then(r => r.json())
             .then(res => { if (res.success && res.data?.foreignFlow) setForeignFlow(res.data.foreignFlow); })
             .catch(() => {});
+
+        // Net Foreign RESMI (Index Alpha) / partisipasi asing (IDX bulanan)
+        fetch("/api/idx/foreign-flow")
+            .then(r => r.json())
+            .then(res => { if (res.success) setOfficialFF(res); })
+            .catch(() => {});
     }, []);
 
     const ihsg = indices.find(i => i.symbol === "^JKSE" || i.name?.includes("IHSG"));
@@ -333,6 +350,7 @@ export default function MarketPage() {
     return (
         <div className="space-y-6">
             <MarketStatusBar />
+            <AlertChecker prices={livePrices} />
 
             {/* Hero header ala terminal */}
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-r from-primary/10 via-card to-card p-5">
@@ -345,15 +363,27 @@ export default function MarketPage() {
                     </div>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 shrink-0">
                         {(() => {
-                            const foreignNet = foreignFlow.find(f => f.investor === "Foreign")?.netValue;
-                            const hasForeign = foreignNet != null;
-                            return [
+                            const proxyNet = foreignFlow.find(f => f.investor === "Foreign")?.netValue;
+                            const realNet: number | null = officialFF?.netValue ?? null;
+                            const partVal: number | null = officialFF?.participationValue ?? null;
+
+                            const tiles: { label: string; value: string | number; cls: string; sub?: string }[] = [
                                 { label: "Naik", value: breadth.advancing, cls: "text-success" },
                                 { label: "Turun", value: breadth.declining, cls: "text-destructive" },
                                 { label: "Tetap", value: breadth.unchanged, cls: "text-muted-foreground" },
-                                { label: "Net Foreign", value: hasForeign ? formatCompactIDR(foreignNet!) : "—", cls: hasForeign ? (foreignNet! >= 0 ? "text-success" : "text-destructive") : "text-muted-foreground", sub: hasForeign ? "All Market" : undefined },
-                                { label: "Saham", value: totalStocks, cls: "text-foreground" },
-                            ].map(s => (
+                            ];
+                            if (realNet != null) {
+                                tiles.push({ label: "Net Foreign", value: `${realNet >= 0 ? "+" : ""}${formatCompactIDR(realNet)}`, cls: realNet >= 0 ? "text-success" : "text-destructive", sub: "Resmi IDX" });
+                            } else if (partVal != null) {
+                                tiles.push({ label: "Foreign Value", value: formatCompactIDR(partVal), cls: "text-primary", sub: "IDX bulanan" });
+                            } else if (proxyNet != null) {
+                                tiles.push({ label: "Net Foreign", value: `${proxyNet >= 0 ? "+" : ""}${formatCompactIDR(proxyNet)}`, cls: proxyNet >= 0 ? "text-success" : "text-destructive", sub: "≈ proxy" });
+                            } else {
+                                tiles.push({ label: "Net Foreign", value: "—", cls: "text-muted-foreground" });
+                            }
+                            tiles.push({ label: "Saham", value: totalStocks, cls: "text-foreground" });
+
+                            return tiles.map(s => (
                                 <div key={s.label} className="rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-center backdrop-blur-sm">
                                     <p className={cn("text-lg font-black tabular-nums leading-none", s.cls)}>{s.value}</p>
                                     <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">{s.label}</p>
@@ -368,6 +398,7 @@ export default function MarketPage() {
                         <Clock className="w-2.5 h-2.5" />{lastUpdate.toLocaleTimeString("id-ID")}
                     </span>
                 )}
+                <AlertBadge count={activeAlertCount} className="absolute bottom-1.5 left-3" />
             </div>
 
             {/* Tabs */}
@@ -405,7 +436,10 @@ export default function MarketPage() {
                         </div>
                         <div className="space-y-4">
                             <MarketBreadthSection breadth={breadth} total={totalStocks} />
-                            <ForeignFlowCard foreignFlow={foreignFlow} />
+                            <ForeignFlowCard foreignFlow={officialFF?.netValue != null ? [
+                                { investor: "Foreign", buyValue: officialFF.buyValue ?? 0, sellValue: officialFF.sellValue ?? 0, netValue: officialFF.netValue },
+                                { investor: "Domestic", buyValue: 0, sellValue: 0, netValue: 0 },
+                            ] : foreignFlow} official={officialFF?.source === "indexalpha"} />
                         </div>
                     </div>
 

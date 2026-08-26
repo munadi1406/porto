@@ -112,6 +112,14 @@ function kickBackgroundFetch() {
     })();
 }
 
+// Cron ringan: pastikan data broksum selalu siap — kick saat boot + tiap 30 menit
+const g2 = globalThis as Record<string, unknown>;
+if (!g2.__broksumCron) {
+    g2.__broksumCron = true;
+    setTimeout(() => kickBackgroundFetch(), 15_000);
+    setInterval(() => kickBackgroundFetch(), 30 * 60 * 1000);
+}
+
 export async function GET() {
     if (!cache) loadDisk(); // pulihkan dari restart sebelumnya
     const age = cache ? Date.now() - cache.ts : Infinity;

@@ -29,6 +29,15 @@ async function ensureTables() {
             UNIQUE KEY uq_usage_date (usage_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    await sequelize.query(`
+        CREATE TABLE IF NOT EXISTS api_cache (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            cache_key VARCHAR(120) NOT NULL,
+            payload LONGTEXT NOT NULL,
+            fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_cache_key (cache_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
     tableReady = true;
 }
 
@@ -97,6 +106,34 @@ export async function incrementUsage(): Promise<void> {
         await sequelize.query(
             `INSERT INTO broker_api_usage (usage_date, calls) VALUES (CURDATE(), 1)
              ON DUPLICATE KEY UPDATE calls = calls + 1`
+        );
+    } catch {}
+}
+
+// ── Cache generik (key-value) untuk endpoint API berkuota ──
+export async function getCachedJson(key: string, maxAgeMs: number): Promise<any | null> {
+    try {
+        await ensureTables();
+        const [rows]: any[] = await sequelize.query(
+            "SELECT payload, fetched_at FROM api_cache WHERE cache_key = :key LIMIT 1",
+            { replacements: { key } }
+        );
+        if (!rows || rows.length === 0) return null;
+        const age = Date.now() - new Date(rows[0].fetched_at).getTime();
+        if (age > maxAgeMs) return null;
+        return JSON.parse(rows[0].payload);
+    } catch {
+        return null;
+    }
+}
+
+export async function saveCachedJson(key: string, payload: any): Promise<void> {
+    try {
+        await ensureTables();
+        await sequelize.query(
+            `INSERT INTO api_cache (cache_key, payload) VALUES (:key, :payload)
+             ON DUPLICATE KEY UPDATE payload = VALUES(payload), fetched_at = CURRENT_TIMESTAMP`,
+            { replacements: { key, payload: JSON.stringify(payload) } }
         );
     } catch {}
 }

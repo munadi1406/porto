@@ -10,15 +10,30 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { exportToPDF, exportToImage } from "@/lib/exportPDF";
 import { AvgDownModal } from "./AvgDownModal";
 import { useCompanyNames } from "@/hooks/useCompanyNames";
+import { useFlash } from "@/hooks/useFlash";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableFooter } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
+// Teks dengan flash hijau/merah saat nilai berubah (hook-safe per baris)
+function FlashText({ value, text, className }: { value: number; text: string; className?: string }) {
+    const flash = useFlash(value);
+    return (
+        <span className={cn(
+            "inline-block rounded px-1 -mx-1",
+            flash === "up" && "flash-up",
+            flash === "down" && "flash-down",
+            className
+        )}>
+            {text}
+        </span>
+    );
+}
+
 interface PortfolioTableProps {
-    portfolio: PortfolioItem[];
-    marketData: Record<string, StockPrice>;
+    portfolio: PortfolioItem[];    marketData: Record<string, StockPrice>;
     onRemove: (id: string) => void;
     onUpdate: (id: string, data: Partial<PortfolioItem>) => void;
     onTransaction: (id: string, type: 'buy' | 'sell', lots: number, price: number) => void;
@@ -390,7 +405,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                     <TableCell className="text-right font-semibold">{formatNumber(item.lots)}</TableCell>
                                     <TableCell className="text-right text-muted-foreground">{formatIDR(item.averagePrice)}</TableCell>
                                     <TableCell className="text-right">
-                                        <div className="font-semibold">{currentPrice > 0 ? formatIDR(currentPrice) : '...'}</div>
+                                        <FlashText value={currentPrice} text={currentPrice > 0 ? formatIDR(currentPrice) : '...'} className="font-semibold" />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className={cn("font-semibold", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
@@ -402,9 +417,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                     </TableCell>
                                     <TableCell className="text-right font-semibold">{formatIDR(marketValue)}</TableCell>
                                     <TableCell className="text-right">
-                                        <span className={cn("font-semibold", isProfit && "text-success", isLoss && "text-destructive")}>
-                                            {gainLoss > 0 ? "+" : ""}{formatIDR(gainLoss)}
-                                        </span>
+                                        <FlashText value={gainLoss} text={`${gainLoss > 0 ? "+" : ""}${formatIDR(gainLoss)}`} className={cn("font-semibold", isProfit && "text-success", isLoss && "text-destructive")} />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Badge variant={isProfit ? "default" : isLoss ? "destructive" : "secondary"} className={cn("font-semibold text-xs", isProfit && "bg-success/15 text-success hover:bg-success/20 hover:text-success")}>

@@ -4,6 +4,54 @@ import { useEffect, useRef } from "react";
 import * as LightweightCharts from "lightweight-charts";
 import { useTheme } from "@/hooks/useTheme";
 
+// ── Kalkulasi indikator ──
+function emaArr(values: number[], period: number): (number | null)[] {
+    const out: (number | null)[] = new Array(values.length).fill(null);
+    if (values.length < period) return out;
+    const k = 2 / (period + 1);
+    let prev = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    out[period - 1] = prev;
+    for (let i = period; i < values.length; i++) {
+        prev = values[i] * k + prev * (1 - k);
+        out[i] = prev;
+    }
+    return out;
+}
+
+function computeRsi(closes: number[], period = 14): (number | null)[] {
+    const out: (number | null)[] = new Array(closes.length).fill(null);
+    if (closes.length <= period) return out;
+    let gain = 0, loss = 0;
+    for (let i = 1; i <= period; i++) {
+        const d = closes[i] - closes[i - 1];
+        if (d > 0) gain += d; else loss -= d;
+    }
+    let ag = gain / period, al = loss / period;
+    out[period] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+    for (let i = period + 1; i < closes.length; i++) {
+        const d = closes[i] - closes[i - 1];
+        ag = (ag * (period - 1) + Math.max(d, 0)) / period;
+        al = (al * (period - 1) + Math.max(-d, 0)) / period;
+        out[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+    }
+    return out;
+}
+
+function computeMacd(closes: number[]) {
+    const e12 = emaArr(closes, 12);
+    const e26 = emaArr(closes, 26);
+    const macd: (number | null)[] = closes.map((_, i) => (e12[i] != null && e26[i] != null ? +(e12[i]! - e26[i]!).toFixed(4) : null));
+    const valid = macd.filter((v): v is number => v != null);
+    const sigValid = emaArr(valid, 9);
+    const signal: (number | null)[] = new Array(closes.length).fill(null);
+    let vi = 0;
+    for (let i = 0; i < macd.length; i++) {
+        if (macd[i] != null) { signal[i] = sigValid[vi]; vi++; }
+    }
+    const hist: (number | null)[] = macd.map((m, i) => (m != null && signal[i] != null ? +(m - signal[i]!).toFixed(4) : null));
+    return { macd, signal, hist };
+}
+
 interface StockChartProps {
     data: any[];
     markers: any[];
@@ -25,6 +73,7 @@ interface StockChartProps {
         fillTo?: number;
         fillDir?: 'above' | 'below';
     }[];
+    indicators?: boolean;
     patternMarkers?: {
         time: number;
         position: 'aboveBar' | 'belowBar';
@@ -35,7 +84,7 @@ interface StockChartProps {
     }[];
 }
 
-export default function StockChart({ data, markers, prediction, buyPrice, maLines, drawings, patternMarkers }: StockChartProps) {
+export default function StockChart({ data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, indicators = true }: StockChartProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<any>(null);
     const { theme } = useTheme();
@@ -120,18 +169,17 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
             if (cleanData.length === 0) return;
 
             // ULTRA-DEFENSIVE SERIES CREATION
-            const createSeries = (type: 'Candlestick' | 'Line' | 'Area' | 'Baseline' | 'Histogram', options: any) => {
+            const createSeries = (type: 'Candlestick' | 'Line' | 'Area' | 'Baseline' | 'Histogram', options: any, paneIndex?: number) => {
                 const c: any = chart;
-                // Try direct method
+                // Try direct method (v4)
                 const methodName = `add${type}Series`;
                 if (typeof c[methodName] === 'function') {
-                    return c[methodName](options);
+                    return paneIndex != null ? c[methodName](options, paneIndex) : c[methodName](options);
                 }
-                // Try generic addSeries method
+                // v5 generic addSeries(type, options, paneIndex?)
                 if (typeof c.addSeries === 'function') {
-                    // Try to get type from library exports, otherwise use string
                     const seriesType = (LightweightCharts as any)[`${type}Series`] || type;
-                    return c.addSeries(seriesType, options);
+                    return paneIndex != null ? c.addSeries(seriesType, options, paneIndex) : c.addSeries(seriesType, options);
                 }
                 return null;
             };
@@ -319,6 +367,47 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                 });
             }
 
+            // ── Pane indikator: RSI (pane 1) + MACD (pane 2) — lightweight-charts v5 ──
+            if (indicators && cleanData.length > 30) {
+                try {
+                    const closes = cleanData.map(d => Number(d.close));
+                    const timeAt = (i: number) => cleanData[i].time;
+
+                    // RSI pane
+                    const rsiVals = computeRsi(closes, 14);
+                    const rsiData = rsiVals.map((v, i) => (v == null ? null : { time: timeAt(i), value: +v.toFixed(2) })).filter(Boolean) as any[];
+                    const rsiSeries = createSeries('Line', {
+                        color: '#a967ff', lineWidth: 1, lastValueVisible: false, priceLineVisible: false,
+                    }, 1);
+                    if (rsiSeries) {
+                        rsiSeries.setData(rsiData);
+                        if (typeof rsiSeries.createPriceLine === 'function') {
+                            rsiSeries.createPriceLine({ price: 70, color: 'rgba(239,92,112,0.45)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title: '' });
+                            rsiSeries.createPriceLine({ price: 30, color: 'rgba(30,217,139,0.45)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title: '' });
+                        }
+                    }
+
+                    // MACD pane (histogram + macd + signal)
+                    const { macd, signal, hist } = computeMacd(closes);
+                    const toSeries = (arr: (number | null)[]) => arr.map((v, i) => (v == null ? null : { time: timeAt(i), value: v })).filter(Boolean) as any[];
+                    const hSeries = createSeries('Histogram', { color: 'rgba(109,125,255,0.45)', lastValueVisible: false, priceLineVisible: false }, 2);
+                    hSeries?.setData(toSeries(hist));
+                    const mSeries = createSeries('Line', { color: '#14b8a6', lineWidth: 1, lastValueVisible: false, priceLineVisible: false }, 2);
+                    mSeries?.setData(toSeries(macd));
+                    const sSeries = createSeries('Line', { color: '#eaa82e', lineWidth: 1, lastValueVisible: false, priceLineVisible: false }, 2);
+                    sSeries?.setData(toSeries(signal));
+
+                    // Tinggi pane
+                    const panes = (chart as any).panes?.();
+                    if (Array.isArray(panes)) {
+                        panes[1]?.setHeight?.(90);
+                        panes[2]?.setHeight?.(80);
+                    }
+                } catch (e) {
+                    console.warn('[StockChart] indikator gagal:', e);
+                }
+            }
+
             chart.timeScale().fitContent();
         } catch (err: any) {
             console.error("[Chart Error] Failed to assemble:", err);
@@ -338,7 +427,7 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                 chartRef.current = null;
             }
         };
-    }, [data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, palette.background, palette.text, palette.grid, palette.border, palette.up, palette.down, palette.ma20, palette.ma50, palette.buy, palette.forecast, theme]);
+    }, [data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, indicators, palette.background, palette.text, palette.grid, palette.border, palette.up, palette.down, palette.ma20, palette.ma50, palette.buy, palette.forecast, theme]);
 
     return <div ref={chartContainerRef} className="w-full h-[480px]" />;
 }

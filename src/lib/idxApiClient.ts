@@ -603,12 +603,13 @@ export async function getDigitalStatPaginated(
     return data;
 }
 
-/** Digital Statistics — non-paginated (needs base64 query) */
+/** Digital Statistics — non-paginated (needs base64 query).
+ *  Pakai resilientFetch (direct → proxy → Chromium) supaya tetap jalan saat IDX kena Cloudflare. */
 export async function getDigitalStat(urlName: UrlName, query: string) {
     const params = new URLSearchParams({ urlName, query, isPrint: 'False', cumulative: 'false' });
     const key = `dstat:${params.toString()}`;
     if (getCached(key)) return getCached(key);
-    const data = await idxFetch<any>(`/primary/DigitalStatistic/GetApiData?${params}`);
+    const data = await resilientFetch<any>(`/primary/DigitalStatistic/GetApiData?${params}`);
     setCache(key, data);
     return data;
 }
@@ -695,7 +696,8 @@ export async function getMonthlyPageData(pagePath: PagePath, filter: { year: str
     const url = `/primary/page/id/data-pasar/laporan-statistik/digital-statistic/monthly/${pagePath}?filter=${encodeURIComponent(f)}`;
     const key = `page:${pagePath}:${f}`;
     if (getCached(key)) return getCached(key);
-    const data = await idxFetch<any>(url);
+    // resilientFetch: direct → proxy → Chromium (tahan Cloudflare)
+    const data = await resilientFetch<any>(url);
     setCache(key, data);
     return data;
 }

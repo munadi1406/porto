@@ -5,10 +5,12 @@ import dynamic from "next/dynamic";
 import { analyzeCandlesticks, AnalysisResult } from "@/lib/analysis-utils";
 import { detectChartDrawings, detectChartMarkers } from "@/lib/patternDetection";
 import { formatIDR, cn, formatCompactIDR } from "@/lib/utils";
-import { ArrowLeft, Search, Loader2, ShieldCheck, Building2, Users, Briefcase, TrendingUp, TrendingDown, Share2, Link2 } from "lucide-react";
+import { ArrowLeft, Search, Loader2, ShieldCheck, Building2, Users, Briefcase, TrendingUp, TrendingDown, Share2, Link2, Star, Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFundamentals } from "@/hooks/useFundamentals";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { AlertsPopover } from "@/components/AlertsPopover";
 import { useCompanyDetail, useTradingDaily, useFinancialStatement } from "@/hooks/useIdxExtended";
 import TechnicalSignals from "@/components/TechnicalSignals";
 import StockStatistics from "@/components/StockStatistics";
@@ -99,6 +101,10 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
         }
     };
 
+    // Watchlist
+    const watchlist = useWatchlist();
+    const isWatched = watchlist.has(ticker);
+
     const lastCandle = data.length > 0 ? data[data.length - 1] : null;
     const currentPrice = smartMoney?.currentPrice ?? lastCandle?.close ?? 0;
     const changePercent = smartMoney?.priceChangePercent ?? 0;
@@ -147,6 +153,19 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                         >
                             {copied ? <Link2 className="w-3.5 h-3.5 text-success" /> : <Share2 className="w-3.5 h-3.5" />}
                         </button>
+                        <button
+                            onClick={() => watchlist.toggle(ticker)}
+                            className={cn(
+                                "p-1.5 rounded-lg border bg-card transition-colors cursor-pointer",
+                                isWatched
+                                    ? "border-amber-500/50 text-amber-500 bg-amber-500/5"
+                                    : "border-border text-muted-foreground hover:text-foreground hover:border-amber-500/40"
+                            )}
+                            title={isWatched ? "Hapus dari watchlist" : "Tambah ke watchlist"}
+                        >
+                            <Star className={cn("w-3.5 h-3.5", isWatched && "fill-amber-500")} />
+                        </button>
+                        <AlertsPopover ticker={ticker} currentPrice={currentPrice} />
                     </div>
                     {smartMoney?.sector && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
