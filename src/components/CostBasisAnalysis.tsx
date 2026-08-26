@@ -65,7 +65,7 @@ export function CostBasisAnalysis({ portfolio, prices }: CostBasisAnalysisProps)
 
     if (chartData.length === 0) {
         return (
-            <div className="bg-card p-6 rounded-2xl border border-border">
+            <div className="bg-card p-6 rounded-xl border border-border">
                 <h3 className="text-lg font-bold text-foreground mb-2">Cost Basis Analysis</h3>
                 <p className="text-sm text-muted-foreground">Tambahkan saham untuk analisis</p>
             </div>
@@ -73,7 +73,7 @@ export function CostBasisAnalysis({ portfolio, prices }: CostBasisAnalysisProps)
     }
 
     return (
-        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-xl shadow-sm border border-border">
             <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-primary/10 rounded-xl">
                     <DollarSign className="w-5 h-5 text-primary" />

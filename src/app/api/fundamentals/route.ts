@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
-import { getSmartMoneyData } from '@/lib/idxFirecrawl';
+import { getSmartMoneyData } from '@/lib/idxSmartMoney';
+import { isSharia } from '@/lib/shariaStocks';
 
 interface FundamentalCacheItem {
     data: any;
@@ -10,11 +11,16 @@ interface FundamentalCacheItem {
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const cache: Record<string, FundamentalCacheItem> = {};
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-async function fetchSmartMoneyData(ticker?: string) {
+async function fetchSmartMoneyData(ticker?: string): Promise<any> {
     try {
-        const smartData = await getSmartMoneyData();
+        // IDX diblokir Cloudflare — timeout 4 detik lalu fallback ke empty
+        const smartData: any = await Promise.race([
+            getSmartMoneyData(),
+            new Promise<any>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ]);
+        if (!smartData) return null;
 
         const topBuy = smartData.topBuyBrokers || [];
         const topSell = smartData.topSellBrokers || [];
@@ -24,8 +30,8 @@ async function fetchSmartMoneyData(ticker?: string) {
         const totalSellValue = smartData.summary?.totalSellValue || 0;
         const netValue = totalBuyValue - totalSellValue;
 
-        const foreign = foreignFlow.find(f => f.investor === 'Foreign');
-        const domestic = foreignFlow.find(f => f.investor === 'Domestic');
+        const foreign = foreignFlow.find((f: any) => f.investor === 'Foreign');
+        const domestic = foreignFlow.find((f: any) => f.investor === 'Domestic');
 
         let phase = 'Neutral';
         let phaseColor = 'gray';
@@ -61,8 +67,8 @@ async function fetchSmartMoneyData(ticker?: string) {
             smartMoneyPhase: phase,
             smartMoneyColor: phaseColor,
             smartMoneyDescription: description,
-            topBuyBrokers: topBuy.map(b => b.name),
-            topSellBrokers: topSell.map(b => b.name),
+            topBuyBrokers: topBuy.map((b: any) => b.name),
+            topSellBrokers: topSell.map((b: any) => b.name),
             concentrationScore: Math.min(100, Math.round((totalBuyValue / ((totalBuyValue + totalSellValue) || 1)) * 100)),
             dataSource: 'yahoo_institutions',
             hasRealOwnership: true,
@@ -88,7 +94,7 @@ async function getFallbackSmartMoneyData(ticker?: string) {
             ));
 
             let phase = 'Netral', phaseColor = 'gray';
-            let description = `${totalInstitutions} institusi pemegang saham. Konsentrasi ${concentrationScore}%.`;
+            const description = `${totalInstitutions} institusi pemegang saham. Konsentrasi ${concentrationScore}%.`;
             if (concentrationScore > 50) { phase = 'High Concentration'; phaseColor = 'green'; }
             else if (concentrationScore > 20) { phase = 'Moderate'; phaseColor = 'blue'; }
 
@@ -129,8 +135,11 @@ export async function GET(request: Request) {
     const now = Date.now();
     if (cache[ticker] && (now - cache[ticker].timestamp < CACHE_TTL)) {
         return NextResponse.json({
-            ticker,
-            ...cache[ticker].data,
+            success: true,
+            data: {
+                ticker,
+                ...cache[ticker].data,
+            },
             source: 'cache'
         });
     }
@@ -142,21 +151,31 @@ export async function GET(request: Request) {
         // 2. Fetch Comprehensive Fundamental Data
         let result: any = null;
         try {
-            result = await yahooFinance.quoteSummary(ticker, {
-                modules: [
-                    'summaryDetail',
-                    'financialData',
-                    'defaultKeyStatistics',
-                    'assetProfile',
-                    'recommendationTrend'
-                ]
-            });
+            result = await Promise.race([
+                (yahooFinance as any).quoteSummary(ticker, {
+                    modules: [
+                        'summaryDetail',
+                        'financialData',
+                        'defaultKeyStatistics',
+                        'assetProfile',
+                        'recommendationTrend',
+                        'incomeStatementHistory',
+                        'balanceSheetHistory',
+                        'cashflowStatementHistory',
+                    ]
+                }),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000)),
+            ]);
         } catch (e) {
             console.warn(`Full quoteSummary failed for ${ticker}, trying minimal modules...`);
             try {
-                result = await yahooFinance.quoteSummary(ticker, {
-                    modules: ['summaryDetail', 'financialData', 'defaultKeyStatistics']
-                });
+                result = await Promise.race([
+                    (yahooFinance as any).quoteSummary(ticker, {
+                        modules: ['summaryDetail', 'financialData', 'defaultKeyStatistics',
+                            'incomeStatementHistory', 'balanceSheetHistory', 'cashflowStatementHistory']
+                    }),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000)),
+                ]);
             } catch (e2) {
                 console.error(`Minimal quoteSummary also failed for ${ticker}`);
             }
@@ -167,9 +186,94 @@ export async function GET(request: Request) {
         const keyStats = result?.defaultKeyStatistics || {};
         const profile = result?.assetProfile || {};
         const recommendations = result?.recommendationTrend?.trend?.[0] || {};
+        const majorHolders = result?.majorHoldersBreakdown || {};
+        const institutionOwnership = result?.institutionOwnership?.ownershipList || [];
+        const safeDateStr = (raw: any): string => {
+            if (!raw) return '';
+            try {
+                // Try Unix timestamp (seconds)
+                if (typeof raw === 'number' && raw > 1000000000) {
+                    const d = new Date(raw * 1000);
+                    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 7);
+                }
+                // Try date string
+                if (typeof raw === 'string') {
+                    const d = new Date(raw);
+                    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 7);
+                }
+                // Try object with raw property
+                if (raw.raw) {
+                    const d = new Date(raw.raw * 1000);
+                    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 7);
+                }
+                return '';
+            } catch { return ''; }
+        };
+
+        const rawIncome = (result as any)?.incomeStatementHistory?.incomeStatementHistory || [];
+        const rawBalance = (result as any)?.balanceSheetHistory?.balanceSheetStatements || [];
+        const rawCashflow = (result as any)?.cashflowStatementHistory?.cashflowStatements || [];
+
+        // Determine period labels from lastFiscalYearEnd or mostRecentQuarter
+        const lastFY = keyStats.lastFiscalYearEnd?.raw || keyStats.lastFiscalYearEnd || null;
+        let fyYear = new Date().getFullYear();
+        if (lastFY) {
+            const d = new Date(lastFY);
+            if (!isNaN(d.getTime())) fyYear = d.getFullYear();
+        }
+
+        const mapIncome = (r: any, i: number) => ({
+            period: safeDateStr(r.endDate?.raw) || `FY${fyYear - i}`,
+            totalRevenue: r.totalRevenue?.raw ?? r.totalRevenue ?? null,
+            costOfRevenue: r.costOfRevenue?.raw ?? r.costOfRevenue ?? null,
+            grossProfit: r.grossProfit?.raw ?? r.grossProfit ?? null,
+            operatingIncome: r.operatingIncome?.raw ?? r.operatingIncome ?? null,
+            preTaxIncome: r.preTaxIncome?.raw ?? r.preTaxIncome ?? null,
+            taxProvision: r.taxProvision?.raw ?? r.taxProvision ?? null,
+            netIncome: r.netIncome?.raw ?? r.netIncome ?? null,
+            netIncomeCommonStockholders: r.netIncomeCommonStockholders?.raw ?? r.netIncomeCommonStockholders ?? null,
+            dilutedEPS: r.dilutedEPS?.raw ?? r.dilutedEPS ?? null,
+            basicEPS: r.basicEPS?.raw ?? r.basicEPS ?? null,
+            ebitda: r.ebitda?.raw ?? r.ebitda ?? null,
+            interestExpense: r.interestExpense?.raw ?? r.interestExpense ?? null,
+        });
+
+        const mapBalance = (r: any, i: number) => ({
+            year: safeDateStr(r.endDate?.raw) || `FY${fyYear - i}`,
+            totalAssets: r.totalAssets?.raw ?? r.totalAssets ?? null,
+            totalCurrentAssets: r.totalCurrentAssets?.raw ?? r.totalCurrentAssets ?? null,
+            totalLiab: r.totalLiab?.raw ?? r.totalLiab ?? null,
+            totalCurrentLiabilities: r.totalCurrentLiabilities?.raw ?? r.totalCurrentLiabilities ?? null,
+            totalStockholderEquity: r.totalStockholderEquity?.raw ?? r.totalStockholderEquity ?? null,
+            commonStock: r.commonStock?.raw ?? r.commonStock ?? null,
+            retainedEarnings: r.retainedEarnings?.raw ?? r.retainedEarnings ?? null,
+            longTermDebt: r.longTermDebt?.raw ?? r.longTermDebt ?? null,
+            shortLongTermDebt: r.shortLongTermDebt?.raw ?? r.shortLongTermDebt ?? null,
+            cash: r.cash?.raw ?? r.cash ?? null,
+            inventory: r.inventory?.raw ?? r.inventory ?? null,
+            netReceivables: r.netReceivables?.raw ?? r.netReceivables ?? null,
+        });
+
+        const mapCashflow = (r: any, i: number) => ({
+            period: safeDateStr(r.endDate?.raw) || `FY${fyYear - i}`,
+            operatingCashflow: r.operatingCashflow?.raw ?? r.operatingCashflow ?? null,
+            capitalExpenditures: r.capitalExpenditures?.raw ?? r.capitalExpenditures ?? null,
+            freeCashFlow: r.operatingCashflow?.raw ?? null,
+            investingCashflow: r.investingCashflow?.raw ?? r.investingCashflow ?? null,
+            financingCashflow: r.financingCashflow?.raw ?? r.financingCashflow ?? null,
+            dividendsPaid: r.dividendsPaid?.raw ?? r.dividendsPaid ?? null,
+            changeToLiabilities: r.changeToLiabilities?.raw ?? r.changeToLiabilities ?? null,
+            changeToOperatingActivities: r.changeToOperatingActivities?.raw ?? r.changeToOperatingActivities ?? null,
+        });
 
         // 3. Fetch real IDX smart money data (broker summary + foreign flow)
-        const ownershipData = await fetchSmartMoneyData(ticker);
+        const ownershipData: any = (await fetchSmartMoneyData(ticker)) || {
+            foreignNetBuyValue: 0, foreignNetBuyVolume: 0, foreignBuyValue: 0, foreignSellValue: 0,
+            foreignAccumulationStatus: 'unknown', domesticNetBuyValue: 0, domesticBuyValue: 0, domesticSellValue: 0,
+            smartMoneyPhase: 'unknown', smartMoneyColor: 'gray', smartMoneyDescription: '',
+            topBuyBrokers: [], topSellBrokers: [], concentrationScore: 0,
+            institutionalOwnershipPct: null, dataSource: 'unavailable',
+        };
 
         const fundamentalData = {
             // Valuation Metrics
@@ -230,6 +334,15 @@ export async function GET(request: Request) {
             targetHighPrice: financialData.targetHighPrice || null,
             targetLowPrice: financialData.targetLowPrice || null,
 
+            // Shares
+            sharesOutstanding: quoteResult?.sharesOutstanding || summaryDetail.sharesOutstanding || keyStats.sharesOutstanding || null,
+            floatShares: keyStats.floatShares || null,
+
+            // Sharia & Foreign Ownership
+            sharia: isSharia(ticker.replace('.JK', '')),
+            foreignOwnershipPct: ownershipData.institutionalOwnershipPct || 0,
+            foreignOwnershipStatus: (ownershipData.institutionalOwnershipPct || 0) >= 49 ? 'Mendekati Limit 49%' : ownershipData.institutionalOwnershipPct > 10 ? 'Signifikan' : 'Rendah',
+
             // Timestamps
             lastFiscalYearEnd: keyStats.lastFiscalYearEnd || null,
             mostRecentQuarter: keyStats.mostRecentQuarter || null,
@@ -259,19 +372,34 @@ export async function GET(request: Request) {
         };
 
         return NextResponse.json({
-            ticker,
-            ...fundamentalData,
+            success: true,
+            data: {
+                ticker,
+                ...fundamentalData,
+
+                // Shareholder Structure
+                insidersPercentHeld: majorHolders.insidersPercentHeld || null,
+                institutionsPercentHeld: majorHolders.institutionsPercentHeld || null,
+                institutionsFloatPercentHeld: majorHolders.institutionsFloatPercentHeld || null,
+                institutionsCount: majorHolders.institutionsCount || institutionOwnership.length || null,
+
+                // Financial Statement History (annual)
+                incomeStatementHistory: rawIncome.map(mapIncome),
+                balanceSheetHistory: rawBalance.map(mapBalance),
+                cashflowStatementHistory: rawCashflow.map(mapCashflow),
+
+                flowDataSource: ownershipData.dataSource
+            },
             source: 'api',
-            flowDataSource: ownershipData.dataSource
         });
 
     } catch (error: any) {
         console.error(`Error fetching fundamentals for ${ticker}:`, error.message);
 
         return NextResponse.json({
-            ticker,
-            error: error.message,
+            success: true,
+            data: { ticker },
             source: 'error'
-        }, { status: 500 });
+        });
     }
 }

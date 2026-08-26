@@ -125,5 +125,7 @@ Ambil rata-rata dari ketiga pendekatan jika data tersedia.
 1. Jangan gunakan markdown ```json di luar nilai JSON
 2. Jangan tambahkan teks penjelasan di luar JSON
 3. Jika data tidak tersedia, gunakan `0` atau `""` (jangan null)
-4. Untuk strength/risk: minimal 3 item masing-masing
-5. Reasoning: 3-4 kalimat jelas dalam Bahasa Indonesia
+4. Untuk strength/risk: 1-3 item sesuai data yang tersedia. JANGAN gunakan teks placeholder seperti "Tidak ada data" — jika benar-benar tidak ada data yang bisa diekstrak, gunakan array kosong `[]`
+5. JANGAN duplikasi item strength/risk yang sama. Setiap item harus konten unik
+6. JIKA teks prospektus tidak mengandung data keuangan atau informasi relevan (hanya metadata/header), set semua field ke 0 dan strength/risk ke `[]`, serta beri reasoning yang jujur bahwa data tidak ditemukan
+7. Reasoning: 3-4 kalimat jelas dalam Bahasa Indonesia

@@ -94,7 +94,7 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
 
     return (
         <div className={cn(
-            "relative overflow-hidden p-6 rounded-3xl border transition-all duration-500",
+            "relative overflow-hidden p-6 rounded-xl border transition-all duration-500",
             advice.color === "emerald" && "bg-success/10 border-success/20",
             advice.color === "blue" && "bg-primary/10 border-primary/20",
             advice.color === "orange" && "bg-warning/10 border-warning/20",
@@ -109,7 +109,7 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
 
             <div className="relative flex flex-col md:flex-row gap-6 items-start">
                 <div className={cn(
-                    "p-4 rounded-2xl shadow-lg flex-shrink-0 animate-pulse",
+                    "p-4 rounded-xl shadow-lg flex-shrink-0 animate-pulse",
                     advice.color === "emerald" && "bg-success text-success-foreground shadow-success/20",
                     advice.color === "blue" && "bg-primary text-primary-foreground shadow-primary/20",
                     advice.color === "orange" && "bg-warning text-warning-foreground shadow-warning/20",
@@ -152,7 +152,7 @@ export function DecisionAdvisor({ portfolio, cash, prices }: DecisionAdvisorProp
                     )}
                 </div>
 
-                <div className="w-full md:w-auto flex-shrink-0 bg-card p-4 rounded-2xl border border-border shadow-sm">
+                <div className="w-full md:w-auto flex-shrink-0 bg-card p-4 rounded-xl border border-border shadow-sm">
                     <div className="text-center">
                         <div className="text-[9px] font-black text-muted-foreground uppercase mb-1">CASH RATIO</div>
                         <div className="text-2xl font-black text-foreground">{advice.cashRatio.toFixed(0)}%</div>

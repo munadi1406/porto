@@ -44,7 +44,7 @@ export function PortfolioTableSkeleton() {
 
 export function CardSkeleton() {
     return (
-        <div className="bg-card border rounded-2xl p-6 space-y-4">
+        <div className="bg-card border rounded-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-8 w-8 rounded-full" />
@@ -57,7 +57,7 @@ export function CardSkeleton() {
 
 export function ChartSkeleton() {
     return (
-        <div className="bg-card border rounded-2xl p-6 space-y-4">
+        <div className="bg-card border rounded-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
                 <Skeleton className="h-6 w-48" />
                 <Skeleton className="h-8 w-24" />
@@ -89,7 +89,7 @@ export function DashboardSkeleton() {
                 <ChartSkeleton />
                 <ChartSkeleton />
             </div>
-            <div className="bg-card border rounded-2xl p-6">
+            <div className="bg-card border rounded-xl p-6">
                 <Skeleton className="h-6 w-32 mb-4" />
                 <PortfolioTableSkeleton />
             </div>
@@ -99,7 +99,7 @@ export function DashboardSkeleton() {
 
 export function TransactionHistorySkeleton() {
     return (
-        <div className="bg-card border p-6 rounded-2xl">
+        <div className="bg-card border p-6 rounded-xl">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                     <Skeleton className="h-10 w-10 rounded-xl" />
@@ -154,7 +154,7 @@ export function EquityGrowthChartSkeleton() {
 
 export function CashManagerSkeleton() {
     return (
-        <div className="bg-card border p-6 rounded-2xl">
+        <div className="bg-card border p-6 rounded-xl">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                     <Skeleton className="h-10 w-10 rounded-xl" />

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { formatIDR, formatPercentage, cn } from "@/lib/utils";
-import { Upload, FileText, TrendingUp, TrendingDown, BarChart3, Plus, Trash2, Loader2, AlertCircle, Target, Scale, Brain, Zap, File, X, Check } from "lucide-react";
+import { Upload, FileText, TrendingUp, TrendingDown, BarChart3, Plus, Trash2, Loader2, AlertCircle, Target, Scale, Brain, Zap, File, X, Check, ListChecks, Clock, ChartArea } from "lucide-react";
 import Link from "next/link";
 import type { ProspectusAnalysis } from "@/lib/prospectusAnalyzer";
+import ProspectusCharts from "@/components/ProspectusCharts";
 
 export default function ProspectusPage() {
     const [analyses, setAnalyses] = useState<ProspectusAnalysis[]>([]);
@@ -15,12 +16,24 @@ export default function ProspectusPage() {
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState('');
     const [progress, setProgress] = useState({ step: '', progress: 0, eta: 0 });
+    const [logs, setLogs] = useState<{ time: string; msg: string }[]>([]);
     const fileRef = useRef<HTMLInputElement>(null);
+    const logEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
+
+    const addLog = (msg: string) => {
+        const t = new Date();
+        const time = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:${String(t.getSeconds()).padStart(2, '0')}`;
+        setLogs(prev => [...prev, { time, msg }]);
+    };
 
     const handleAnalyze = async () => {
         if (!file && !text && !url) { setError('Upload PDF, masukkan URL, atau tempel teks prospektus'); return; }
         setAnalyzing(true);
         setError('');
+        setLogs([]);
+        addLog('Memulai analisis prospektus...');
         setProgress({ step: 'Memulai analisis...', progress: 0, eta: 40 });
 
         try {
@@ -36,6 +49,7 @@ export default function ProspectusPage() {
             const headers: Record<string, string> = {};
             if (!file) headers['Content-Type'] = 'application/json';
 
+            addLog('Mengirim request ke server...');
             const res = await fetch('/api/analyze/prospectus', { method: 'POST', body, headers });
 
             if (!res.ok) {
@@ -56,10 +70,11 @@ export default function ProspectusPage() {
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
+                let lastEvent = '';
 
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
-                        const eventType = line.slice(7).trim();
+                        lastEvent = line.slice(7).trim();
                         continue;
                     }
                     if (line.startsWith('data: ')) {
@@ -67,10 +82,15 @@ export default function ProspectusPage() {
                             const data = JSON.parse(line.slice(6));
                             if (data.step) {
                                 setProgress({ step: data.step, progress: data.progress, eta: data.eta });
+                                addLog(data.step);
                             }
                             if (data.data) {
+                                addLog('✅ Analisis selesai!');
                                 setAnalyses(prev => [...prev, data.data]);
                                 resetForm();
+                            }
+                            if (data.message && lastEvent === 'error') {
+                                addLog(`❌ ${data.message}`);
                             }
                         } catch {}
                     }
@@ -78,6 +98,7 @@ export default function ProspectusPage() {
             }
         } catch (e: any) {
             setError(e.message || 'Gagal menganalisis prospektus');
+            addLog(`❌ Error: ${e.message}`);
         }
         setAnalyzing(false);
     };
@@ -93,14 +114,14 @@ export default function ProspectusPage() {
     };
 
     return (
-        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-foreground tracking-tight">Analisis Prospektus</h1>
                 <p className="text-sm text-muted-foreground">Upload PDF prospektus IPO — analisis fundamental, ARA, fair value & rekomendasi AI. Multi-emiten komparasi.</p>
             </div>
 
             {/* Upload Area */}
-            <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
                 {/* File Upload Dropzone */}
                 <div
                     onClick={() => fileRef.current?.click()}
@@ -108,7 +129,7 @@ export default function ProspectusPage() {
                     onDragLeave={e => e.currentTarget.classList.remove('border-primary')}
                     onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-primary'); const f = e.dataTransfer.files[0]; if (f && f.type === 'application/pdf') setFile(f); }}
                     className={cn(
-                        "border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all hover:bg-muted/30",
+                        "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all hover:bg-muted/30",
                         file ? "border-success bg-success/5" : "border-border hover:border-primary/30"
                     )}
                 >
@@ -134,18 +155,18 @@ export default function ProspectusPage() {
                 {/* Name + URL */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Label Analisis</label>
+                        <label className="card-title">Label Analisis</label>
                         <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. BBCA IPO" className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Atau URL PDF</label>
+                        <label className="card-title">Atau URL PDF</label>
                         <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     </div>
                 </div>
 
                 {/* Or paste text */}
                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Atau tempel teks prospektus</label>
+                    <label className="card-title">Atau tempel teks prospektus</label>
                     <textarea value={text} onChange={e => setText(e.target.value)} rows={4}
                         className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
                         placeholder={file ? `File "${file.name}" siap. Klik "Analisis Prospektus" untuk mulai.` : 'Tempel teks prospektus di sini...'} />
@@ -166,7 +187,7 @@ export default function ProspectusPage() {
                         const isBuy = a.recommendation === 'BUY';
                         const aPrices = ara(a);
                         return (
-                            <div key={a.id} className="bg-card border border-border rounded-2xl overflow-hidden">
+                            <div key={a.id} className="card-flush">
                                 <div className={cn("px-5 py-4 flex items-center justify-between border-b", isBuy ? "bg-success/5 border-success/20" : "bg-destructive/5 border-destructive/20")}>
                                     <div className="flex items-center gap-3">
                                         <div className={cn("p-2 rounded-xl", isBuy ? "bg-success/20" : "bg-destructive/20")}>
@@ -209,7 +230,7 @@ export default function ProspectusPage() {
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <Zap className="w-4 h-4 text-warning" />
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Proyeksi ARA (Auto Rejection Atas)</span>
+                                            <span className="card-title">Proyeksi ARA (Auto Rejection Atas)</span>
                                         </div>
                                         <div className="grid grid-cols-5 gap-2">
                                             {aPrices.prices.map((p, i) => (
@@ -225,7 +246,7 @@ export default function ProspectusPage() {
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <BarChart3 className="w-4 h-4 text-primary" />
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Data Keuangan</span>
+                                            <span className="card-title">Data Keuangan</span>
                                         </div>
                                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                                             {[
@@ -244,10 +265,41 @@ export default function ProspectusPage() {
                                         </div>
                                     </div>
 
+                                    {/* Charts */}
+                                    <details className="group">
+                                        <summary className="flex items-center gap-2 cursor-pointer text-[10px] font-black uppercase tracking-wider text-primary hover:text-primary/80 transition-colors">
+                                            <ChartArea className="w-4 h-4" />
+                                            <span>Tampilkan Chart Analisis</span>
+                                        </summary>
+                                        <div className="mt-4 p-4 bg-muted/10 rounded-xl border border-border/50">
+                                            <ProspectusCharts
+                                                revenue={a.financials.totalRevenue}
+                                                netProfit={a.financials.netProfit}
+                                                totalAssets={a.financials.totalAssets}
+                                                totalEquity={a.financials.totalEquity}
+                                                totalLiabilities={a.financials.totalLiabilities}
+                                                eps={a.financials.eps}
+                                                per={a.financials.per}
+                                                pbv={a.financials.pbv}
+                                                roe={a.financials.roe}
+                                                der={a.financials.der}
+                                                currentRatio={a.financials.currentRatio}
+                                                revenueGrowth={a.financials.revenueGrowth}
+                                                profitGrowth={a.financials.profitGrowth}
+                                                grossMargin={(a.financials as any).grossProfitMargin}
+                                                netMargin={(a.financials as any).netProfitMargin}
+                                                ipoPrice={a.emitent.ipoPrice}
+                                                fairValue={a.fairValue}
+                                                priceTargets={a.priceTarget}
+                                                aPrices={aPrices.prices}
+                                            />
+                                        </div>
+                                    </details>
+
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <Target className="w-4 h-4 text-primary" />
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Target Harga</span>
+                                            <span className="card-title">Target Harga</span>
                                         </div>
                                         <div className="grid grid-cols-3 gap-3">
                                             {[
@@ -261,7 +313,7 @@ export default function ProspectusPage() {
                                                         <p className="text-[9px] font-bold text-muted-foreground uppercase">{t.label}</p>
                                                         <p className="text-sm font-black text-foreground">{t.value > 0 ? formatIDR(t.value) : '-'}</p>
                                                         <p className={cn("text-[10px] font-bold", vsIpo >= 0 ? "text-success" : "text-destructive")}>
-                                                            {vsIpo >= 0 ? '+' : ''}{formatPercentage(vsIpo)} vs IPO
+                                                            {formatPercentage(vsIpo)} vs IPO
                                                         </p>
                                                     </div>
                                                 );
@@ -269,29 +321,36 @@ export default function ProspectusPage() {
                                         </div>
                                     </div>
 
-                                    <div className="p-4 bg-muted/20 rounded-2xl border border-border/50">
+                                    <div className="p-4 bg-muted/20 rounded-xl border border-border/50">
                                         <p className="text-[10px] font-bold text-muted-foreground mb-2">Analisis & Rekomendasi</p>
                                         <p className="text-xs text-foreground leading-relaxed">{a.reasoning}</p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {a.strength.length > 0 && (
-                                            <div className="p-3 bg-success/5 rounded-xl border border-success/20">
-                                                <p className="text-[9px] font-black text-success uppercase tracking-wider mb-2">Kekuatan</p>
-                                                <ul className="space-y-1">
-                                                    {a.strength.map((s, i) => <li key={i} className="text-[11px] text-foreground flex items-start gap-1.5"><span className="text-success mt-0.5">+</span>{s}</li>)}
-                                                </ul>
+                                    {(() => {
+                                        const strengths = a.strength.filter(s => s && s.length > 3 && !s.includes('Tidak ada data'));
+                                        const risks = a.risk.filter(r => r && r.length > 3 && !r.includes('Tidak ada data'));
+                                        if (strengths.length === 0 && risks.length === 0) return null;
+                                        return (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {strengths.length > 0 && (
+                                                    <div className="p-3 bg-success/5 rounded-xl border border-success/20">
+                                                        <p className="text-[9px] font-black text-success uppercase tracking-wider mb-2">Kekuatan</p>
+                                                        <ul className="space-y-1">
+                                                            {strengths.map((s, i) => <li key={i} className="text-[11px] text-foreground flex items-start gap-1.5"><span className="text-success mt-0.5">+</span>{s}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {risks.length > 0 && (
+                                                    <div className="p-3 bg-destructive/5 rounded-xl border border-destructive/20">
+                                                        <p className="text-[9px] font-black text-destructive uppercase tracking-wider mb-2">Risiko</p>
+                                                        <ul className="space-y-1">
+                                                            {risks.map((r, i) => <li key={i} className="text-[11px] text-foreground flex items-start gap-1.5"><span className="text-destructive mt-0.5">−</span>{r}</li>)}
+                                                        </ul>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        {a.risk.length > 0 && (
-                                            <div className="p-3 bg-destructive/5 rounded-xl border border-destructive/20">
-                                                <p className="text-[9px] font-black text-destructive uppercase tracking-wider mb-2">Risiko</p>
-                                                <ul className="space-y-1">
-                                                    {a.risk.map((r, i) => <li key={i} className="text-[11px] text-foreground flex items-start gap-1.5"><span className="text-destructive mt-0.5">−</span>{r}</li>)}
-                                                </ul>
-                                            </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         );
@@ -299,10 +358,10 @@ export default function ProspectusPage() {
 
                     {/* Comparison Table */}
                     {analyses.length > 1 && (
-                        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                        <div className="card-flush">
                             <div className="px-5 py-4 border-b border-border flex items-center gap-2">
                                 <Scale className="w-4 h-4 text-primary" />
-                                <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">Perbandingan Emiten</span>
+                                <span className="card-title">Perbandingan Emiten</span>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
@@ -366,29 +425,35 @@ export default function ProspectusPage() {
             )}
 
             {analyzing && analyses.length === 0 && (
-                <div className="p-16 text-center">
-                    <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-                    <p className="text-sm font-medium text-foreground">{progress.step || 'Menganalisis prospektus...'}</p>
-
-                    {/* Progress bar */}
-                    <div className="max-w-md mx-auto mt-4">
-                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-primary rounded-full transition-all duration-500"
-                                style={{ width: `${progress.progress}%` }}
-                            />
+                <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                            <span className="text-sm font-bold text-foreground">{progress.step || 'Menganalisis prospektus...'}</span>
                         </div>
-                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                            <span>{progress.progress}%</span>
-                            <span>Estimasi sisa: ~{progress.eta} detik</span>
-                        </div>
+                        <span className="text-xs text-muted-foreground font-mono">{progress.progress}%</span>
                     </div>
 
-                    <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto leading-relaxed">
-                        Pass 1: Ekstraksi data emiten & IPO<br />
-                        Pass 2: Analisis keuangan<br />
-                        Pass 3: Rekomendasi & fair value
-                    </p>
+                    {/* Progress bar */}
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${progress.progress}%` }} />
+                    </div>
+                    <div className="text-xs text-muted-foreground text-right">Estimasi sisa: ~{progress.eta} detik</div>
+
+                    {/* Live Log */}
+                    <div className="bg-muted/30 rounded-xl border border-border/50 max-h-64 overflow-y-auto p-3 space-y-1">
+                        {logs.map((log, i) => (
+                            <div key={i} className="flex gap-2 text-[11px] font-mono">
+                                <span className="text-muted-foreground shrink-0">{log.time}</span>
+                                <span className={cn(
+                                    log.msg.startsWith('❌') ? 'text-destructive' :
+                                    log.msg.startsWith('✅') ? 'text-success' :
+                                    log.msg.startsWith('⚠️') ? 'text-warning' : 'text-foreground'
+                                )}>{log.msg}</span>
+                            </div>
+                        ))}
+                        <div ref={logEndRef} />
+                    </div>
                 </div>
             )}
         </div>

@@ -4,7 +4,9 @@ import { TopProgressBar } from "@/components/TopProgressBar";
 import { Inter } from "next/font/google";
 import { ThemeInit } from "@/components/ThemeInit";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ClientMobileNav } from "@/components/ClientMobileNav";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "Portfolio Saham IDX",
+  title: "Porto - Portfolio Saham IDX",
   description: "Kelola portfolio investasi saham Indonesia",
 };
 
@@ -27,14 +29,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <TooltipProvider>
             <TopProgressBar />
             <Toaster position="top-right" />
-            <ClientMobileNav />
-            <div className="md:pl-64">
-              <div className="pt-14 pb-20 md:pt-6 md:pb-6">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  {children}
+            <SidebarProvider
+              style={
+                {
+                  "--sidebar-width": "calc(var(--spacing) * 72)",
+                  "--header-height": "calc(var(--spacing) * 12)",
+                } as React.CSSProperties
+              }
+            >
+              <AppSidebar variant="inset" />
+              <SidebarInset>
+                <SiteHeader />
+                <div className="flex flex-1 flex-col">
+                  <div className="@container/main flex flex-1 flex-col gap-2">
+                    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
+                      {children}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </SidebarInset>
+            </SidebarProvider>
           </TooltipProvider>
         </QueryProvider>
       </body>

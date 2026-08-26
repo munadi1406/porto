@@ -1,285 +1,501 @@
 "use client";
 
-import { useRef } from "react";
-import { useAggregatePortfolio } from "@/hooks/useAggregatePortfolio";
-import { useAggregateHistory } from "@/hooks/useAggregateHistory";
-import { SummaryCard } from "@/components/SummaryCard";
-import { formatIDR, formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
-import { Briefcase, DollarSign, TrendingUp, Activity, PieChart, Wallet, Layers } from "lucide-react";
-import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
-import { DashboardTabs } from "@/components/DashboardTabs";
-import { EquityGrowthChart } from "@/components/EquityGrowthChart";
-import { EquityReturnTable } from "@/components/EquityReturnTable";
-import { DailyPerformanceCalendar } from "@/components/DailyPerformanceCalendar";
-import { ExportDashboard } from "@/components/ExportDashboard";
-import { SharePortfolio } from "@/components/SharePortfolio";
-import { PrivacyWrapper } from "@/components/PrivacyWrapper";
-import { usePrivacyMode } from "@/hooks/usePrivacyMode";
-import { Calendar as CalendarIcon } from "lucide-react";
-import Link from "next/link";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
+import { TrendingUp, TrendingDown, Clock, Search, BarChart3, PieChart, Zap, DollarSign, Layers } from "lucide-react";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import TickerTape from "@/components/TickerTape";
+import MarketStatusBar from "@/components/MarketStatusBar";
+import LivePrice from "@/components/LivePrice";
+import SectorHeatmap from "@/components/SectorHeatmap";
+import BrokerSummaryPanel from "@/components/BrokerSummaryPanel";
+import { usePortfolio } from "@/hooks/usePortfolio";
+import { useMarketData } from "@/hooks/useMarketData";
+import { useCountUp } from "@/hooks/useCountUp";
 
-export default function HomePage() {
-  const dashboardRef = useRef<HTMLDivElement>(null);
-  const { isPrivacyMode } = usePrivacyMode();
-  const { data, loading } = useAggregatePortfolio();
-  const { history, getHistoryForPeriod, loading: historyLoading } = useAggregateHistory();
+const IHSGChart = dynamic(() => import("@/components/IHSGChart"), { ssr: false, loading: () => <div className="h-[300px] bg-muted animate-pulse rounded-lg" /> });
 
-  if (loading || !data) {
+type TabKey = "overview" | "gainers" | "brokers" | "all-stocks" | "sectors";
+
+interface MarketIndex { symbol: string; name: string; label: string; lastPrice: number; change: number; changePercent: number; previousClose: number; open: number; dayHigh: number; dayLow: number; volume: number; }
+interface MostActiveStock { ticker: string; name: string; price: number; change: number; changePercent: number; volume: number; value: number; }
+interface SectorSummary { sector: string; stocks: number; totalVolume: number; totalValue: number; avgChangePercent: number; gainers: number; losers: number; }
+interface ForeignFlowItem { investor: string; buyValue: number; sellValue: number; netValue: number; }
+interface GainerLoserItem { KODE_SAHAM: string; NAMA_SAHAM: string; HARGA_PENUTUPAN: number; PERSEN_PERUBAHAN: number; }
+interface AllStock { code: string; name: string; close: number; change: number; changePercent: number; volume: number; value: number; high: number; low: number; open: number; }
+
+function MiniSparkline({ data, color }: { data: number[]; color: string }) {
+    if (data.length < 2) return null;
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+    const w = 80;
+    const h = 28;
+    const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(" ");
     return (
-      <div className="space-y-4">
-        <div className="h-6 w-48 bg-muted animate-pulse rounded" />
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
-          ))}
-        </div>
-        <div className="h-80 bg-muted animate-pulse rounded-lg" />
-      </div>
+        <svg width={w} height={h} className="shrink-0">
+            <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} />
+        </svg>
     );
-  }
+}
 
-  const { portfolios, totals, consolidatedItems } = data;
-
-  const chartData = portfolios.map((p: any) => ({
-    name: p.name,
-    value: p.totalValue,
-    color: p.color
-  })).filter((d: any) => d.value > 0);
-
-  return (
-    <div ref={dashboardRef} className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-primary mb-1">
-            <Layers className="w-4 h-4" />
-            <span>Executive View</span>
-          </div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Main Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Konsolidasi dari <span className="font-medium text-foreground">{portfolios.length} portofolio</span> aktif.
-          </p>
+function IndexCard({ index, sparkData, live }: { index: MarketIndex; sparkData: number[]; live?: any }) {
+    const target = live?.price ?? index.lastPrice;
+    const price = useCountUp(target);
+    const chgPct = live ? live.changePercent : index.changePercent;
+    const isUp = (chgPct ?? index.change ?? 0) >= 0;
+    return (
+        <div className="card-glow bg-card border border-border rounded-lg p-3 cursor-default">
+            <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-bold text-muted-foreground">{index.name}</span>
+                <MiniSparkline data={sparkData} color={isUp ? "var(--success)" : "var(--danger)"} />
+            </div>
+            <LivePrice value={price} className="text-lg font-bold text-foreground" format={(v) => v.toLocaleString("id-ID", { maximumFractionDigits: 2 })} />
+            <span className={cn(
+                "inline-flex items-center gap-1 mt-1 text-[10px] font-black rounded-full px-2 py-0.5",
+                isUp ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+            )}>
+                {isUp ? "▲" : "▼"} {formatPercentage(chgPct ?? index.change)}
+            </span>
         </div>
-        <div className="flex items-center gap-2">
-          <SharePortfolio
-            consolidatedItems={consolidatedItems || []}
-            totals={{
-              grandTotal: totals.grandTotal || 0,
-              profitLoss: totals.profitLoss || 0,
-              returnPercent: totals.returnPercent || 0,
-              invested: totals.invested || 0
-            }}
-          />
-          <ExportDashboard targetRef={dashboardRef} filename="main-dashboard" />
+    );
+}
+
+function MarketBreadthSection({ breadth, total }: { breadth: { advancing: number; declining: number; unchanged: number }; total: number }) {
+    const { advancing, declining, unchanged } = breadth;
+    const totalCount = advancing + declining + unchanged || 1;
+    return (
+        <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Market Breadth {total > 0 && <span className="text-muted-foreground/60">({total} saham)</span>}</h3>
+            <div className="flex items-end gap-6 mb-3">
+                <div><p className="text-2xl font-bold text-success">{advancing}</p><p className="text-[10px] font-bold text-success uppercase">Advancing</p></div>
+                <div><p className="text-2xl font-bold text-destructive">{declining}</p><p className="text-[10px] font-bold text-destructive uppercase">Declining</p></div>
+                <div><p className="text-2xl font-bold text-muted-foreground">{unchanged}</p><p className="text-[10px] font-bold text-muted-foreground uppercase">Unchanged</p></div>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+                <div className="bg-success h-full" style={{ width: `${(advancing / totalCount) * 100}%` }} />
+                <div className="bg-muted-foreground/30 h-full" style={{ width: `${(unchanged / totalCount) * 100}%` }} />
+                <div className="bg-destructive h-full" style={{ width: `${(declining / totalCount) * 100}%` }} />
+            </div>
         </div>
-      </div>
+    );
+}
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        <SummaryCard title="Modal Total" value={formatIDR(totals.invested)} icon={Briefcase} />
-        <SummaryCard title="Total Cash" value={formatIDR(totals.cash)} icon={Wallet} trend="neutral" />
-        <SummaryCard
-          title="Cuan/Rugi"
-          value={totals.profitLoss >= 0 ? `+${formatIDR(totals.profitLoss)}` : formatIDR(totals.profitLoss)}
-          subValue={formatPercentage(totals.returnPercent)}
-          icon={TrendingUp}
-          trend={totals.profitLoss >= 0 ? "up" : "down"}
-        />
-        <SummaryCard
-          title="Day Change"
-          value={totals.dayChange >= 0 ? `+${formatIDR(totals.dayChange)}` : formatIDR(totals.dayChange)}
-          subValue={(totals.dayChange >= 0 ? "+" : "") + formatPercentage(totals.dayChangePercent)}
-          icon={Activity}
-          trend={totals.dayChange >= 0 ? "up" : "down"}
-        />
-        <SummaryCard
-          title="Top Asset"
-          value={portfolios.sort((a: any, b: any) => b.marketValue - a.marketValue)[0]?.name || "-"}
-          subLabel="Portofolio Teratas"
-          icon={PieChart}
-          trend="up"
-        />
-      </div>
-
-      <DashboardTabs
-        tabs={[
-          { id: "overview", label: "Perbandingan", icon: <Layers className="w-4 h-4" /> },
-          { id: "growth", label: "Performa", icon: <TrendingUp className="w-4 h-4" /> },
-          { id: "calendar", label: "Kalender", icon: <CalendarIcon className="w-4 h-4" /> },
-          { id: "holdings", label: "Konsolidasi", icon: <Briefcase className="w-4 h-4" /> },
-        ]}
-      >
-        {(activeTab) => (
-          <div>
-            {activeTab === "overview" && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                <div className="lg:col-span-8 bg-card border border-border rounded-lg overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
-                    <h2 className="font-medium text-foreground">Perbandingan Portofolio</h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-xs text-muted-foreground">
-                          <th className="px-4 py-3 font-medium text-left">Portofolio</th>
-                          <th className="px-4 py-3 font-medium text-left">Total Aset</th>
-                          <th className="px-4 py-3 font-medium text-right">Perubahan</th>
-                          <th className="px-4 py-3 font-medium text-right">Total Return</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {portfolios.map((p: any) => (
-                          <tr key={p.id} className="hover:bg-muted transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                                <div>
-                                  <span className="font-medium text-foreground">{p.name}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">{p.tickerCount} saham</span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-foreground"><PrivacyWrapper isPrivate={isPrivacyMode}>{formatIDR(p.totalValue)}</PrivacyWrapper></div>
-                              <div className="text-xs text-muted-foreground">Cash: <PrivacyWrapper isPrivate={isPrivacyMode}>{formatIDR(p.cashValue)}</PrivacyWrapper></div>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className={cn("font-medium", p.dayChange >= 0 ? "text-success" : "text-destructive")}>
-                                <PrivacyWrapper isPrivate={isPrivacyMode}>{p.dayChange >= 0 ? "+" : ""}{formatIDR(p.dayChange)}</PrivacyWrapper>
-                              </div>
-                              <div className={cn("text-xs", p.dayChange >= 0 ? "text-success" : "text-destructive")}>
-                                {p.dayChange >= 0 ? "+" : ""}{formatPercentage(p.dayChangePercent)}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className={cn("font-semibold", p.profitLoss >= 0 ? "text-success" : "text-destructive")}>
-                                <PrivacyWrapper isPrivate={isPrivacyMode}>{formatPercentage(p.returnPercent)}</PrivacyWrapper>
-                              </div>
-                              <div className="text-xs text-muted-foreground">{formatIDR(p.profitLoss)}</div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+function ForeignFlowCard({ foreignFlow }: { foreignFlow: ForeignFlowItem[] }) {
+    const foreign = foreignFlow.find(f => f.investor === "Foreign");
+    if (!foreign) return null;
+    const max = Math.max(Math.abs(foreign.buyValue), Math.abs(foreign.sellValue), 1);
+    return (
+        <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Foreign Flow (All Market)</h3>
+            <div className="flex items-baseline gap-2">
+                <span className="text-xs text-muted-foreground">Net {foreign.netValue >= 0 ? "Buy" : "Sell"}</span>
+                <span className={cn("text-lg font-bold tabular-nums", foreign.netValue >= 0 ? "text-success" : "text-destructive")}>
+                    {foreign.netValue >= 0 ? "+" : ""}{formatCompactIDR(foreign.netValue)}
+                </span>
+            </div>
+            <div className="mt-3 space-y-2">
+                <div>
+                    <div className="flex justify-between text-[9px] font-bold text-muted-foreground mb-0.5"><span>BUY</span><span className="tabular-nums">{formatCompactIDR(foreign.buyValue)}</span></div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-success transition-all duration-700" style={{ width: `${(Math.abs(foreign.buyValue) / max) * 100}%` }} />
+                    </div>
                 </div>
+                <div>
+                    <div className="flex justify-between text-[9px] font-bold text-muted-foreground mb-0.5"><span>SELL</span><span className="tabular-nums">{formatCompactIDR(foreign.sellValue)}</span></div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-destructive transition-all duration-700" style={{ width: `${(Math.abs(foreign.sellValue) / max) * 100}%` }} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                <div className="lg:col-span-4 bg-card border border-border rounded-lg p-4">
-                  <h3 className="font-medium text-foreground mb-4">Distribusi Aset</h3>
-                  <div className="h-48">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie data={chartData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
-                          {chartData.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                          formatter={(value: any) => formatIDR(Number(value || 0))}
-                        />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex items-center justify-center mt-2">
-                    <p className="text-2xl font-semibold text-foreground">
-                      <PrivacyWrapper isPrivate={isPrivacyMode}>{formatCompactIDR(totals.grandTotal)}</PrivacyWrapper>
-                    </p>
-                  </div>
-                  <div className="space-y-1 mt-3">
-                    {chartData.map((d: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between py-1.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                          <span className="text-sm text-muted-foreground">{d.name}</span>
-                        </div>
-                        <span className="text-sm font-medium text-foreground">
-                          <PrivacyWrapper isPrivate={isPrivacyMode}>{((d.value / totals.grandTotal) * 100).toFixed(1)}%</PrivacyWrapper>
+function TableCard({ title, icon: Icon, items, type, onViewAll, livePrices }: { title: string; icon: any; items: any[]; type: "active" | "volume" | "gainer" | "loser"; onViewAll: () => void; livePrices?: Record<string, any> }) {
+    const router = useRouter();
+    return (
+        <div className="card-flush">
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                <h3 className="card-title">{title}</h3>
+                {livePrices && Object.keys(livePrices).length > 0 && (
+                    <span className="ml-auto flex items-center gap-1 text-[9px] font-bold text-success uppercase">
+                        <span className="relative flex size-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                            <span className="relative inline-flex size-1.5 rounded-full bg-success" />
                         </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-12">
-                  <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
-                </div>
-              </div>
-            )}
-
-            {activeTab === "growth" && (
-              <div className="space-y-4">
-                <EquityGrowthChart getHistoryForPeriod={getHistoryForPeriod} currentEquity={totals.grandTotal} totalReturnPercent={totals.returnPercent} />
-                <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
-              </div>
-            )}
-
-            {activeTab === "calendar" && (
-              <div className="space-y-4">
-                <DailyPerformanceCalendar history={history} />
-                <EquityReturnTable getHistoryForPeriod={getHistoryForPeriod} />
-              </div>
-            )}
-
-            {activeTab === "holdings" && (
-              <div className="bg-card border border-border rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-border">
-                  <h3 className="font-medium text-foreground">Konsolidasi Saham</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                        Live
+                    </span>
+                )}
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="px-4 py-3 font-medium text-left">Saham</th>
-                        <th className="px-4 py-3 font-medium text-right">Lot</th>
-                        <th className="px-4 py-3 font-medium text-right">Harga</th>
-                        <th className="px-4 py-3 font-medium text-right">Market Value</th>
-                        <th className="px-4 py-3 font-medium text-right">Return</th>
-                      </tr>
+                        <tr className="border-b border-border bg-muted/30">
+                            <th className="text-left px-4 py-2 font-bold text-muted-foreground">Ticker</th>
+                            <th className="text-right px-4 py-2 font-bold text-muted-foreground">Price</th>
+                            <th className="text-right px-4 py-2 font-bold text-muted-foreground">Change</th>
+                            {(type === "active" || type === "volume") && <th className="text-right px-4 py-2 font-bold text-muted-foreground">{type === "volume" ? "Volume" : "Value"}</th>}
+                        </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {consolidatedItems.map((item: any) => (
-                        <tr key={item.ticker} className="hover:bg-muted transition-colors">
-                          <td className="px-4 py-3">
-                            <Link href={`/analysis/${item.ticker}`} className="block">
-                              <div className="font-mono font-medium text-primary text-sm">{item.ticker}</div>
-                              <div className="text-xs text-muted-foreground truncate max-w-[200px]">{item.name}</div>
-                            </Link>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {item.portfolios.map((pName: string) => (
-                                <span key={pName} className="text-[10px] px-1.5 py-0.5 bg-muted border border-border rounded text-muted-foreground">{pName}</span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium text-foreground">{item.totalLots} lot</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="text-[11px] text-muted-foreground">Avg: <PrivacyWrapper isPrivate={isPrivacyMode}>{formatIDR(item.avgPrice)}</PrivacyWrapper></div>
-                            <div className="text-sm font-medium text-foreground">Cur: <PrivacyWrapper isPrivate={isPrivacyMode}>{formatIDR(item.currentPrice)}</PrivacyWrapper></div>
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium text-foreground"><PrivacyWrapper isPrivate={isPrivacyMode}>{formatIDR(item.marketValue)}</PrivacyWrapper></td>
-                          <td className="px-4 py-3 text-right">
-                            <div className={cn("font-semibold", item.profitLoss >= 0 ? "text-success" : "text-destructive")}>
-                              <PrivacyWrapper isPrivate={isPrivacyMode}>{formatPercentage(item.returnPercent)}</PrivacyWrapper>
-                            </div>
-                            <div className={cn("text-xs", item.profitLoss >= 0 ? "text-success" : "text-destructive")}>
-                              {item.profitLoss >= 0 ? "+" : ""}{formatIDR(item.profitLoss)}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {consolidatedItems.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                            Belum ada kepemilikan saham
-                          </td>
-                        </tr>
-                      )}
+                        {items.slice(0, 8).map((s: any) => {
+                            const ticker = s.ticker || s.code || s.KODE_SAHAM || "";
+                            const tkFull = ticker.includes(".") ? ticker : `${ticker}.JK`;
+                            const lp = livePrices?.[tkFull];
+                            const price = lp?.price || s.price || s.HARGA_PENUTUPAN || 0;
+                            const chg = lp ? lp.changePercent : (s.changePercent || s.PERSEN_PERUBAHAN || 0);
+                            const isUp = (chg ?? 0) >= 0;
+                            return (
+                                <tr key={ticker} onClick={() => router.push(`/analysis/${ticker}.JK`)} className="hover:bg-muted/40 cursor-pointer">
+                                    <td className="px-4 py-2 font-bold text-foreground">
+                                        <span className="flex items-center gap-1.5">
+                                            {lp && <span className={cn("size-1 rounded-full shrink-0", isUp ? "bg-success" : "bg-destructive")} />}
+                                            {ticker}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-mono tabular-nums text-foreground">
+                                        <LivePrice value={price} format={(v) => v.toLocaleString("id-ID", { maximumFractionDigits: 0 })} />
+                                    </td>
+                                    <td className={cn("px-4 py-2 text-right font-bold", isUp ? "text-success" : "text-destructive")}>{formatPercentage(chg)}</td>
+                                    {type === "active" && <td className="px-4 py-2 text-right text-muted-foreground">{formatCompactIDR(s.value || 0)}</td>}
+                                    {type === "volume" && <td className="px-4 py-2 text-right text-muted-foreground">{formatCompactIDR(s.volume || 0).replace("Rp", "")}</td>}
+                                </tr>
+                            );
+                        })}
                     </tbody>
-                  </table>
+                </table>
+            </div>
+            <button
+                onClick={onViewAll}
+                className="w-full px-4 py-2 border-t border-border text-center text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            >
+                View all ({items.length})
+            </button>
+        </div>
+    );
+}
+
+function SectorPerformanceCard({ sectors, onViewAll }: { sectors: SectorSummary[]; onViewAll: () => void }) {
+    const sorted = [...sectors].sort((a, b) => b.totalValue - a.totalValue).slice(0, 8);
+    return (
+        <div className="card-flush">
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                <PieChart className="w-3.5 h-3.5 text-muted-foreground" />
+                <h3 className="card-title">Sector Performance</h3>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                    <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                            <th className="text-left px-4 py-2 font-bold text-muted-foreground">Sector</th>
+                            <th className="text-right px-4 py-2 font-bold text-muted-foreground">Change</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                        {sorted.map(s => (
+                            <tr key={s.sector} className="hover:bg-muted/40">
+                                <td className="px-4 py-2 font-medium text-foreground">{s.sector}</td>
+                                <td className={cn("px-4 py-2 text-right font-bold", s.avgChangePercent >= 0 ? "text-success" : "text-destructive")}>{formatPercentage(s.avgChangePercent)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <button
+                onClick={onViewAll}
+                className="w-full px-4 py-2 border-t border-border text-center text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            >
+                View all ({sectors.length})
+            </button>
+        </div>
+    );
+}
+
+export default function MarketPage() {
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState<TabKey>("overview");
+    const [indices, setIndices] = useState<MarketIndex[]>([]);
+    const [mostActive, setMostActive] = useState<{ byVolume: MostActiveStock[]; byValue: MostActiveStock[] }>({ byVolume: [], byValue: [] });
+    const [sectors, setSectors] = useState<SectorSummary[]>([]);
+    const [gainers, setGainers] = useState<GainerLoserItem[]>([]);
+    const [losers, setLosers] = useState<GainerLoserItem[]>([]);
+    const [breadth, setBreadth] = useState<{ advancing: number; declining: number; unchanged: number }>({ advancing: 0, declining: 0, unchanged: 0 });
+    const [totalStocks, setTotalStocks] = useState(0);
+    const [allStocks, setAllStocks] = useState<any[]>([]);
+    const [foreignFlow, setForeignFlow] = useState<ForeignFlowItem[]>([]);
+    const [search, setSearch] = useState("");
+    const [idxLoading, setIdxLoading] = useState(true);
+    const [activeLoading, setActiveLoading] = useState(true);
+    const [sectorLoading, setSectorLoading] = useState(true);
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+    const [sparkDataMap, setSparkDataMap] = useState<Record<string, number[]>>({});
+
+    // Ticker tape: saham portofolio, fallback ke top movers
+    const { portfolio } = usePortfolio();
+    const portfolioTickers = useMemo(
+        () => Array.from(new Set((portfolio || []).map((s: any) => s.ticker))).slice(0, 15),
+        [portfolio]
+    );
+    const fallbackTickers = useMemo(() => {
+        const t = [...mostActive.byValue, ...mostActive.byVolume]
+            .map((s: any) => s.ticker)
+            .filter(Boolean)
+            .map((t: string) => (t.includes(".") ? t : `${t}.JK`));
+        return Array.from(new Set(t)).slice(0, 15);
+    }, [mostActive]);
+    const tapeTickers = portfolioTickers.length > 0 ? portfolioTickers : fallbackTickers;
+
+    // Ticker live: kartu indeks (^JKSE dll) + top movers — satu koneksi WS gabungan
+    const moverTickers = useMemo(() => {
+        const t = [
+            ...indices.map((i: any) => i.symbol),
+            ...mostActive.byValue.map((s: any) => s.ticker),
+            ...mostActive.byVolume.map((s: any) => s.ticker),
+            ...gainers.map((g: any) => g.KODE_SAHAM),
+            ...losers.map((l: any) => l.KODE_SAHAM),
+        ]
+            .filter(Boolean)
+            .map((t: string) => (t.startsWith("^") || t.includes(".") ? t : `${t}.JK`));
+        return Array.from(new Set(t)).slice(0, 40);
+    }, [indices, mostActive, gainers, losers]);
+    const liveTickers = useMemo(
+        () => Array.from(new Set([...tapeTickers, ...moverTickers])),
+        [tapeTickers, moverTickers]
+    );
+    const { prices: livePrices } = useMarketData(liveTickers);
+
+    // Fetch market index dari Yahoo Finance (cepat)
+    useEffect(() => {
+        fetch("/api/idx/market-index")
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && res.data) {
+                    setIndices(res.data);
+                    setLastUpdate(new Date());
+                    res.data.forEach((idx: any) => {
+                        const pts: number[] = [];
+                        for (let i = 0; i < 20; i++) {
+                            const base = idx.lastPrice || 100;
+                            pts.push(base + (Math.random() - 0.5) * base * 0.02 * (i / 20));
+                        }
+                        pts.push(idx.lastPrice || 100);
+                        setSparkDataMap(prev => ({ ...prev, [idx.symbol]: pts }));
+                    });
+                }
+            })
+            .catch(() => {})
+            .finally(() => setIdxLoading(false));
+    }, []);
+
+    // Market Scan — fetch SEMUA 959 saham, derive most-active/gainers/losers/sector/breadth
+    useEffect(() => {
+        fetch("/api/idx/market-scan")
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && res.data) {
+                    const d = res.data;
+                    setTotalStocks(d.total || 0);
+                    setBreadth(d.breadth || { advancing: 0, declining: 0, unchanged: 0 });
+                    setMostActive(d.mostActive || { byVolume: [], byValue: [] });
+                    setGainers((d.gainers || []).map((s: any) => ({
+                        KODE_SAHAM: s.code, NAMA_SAHAM: s.name, HARGA_PENUTUPAN: s.price, PERSEN_PERUBAHAN: s.changePercent,
+                    })));
+                    setLosers((d.losers || []).map((s: any) => ({
+                        KODE_SAHAM: s.code, NAMA_SAHAM: s.name, HARGA_PENUTUPAN: s.price, PERSEN_PERUBAHAN: s.changePercent,
+                    })));
+                    setSectors(d.sectors || []);
+                    setAllStocks(d.all || []);
+                    setLastUpdate(new Date());
+                }
+            })
+            .catch(() => {})
+            .finally(() => { setActiveLoading(false); setSectorLoading(false); });
+
+        // Broker summary — fire-and-forget
+        fetch("/api/idx/broker-summary")
+            .then(r => r.json())
+            .then(res => { if (res.success && res.data?.foreignFlow) setForeignFlow(res.data.foreignFlow); })
+            .catch(() => {});
+    }, []);
+
+    const ihsg = indices.find(i => i.symbol === "^JKSE" || i.name?.includes("IHSG"));
+    const tabs: { key: TabKey; label: string }[] = [
+        { key: "overview", label: "Overview" },
+        { key: "gainers", label: "Gainers / Losers" },
+        { key: "brokers", label: "Broker Summary" },
+        { key: "all-stocks", label: "All Stocks" },
+        { key: "sectors", label: "Sector" },
+    ];
+
+    return (
+        <div className="space-y-6">
+            <MarketStatusBar />
+
+            {/* Hero header ala terminal */}
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-r from-primary/10 via-card to-card p-5">
+                <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
+                <div className="relative flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-1">IDX · Bursa Efek Indonesia</p>
+                        <h1 className="text-2xl font-black tracking-tight"><span className="text-gradient">Market Overview</span></h1>
+                        <p className="text-xs text-muted-foreground mt-1">Pantau pasar real-time — indeks, breadth, arus dana & sektor</p>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 shrink-0">
+                        {[
+                            { label: "Naik", value: breadth.advancing, cls: "text-success" },
+                            { label: "Turun", value: breadth.declining, cls: "text-destructive" },
+                            { label: "Tetap", value: breadth.unchanged, cls: "text-muted-foreground" },
+                            { label: "Saham", value: totalStocks, cls: "text-foreground" },
+                        ].map(s => (
+                            <div key={s.label} className="rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-center backdrop-blur-sm">
+                                <p className={cn("text-lg font-black tabular-nums leading-none", s.cls)}>{s.value}</p>
+                                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">{s.label}</p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-              </div>
+                {lastUpdate && (
+                    <span className="absolute bottom-1.5 right-3 text-[9px] text-muted-foreground/70 flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5" />{lastUpdate.toLocaleTimeString("id-ID")}
+                    </span>
+                )}
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-0 border-b border-border">
+                {tabs.map(tab => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                        className={cn("px-4 py-2.5 text-xs font-bold transition-colors border-b-2 -mb-px",
+                            activeTab === tab.key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {activeTab === "overview" && (
+                <div className="space-y-6">
+                    {/* Ticker Tape live */}
+                    {tapeTickers.length > 0 && <TickerTape tickers={tapeTickers} prices={livePrices} />}
+
+                    {/* Index Strip */}
+                    {idxLoading ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />)}</div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {indices.slice(0, 4).map(idx => <IndexCard key={idx.symbol} index={idx} sparkData={sparkDataMap[idx.symbol] || []} live={livePrices[idx.symbol]} />)}
+                        </div>
+                    )}
+
+                    {/* IHSG Chart + Market Breadth + Foreign Flow */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="lg:col-span-2 card-flush">
+                            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                                <h3 className="card-title">IHSG Chart</h3>
+                            </div>
+                            <IHSGChart height={300} />
+                        </div>
+                        <div className="space-y-4">
+                            <MarketBreadthSection breadth={breadth} total={totalStocks} />
+                            <ForeignFlowCard foreignFlow={foreignFlow} />
+                        </div>
+                    </div>
+
+                    {/* 4-column grid: Value, Volume, Gainers, Losers */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {activeLoading ? (
+                            Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-64 bg-muted animate-pulse rounded-lg" />)
+                        ) : (
+                            <>
+                                <TableCard title="Top Value" icon={DollarSign} items={mostActive.byValue} type="active" livePrices={livePrices} onViewAll={() => setActiveTab("all-stocks")} />
+                                <TableCard title="Top Volume" icon={Layers} items={mostActive.byVolume} type="volume" livePrices={livePrices} onViewAll={() => setActiveTab("all-stocks")} />
+                                <TableCard title="Top Gainers" icon={TrendingUp} items={gainers} type="gainer" livePrices={livePrices} onViewAll={() => setActiveTab("gainers")} />
+                                <TableCard title="Top Losers" icon={TrendingDown} items={losers} type="loser" livePrices={livePrices} onViewAll={() => setActiveTab("gainers")} />
+                            </>
+                        )}
+                    </div>
+
+                    {/* Sector Heatmap ala Finviz */}
+                    <SectorHeatmap sectors={sectors} />
+
+                    {/* Sector Performance */}
+                    <SectorPerformanceCard sectors={sectors} onViewAll={() => setActiveTab("sectors")} />
+                </div>
             )}
-          </div>
-        )}
-      </DashboardTabs>
-    </div>
-  );
+
+            {activeTab === "gainers" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <TableCard title="Top Gainers" icon={TrendingUp} items={gainers} type="gainer" onViewAll={() => setActiveTab("gainers")} />
+                    <TableCard title="Top Losers" icon={TrendingDown} items={losers} type="loser" onViewAll={() => setActiveTab("gainers")} />
+                </div>
+            )}
+
+            {activeTab === "brokers" && <BrokerSummaryPanel />}
+
+            {activeTab === "all-stocks" && (
+                <div className="space-y-3">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Cari saham (BBCA, TLKM...)"
+                            className="w-full px-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                    </div>
+                    <div className="card-flush">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/30">
+                                        <th className="text-left px-4 py-2 font-bold text-muted-foreground">#</th>
+                                        <th className="text-left px-4 py-2 font-bold text-muted-foreground">Ticker</th>
+                                        <th className="text-left px-4 py-2 font-bold text-muted-foreground hidden sm:table-cell">Nama</th>
+                                        <th className="text-right px-4 py-2 font-bold text-muted-foreground">Price</th>
+                                        <th className="text-right px-4 py-2 font-bold text-muted-foreground">Change</th>
+                                        <th className="text-right px-4 py-2 font-bold text-muted-foreground hidden md:table-cell">Volume</th>
+                                        <th className="text-right px-4 py-2 font-bold text-muted-foreground hidden lg:table-cell">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {(() => {
+                                        const q = search.toLowerCase();
+                                        const filtered = q
+                                            ? allStocks.filter((s: any) => s.code?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q))
+                                            : allStocks;
+                                        return filtered.slice(0, 100).map((s: any, i: number) => (
+                                            <tr key={s.code} onClick={() => router.push(`/analysis/${s.code}.JK`)} className="hover:bg-muted/40 cursor-pointer">
+                                                <td className="px-4 py-2 text-[10px] font-bold text-muted-foreground">{i + 1}</td>
+                                                <td className="px-4 py-2 font-mono font-bold text-foreground">{s.code}</td>
+                                                <td className="px-4 py-2 text-muted-foreground truncate max-w-[180px] hidden sm:table-cell">{s.name}</td>
+                                                <td className="px-4 py-2 text-right font-mono font-bold tabular-nums text-foreground">{s.price?.toLocaleString("id-ID")}</td>
+                                                <td className={cn("px-4 py-2 text-right font-bold", (s.changePercent || 0) >= 0 ? "text-success" : "text-destructive")}>{formatPercentage(s.changePercent)}</td>
+                                                <td className="px-4 py-2 text-right font-mono text-muted-foreground hidden md:table-cell">{formatCompactIDR(s.volume || 0).replace("Rp", "")}</td>
+                                                <td className="px-4 py-2 text-right font-mono text-muted-foreground hidden lg:table-cell">{formatCompactIDR(s.value || 0)}</td>
+                                            </tr>
+                                        ));
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="px-4 py-3 text-center border-t border-border">
+                            <p className="text-[10px] text-muted-foreground">
+                                Menampilkan {search ? "hasil pencarian" : "100 dari"} {allStocks.length} saham IDX
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "sectors" && (
+                sectorLoading ? (
+                    <div className="h-64 bg-muted animate-pulse rounded-lg" />
+                ) : (
+                    <SectorPerformanceCard sectors={sectors} onViewAll={() => setActiveTab("sectors")} />
+                )
+            )}
+        </div>
+    );
 }

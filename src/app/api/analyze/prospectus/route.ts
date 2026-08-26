@@ -1,37 +1,177 @@
 import { NextRequest } from 'next/server';
 import { analyzeProspectus } from '@/lib/prospectusAnalyzer';
 
-const FC_KEY = process.env.FIRECRAWL_API_KEY || '';
+let pdfjs: any = null;
+let Tesseract: any = null;
 
-async function extractTextFromPDF(url: string): Promise<string> {
-    // Use Firecrawl for PDF parsing (handles tables/images)
-    if (FC_KEY) {
+async function getPdfjs() {
+    if (!pdfjs) {
+        pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        try { pdfjs.GlobalWorkerOptions.workerSrc = require?.resolve?.('pdfjs-dist/legacy/build/pdf.worker.min.mjs'); } catch {}
+    }
+    return pdfjs;
+}
+
+async function parsePDFBuffer(buffer: Buffer): Promise<string> {
+    const pdf = await getPdfjs();
+    const loadingTask = pdf.getDocument({ data: new Uint8Array(buffer) });
+    const timeout = setTimeout(() => loadingTask.destroy(), 60000);
+    const doc = await loadingTask.promise;
+    clearTimeout(timeout);
+    let text = '';
+    const maxPages = Math.min(doc.numPages, 100);
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item: any) => item.str).join(' ') + '\n';
+    }
+    text = text.trim();
+    if (text.length > 200) {
+        console.log(`[Prospectus] pdfjs-dist: ${doc.numPages} halaman, ${text.length} chars`);
+        return text;
+    }
+    throw new Error('Teks prospektus terlalu pendek. File mungkin berupa gambar/scan.');
+}
+
+const PAINT_IMAGE_XOBJECT = 85;
+
+async function extractPageImages(doc: any, pageNum: number): Promise<Buffer[]> {
+    const page = await doc.getPage(pageNum);
+    const opList = await page.getOperatorList();
+    const results: Buffer[] = [];
+    for (let i = 0; i < opList.fnArray.length; i++) {
+        if (opList.fnArray[i] !== PAINT_IMAGE_XOBJECT) continue;
         try {
-            const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${FC_KEY}` },
-                body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: false }),
-                signal: AbortSignal.timeout(45000),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    const md = data.data?.markdown || '';
-                    if (md.length > 200) return md;
-                }
+            const obj = await page.objs.get(opList.argsArray[i][0]);
+            if (obj && obj.data?.length > 1000) {
+                const ch = obj.kind === 2 ? 1 : obj.kind === 3 ? 3 : 4;
+                const sharp = (await import('sharp')).default;
+                const png = await sharp(Buffer.from(obj.data), { raw: { width: obj.width, height: obj.height, channels: ch } }).png().toBuffer();
+                if (png.length > 1000) results.push(png);
             }
-        } catch { /* fallback */ }
+        } catch {}
+    }
+    return results;
+}
+
+async function renderPageViaCanvas(doc: any, pageNum: number): Promise<Buffer | null> {
+    const page = await doc.getPage(pageNum);
+    const vp1 = page.getViewport({ scale: 1.0 });
+    let cw = Math.max(1, Math.ceil(vp1.width));
+    let ch = Math.max(1, Math.ceil(vp1.height));
+    if (cw > 4000 || ch > 4000) {
+        const scale = Math.min(4000 / cw, 4000 / ch);
+        const vp2 = page.getViewport({ scale });
+        cw = Math.max(1, Math.ceil(vp2.width));
+        ch = Math.max(1, Math.ceil(vp2.height));
+    }
+    return renderPageViaCanvasAtSize(page, cw, ch);
+}
+
+async function renderPageViaCanvasAtSize(page: any, w: number, h: number): Promise<Buffer | null> {
+    try {
+        const vp = page.getViewport({ scale: 1.0 });
+        // Manually compute needed scale to match target dimensions
+        const scaleX = w / vp.width;
+        const scaleY = h / vp.height;
+        const scale = Math.min(scaleX, scaleY);
+        const scaledVp = page.getViewport({ scale });
+        const cw = Math.max(1, Math.ceil(scaledVp.width));
+        const ch = Math.max(1, Math.ceil(scaledVp.height));
+
+        const { createCanvas } = await import('canvas');
+        const c = createCanvas(cw, ch);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, cw, ch);
+
+        // Try rendering with pdfjs internal render
+        await page.render({ canvasContext: ctx, viewport: scaledVp }).promise;
+        let buf = c.toBuffer('image/png');
+        if (buf.length > 5 * 1024 * 1024) {
+            const sharp = (await import('sharp')).default;
+            buf = await sharp(buf).resize({ width: 1600, fit: 'inside' }).png().toBuffer();
+        }
+        return buf;
+    } catch (e: any) {
+        console.error(`[Prospectus] Canvas render halaman FAIL:`, e.stack?.substring(0, 400));
+        // Fallback: extract images from operator list directly
+        try {
+            const opList = await page.getOperatorList();
+            for (let i = 0; i < opList.fnArray.length; i++) {
+                if (opList.fnArray[i] !== 85) continue;
+                const args = opList.argsArray[i];
+                const imgName = args[0];
+                try {
+                    const obj = await page.objs.get(imgName);
+                    if (obj && obj.data?.length > 1000) {
+                        const imgBuf = Buffer.from(obj.data);
+                        const ch = obj.kind === 2 ? 1 : obj.kind === 3 ? 3 : 4;
+                        const sharp = (await import('sharp')).default;
+                        const png = await sharp(imgBuf, { raw: { width: obj.width, height: obj.height, channels: ch } }).png().toBuffer();
+                        if (png.length > 1000) return png;
+                    }
+                } catch {}
+            }
+        } catch {}
+        return null;
+    }
+}
+
+async function ocrPDFBuffer(buffer: Buffer, onProgress?: (msg: string) => void): Promise<string> {
+    const pdf = await getPdfjs();
+    const doc = await pdf.getDocument({ data: new Uint8Array(buffer) }).promise;
+    const maxPages = Math.min(doc.numPages, 8);
+
+    if (!Tesseract) Tesseract = await import('tesseract.js');
+
+    let fullText = '';
+    for (let i = 1; i <= maxPages; i++) {
+        onProgress?.(`📄 OCR halaman ${i}/${maxPages}...`);
+        console.log(`[Prospectus] OCR halaman ${i}/${maxPages}`);
+
+        let imagesToOcr: Buffer[] = [];
+
+        // Strategy 1: Extract embedded images from operator list (works for scanned PDFs)
+        try {
+            imagesToOcr = await extractPageImages(doc, i);
+            if (imagesToOcr.length > 0) {
+                console.log(`  Found ${imagesToOcr.length} embedded images`);
+            }
+        } catch (e: any) {
+            console.warn(`  extractPageImages gagal: ${e.message}`);
+        }
+
+        // Strategy 2: Render page to canvas (works for text PDFs that need imaging)
+        if (imagesToOcr.length === 0) {
+            const pageImg = await renderPageViaCanvas(doc, i);
+            if (pageImg) imagesToOcr = [pageImg];
+        }
+
+        for (const imgBuf of imagesToOcr) {
+            try {
+                const { data } = await Tesseract.recognize(imgBuf, 'eng+ind', {
+                    logger: (m: any) => m.status === 'recognizing text' && console.log(`  OCR ${Math.round(m.progress * 100)}%`),
+                });
+                if (data?.text?.trim()) {
+                    fullText += data.text.trim() + '\n\n';
+                }
+            } catch (e: any) {
+                console.warn(`  OCR gagal: ${e.message}`);
+            }
+        }
     }
 
-    // Fallback: raw text extraction
+    fullText = fullText.trim();
+    if (fullText.length < 200) throw new Error('OCR gagal — teks terlalu pendek.');
+    console.log(`[Prospectus] OCR: ${doc.numPages} halaman, ${fullText.length} chars`);
+    return fullText;
+}
+
+async function extractTextFromPDF(url: string): Promise<string> {
     const pdfRes = await fetch(url, { signal: AbortSignal.timeout(15000) });
     const buffer = Buffer.from(await pdfRes.arrayBuffer());
-    const text = buffer.toString('utf-8')
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')
-        .replace(/\s+/g, ' ').trim();
-    if (text.length > 200) return text;
-
-    throw new Error('Tidak bisa membaca file. Pastikan file PDF dapat diakses publik.');
+    return await parsePDFBuffer(buffer);
 }
 
 export async function POST(request: NextRequest) {
@@ -53,39 +193,25 @@ export async function POST(request: NextRequest) {
                     fileName = file?.name || 'uploaded.pdf';
                     if (!file) { sendEvent('error', { message: 'File diperlukan' }); controller.close(); return; }
 
-                    sendEvent('progress', { step: 'Mengupload & membaca PDF...', progress: 5, eta: 30 });
+                    sendEvent('progress', { step: '📂 Mengekstrak teks dari PDF via pdfjs...', progress: 5, eta: 30 });
+                    console.log(`[Prospectus] Upload file: ${fileName} (${(file.size / 1024).toFixed(0)} KB)`);
 
-                    // Upload file to a temporary URL for Firecrawl to access
                     const arrayBuffer = await file.arrayBuffer();
-                    const base64 = Buffer.from(arrayBuffer).toString('base64');
-                    const dataUrl = `data:application/pdf;base64,${base64}`;
-
-                    // Extract text from uploaded file buffer
                     const buffer = Buffer.from(arrayBuffer);
-                    content = buffer.toString('utf-8')
-                        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')
-                        .replace(/\s+/g, ' ').trim();
-
-                    // If raw extraction fails (binary PDF), try Firecrawl
-                    if (content.length < 200 && FC_KEY) {
+                    try {
+                        content = await parsePDFBuffer(buffer);
+                        console.log(`[Prospectus] pdfjs-dist: ${content.length} chars`);
+                    } catch (pdfErr: any) {
+                        console.warn(`[Prospectus] pdfjs-dist gagal, coba OCR:`, pdfErr.message);
+                        sendEvent('progress', { step: '🔍 Teks tidak terbaca, mencoba OCR dengan tesseract.js...', progress: 5, eta: 120 });
                         try {
-                            const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${FC_KEY}` },
-                                body: JSON.stringify({
-                                    url: dataUrl,
-                                    formats: ['markdown'],
-                                    onlyMainContent: false,
-                                }),
-                                signal: AbortSignal.timeout(45000),
-                            });
-                            if (res.ok) {
-                                const data = await res.json();
-                                if (data.success && data.data?.markdown?.length > 200) {
-                                    content = data.data.markdown;
-                                }
-                            }
-                        } catch { /* final fallback */ }
+                            content = await ocrPDFBuffer(buffer, (msg) => sendEvent('progress', { step: msg, progress: 20, eta: 90 }));
+                            console.log(`[Prospectus] OCR: ${content.length} chars`);
+                        } catch (ocrErr: any) {
+                            console.error(`[Prospectus] OCR juga gagal:`, ocrErr.message);
+                            sendEvent('error', { message: `Gagal membaca PDF (text & OCR): ${pdfErr.message}` });
+                            controller.close(); return;
+                        }
                     }
                 } else {
                     const body = await request.json();
@@ -94,9 +220,12 @@ export async function POST(request: NextRequest) {
 
                     if (body.text) {
                         content = body.text;
+                        console.log(`[Prospectus] Teks langsung: ${content.length} chars`);
                     } else if (sourceUrl) {
-                        sendEvent('progress', { step: 'Mendownload & membaca PDF...', progress: 5, eta: 40 });
+                        sendEvent('progress', { step: '🌐 Mendownload & membaca PDF dari URL...', progress: 5, eta: 40 });
+                        console.log(`[Prospectus] URL PDF: ${sourceUrl}`);
                         content = await extractTextFromPDF(sourceUrl);
+                        console.log(`[Prospectus] Ekstraksi URL: ${content.length} chars`);
                     } else {
                         sendEvent('error', { message: 'File, URL, atau teks diperlukan' });
                         controller.close(); return;

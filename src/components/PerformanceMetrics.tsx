@@ -69,7 +69,7 @@ export function PerformanceMetrics({ portfolio, prices }: PerformanceMetricsProp
 
     if (!metrics) {
         return (
-            <div className="bg-card p-6 rounded-2xl border-border">
+            <div className="bg-card p-6 rounded-xl border-border">
                 <h3 className="text-lg font-bold text-foreground mb-2">Performance Metrics</h3>
                 <p className="text-sm text-muted-foreground">Tambahkan saham untuk melihat metrics</p>
             </div>
@@ -77,7 +77,7 @@ export function PerformanceMetrics({ portfolio, prices }: PerformanceMetricsProp
     }
 
     return (
-        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-xl shadow-sm border-border">
             <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-primary/10 rounded-xl">
                     <BarChart3 className="w-5 h-5 text-primary" />

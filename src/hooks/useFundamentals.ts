@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-interface FundamentalData {
+export interface FundamentalData {
     ticker: string;
     peRatio: number | null;
     forwardPE: number | null;
@@ -64,6 +64,56 @@ interface FundamentalData {
     hasRealOwnership?: boolean;
     institutionalOwnershipPct?: number;
     dataSource?: string;
+    sharia?: boolean;
+    foreignOwnershipPct?: number;
+    foreignOwnershipStatus?: string;
+    insidersPercentHeld?: number | null;
+    institutionsPercentHeld?: number | null;
+    institutionsFloatPercentHeld?: number | null;
+    institutionsCount?: number | null;
+    sharesOutstanding?: number | null;
+    floatShares?: number | null;
+    incomeStatementHistory?: Array<{
+        period: string;
+        totalRevenue: number | null;
+        costOfRevenue: number | null;
+        grossProfit: number | null;
+        operatingIncome: number | null;
+        preTaxIncome: number | null;
+        taxProvision: number | null;
+        netIncome: number | null;
+        netIncomeCommonStockholders: number | null;
+        dilutedEPS: number | null;
+        basicEPS: number | null;
+        ebitda: number | null;
+        interestExpense: number | null;
+    }>;
+    balanceSheetHistory?: Array<{
+        year: string;
+        totalAssets: number | null;
+        totalCurrentAssets: number | null;
+        totalLiab: number | null;
+        totalCurrentLiabilities: number | null;
+        totalStockholderEquity: number | null;
+        commonStock: number | null;
+        retainedEarnings: number | null;
+        longTermDebt: number | null;
+        shortLongTermDebt: number | null;
+        cash: number | null;
+        inventory: number | null;
+        netReceivables: number | null;
+    }>;
+    cashflowStatementHistory?: Array<{
+        period: string;
+        operatingCashflow: number | null;
+        capitalExpenditures: number | null;
+        freeCashFlow: number | null;
+        investingCashflow: number | null;
+        financingCashflow: number | null;
+        dividendsPaid: number | null;
+        changeToLiabilities: number | null;
+        changeToOperatingActivities: number | null;
+    }>;
 }
 
 export function useFundamentals(ticker: string) {

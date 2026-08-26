@@ -88,7 +88,7 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
 
     if (!analysis) {
         return (
-            <div className="bg-card p-6 rounded-2xl border border-border">
+            <div className="bg-card p-6 rounded-xl border border-border">
                 <h3 className="text-lg font-bold text-foreground mb-2">Holding Period Analysis</h3>
                 <p className="text-sm text-muted-foreground">Tambahkan saham untuk analisis</p>
             </div>
@@ -104,7 +104,7 @@ export function HoldingPeriodAnalysis({ portfolio, transactions, prices }: Holdi
     };
 
     return (
-        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-xl shadow-sm border border-border">
             <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-primary/10 rounded-xl">
                     <Clock className="w-5 h-5 text-primary" />

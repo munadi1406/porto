@@ -106,7 +106,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                         </div>
                         <div style="text-align: right;">
                             <div style="font-size: 22px; font-weight: 700; color: ${prc}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-                                ${isProfit ? '+' : ''}${formatPercentage(gainLossPercent)}
+                                ${formatPercentage(gainLossPercent)}
                             </div>
                             <div style="font-size: 10px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                         </div>
@@ -116,7 +116,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                     <div style="background: linear-gradient(135deg, ${prcl} 0%, #ffffff 80%); border-radius: 20px; padding: 24px 20px; margin-bottom: 24px; text-align: center;">
                         <span style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Return</span>
                         <div style="font-size: 48px; font-weight: 700; color: ${prc}; letter-spacing: -0.03em; line-height: 1.1; margin-top: 6px; font-feature-settings: 'tnum' 1; text-shadow: 0 1px 3px rgba(0,0,0,0.06);">
-                            ${isProfit ? '+' : ''}${formatPercentage(gainLossPercent)}
+                            ${formatPercentage(gainLossPercent)}
                         </div>
                     </div>
 
@@ -238,7 +238,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                     <div style="background: linear-gradient(135deg, ${rclight} 0%, #ffffff 80%); border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; text-align: center;">
                         <span style="font-size: 11px; font-weight: 500; color: ${pal.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Total Return</span>
                         <div style="font-size: 56px; font-weight: 700; color: ${rc}; letter-spacing: -0.03em; line-height: 1.1; margin-top: 8px; font-feature-settings: 'tnum' 1; text-shadow: 0 1px 3px rgba(0,0,0,0.06);">
-                            ${isProfit ? '+' : ''}${formatPercentage(totalReturn)}
+                            ${formatPercentage(totalReturn)}
                         </div>
                     </div>
 
@@ -297,7 +297,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                 </div>
                             </div>
                             <div style="font-size: 13px; font-weight: 600; color: ${isItemProfit ? '#059669' : '#dc2626'}; white-space: nowrap; margin-left: 12px; letter-spacing: -0.01em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-                                ${isItemProfit ? '+' : ''}${formatPercentage(item.gain)}
+                                ${formatPercentage(item.gain)}
                             </div>
                         </div>
                     `;
@@ -397,7 +397,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                             {dailyChangeValue > 0 ? "+" : ""}{formatIDR(dailyChangeValue)}
                                         </div>
                                         <div className={cn("text-[10px]", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
-                                            {dailyChangePercent > 0 ? "+" : ""}{formatPercentage(dailyChangePercent)}
+                                            {formatPercentage(dailyChangePercent)}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right font-semibold">{formatIDR(marketValue)}</TableCell>
@@ -450,14 +450,14 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
                             return (
                                 <TableRow>
-                                    <TableCell className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Total Portofolio</TableCell>
+                                    <TableCell className="card-title">Total Portofolio</TableCell>
                                     <TableCell colSpan={3}></TableCell>
                                     <TableCell className="text-right">
                                         <div className={cn("font-semibold", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
                                             {totals.dayChange > 0 ? "+" : ""}{formatIDR(totals.dayChange)}
                                         </div>
                                         <div className={cn("text-[10px]", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
-                                            {dayChangePercent > 0 ? "+" : ""}{formatPercentage(dayChangePercent)}
+                                            {formatPercentage(dayChangePercent)}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right font-bold">{formatIDR(totals.marketValue)}</TableCell>
@@ -604,12 +604,12 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                                             {formatIDR(target)}
                                                             {isHigh52 && <Badge variant="outline" className="text-[9px] text-warning border-warning/20 uppercase">52W High</Badge>}
                                                         </div>
-                                                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Target Price</div>
+                                                        <div className="card-title">Target Price</div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
                                                     <div className={cn("font-bold", gain >= 0 ? "text-success" : "text-destructive")}>
-                                                        {gain >= 0 ? "+" : ""}{formatPercentage(gain)}
+                                                        {formatPercentage(gain)}
                                                     </div>
                                                     <div className={cn("text-xs font-semibold", gain >= 0 ? "text-success" : "text-destructive")}>
                                                         {gain >= 0 ? "+" : ""}{formatIDR(profitValue)}

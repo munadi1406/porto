@@ -5,7 +5,7 @@ import * as mysql2 from 'mysql2';
 
 // Database credentials (plaintext as requested)
 const sequelize = new Sequelize('dcryptmy_porto', 'dcryptmy_porto', 'I9jR^hLdjMa*I=2h', {
-    host: '195.88.211.226',
+    host: '195.88.211.214',
     dialect: 'mysql',
     dialectModule: mysql2, // Explicitly pass mysql2 to avoid dynamic require issues on Vercel
     logging: false, // Set to console.log to see SQL queries

@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         });
 
         // Calculate growth
-        let growth = { value: 0, percent: 0 };
+        const growth = { value: 0, percent: 0 };
 
         if (snapshots.length >= 2) {
             const first = snapshots[0];

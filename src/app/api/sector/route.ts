@@ -10,7 +10,7 @@ interface SectorCacheItem {
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (sector doesn't change often)
 const cache: Record<string, SectorCacheItem> = {};
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);

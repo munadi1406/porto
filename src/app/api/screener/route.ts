@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
 import { getAllStocks } from '@/lib/screenerStockList';
+import { isSharia } from '@/lib/shariaStocks';
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 interface ScreenerResult {
     ticker: string;
@@ -10,6 +11,7 @@ interface ScreenerResult {
     price: number;
     change: number;
     changePercent: number;
+    sharia: boolean;
     ma20: number;
     ma50: number;
     goldenCross: boolean;
@@ -312,15 +314,17 @@ export async function GET(request: Request) {
                     const keyR = ind.keyResistance || Math.round(price * 1.05);
                     const isSell = ind.signal === 'SELL';
 
+                    const baseTicker = ticker.replace('.JK', '');
                     return {
                         error: false,
                         ticker,
                         data: {
-                            ticker: ticker.replace('.JK', ''),
+                            ticker: baseTicker,
                             name,
                             price,
                             change,
                             changePercent,
+                            sharia: isSharia(baseTicker),
                             ...indicators,
                             entryPrice: realPrice,
                             stopLoss: isSell ? Math.round(keyR * 1.03) : Math.round(keyS * 0.95),

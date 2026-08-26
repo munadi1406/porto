@@ -46,3 +46,14 @@ fix-*.mjs
 fix-*.ps1
 *.txt
 test.txt
+
+# logs
+*.log
+dev.log
+ws-test.log
+
+# firecrawl output
+.firecrawl/
+
+# duplikat skill
+SKILL (1).md

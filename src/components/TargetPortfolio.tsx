@@ -56,7 +56,7 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
     return (
         <div className="space-y-8">
             {/* Target Goal Header Card */}
-            <div className="relative overflow-hidden bg-card p-8 rounded-[2.5rem] border border-border shadow-xl">
+            <div className="relative overflow-hidden bg-card p-8 rounded-xl border border-border shadow-xl">
                 {/* Decorative bg */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
 
@@ -85,13 +85,13 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
                                     value={targetValue}
                                     onChange={(e) => setTargetValue(e.target.value)}
                                     placeholder="Contoh: 100000000"
-                                    className="w-full pl-12 pr-4 py-4 bg-muted/50 border border-border rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-lg"
+                                    className="w-full pl-12 pr-4 py-4 bg-muted/50 border border-border rounded-xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-lg"
                                 />
                             </div>
                             <button
                                 onClick={handleSaveTarget}
                                 disabled={isSaving}
-                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-card bg-foreground text-background rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-border/50"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-card bg-foreground text-background rounded-xl font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-border/50"
                             >
                                 {isSaving ? <span className="animate-spin">◌</span> : <Save className="w-4 h-4" />}
                                 Simpan Target
@@ -116,10 +116,10 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
 
             {/* Progress Visualization */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-card p-8 rounded-3xl border border-border shadow-sm space-y-6">
+                <div className="bg-card p-8 rounded-xl border border-border shadow-sm space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="p-3 bg-success/10 rounded-2xl">
+                            <div className="p-3 bg-success/10 rounded-xl">
                                 <TrendingUp className="w-6 h-6 text-success" />
                             </div>
                             <h3 className="text-xl font-black text-foreground">Estimasi Sisa</h3>
@@ -158,14 +158,14 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
                     </div>
                 </div>
 
-                <div className="bg-primary p-8 rounded-3xl text-primary-foreground shadow-xl relative overflow-hidden group">
+                <div className="bg-primary p-8 rounded-xl text-primary-foreground shadow-xl relative overflow-hidden group">
                     <Rocket className="absolute -bottom-4 -right-4 w-48 h-48 opacity-10 group-hover:scale-110 transition-transform duration-500" />
 
                     <div className="relative space-y-6">
                         <h3 className="text-xl font-black leading-tight">Analisis Pencapaian</h3>
 
                         <div className="space-y-4">
-                            <div className="flex items-start gap-4 p-4 bg-muted/10 rounded-2xl backdrop-blur-sm border border-border/10">
+                            <div className="flex items-start gap-4 p-4 bg-muted/10 rounded-xl backdrop-blur-sm border border-border/10">
                                 <div className="p-2 bg-background/20 rounded-xl">
                                     <CheckCircle2 className="w-5 h-5" />
                                 </div>
@@ -181,7 +181,7 @@ export function TargetPortfolio({ portfolio, prices, cash }: TargetPortfolioProp
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-4 p-4 bg-muted/10 rounded-2xl backdrop-blur-sm border border-border/10">
+                            <div className="flex items-start gap-4 p-4 bg-muted/10 rounded-xl backdrop-blur-sm border border-border/10">
                                 <div className="p-2 bg-background/20 rounded-xl">
                                     <Wallet className="w-5 h-5" />
                                 </div>

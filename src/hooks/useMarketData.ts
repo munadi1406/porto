@@ -2,71 +2,84 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { StockPrice } from "@/lib/types";
+import { useWebSocket } from "./useWebSocket";
 
 interface MarketDataMap {
     [ticker: string]: StockPrice;
 }
 
-// Batch size untuk menghindari rate limit
-const BATCH_SIZE = 3; // Fetch 3 tickers per batch
-const BATCH_DELAY = 200; // 200ms delay between batches
-const REFRESH_INTERVAL = 5000; // 5 seconds for pure real-time updates
+const REFRESH_INTERVAL = 5000;
 
 export function useMarketData(tickers: string[]) {
     const [prices, setPrices] = useState<MarketDataMap>({});
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [useWs, setUseWs] = useState(true);
     const isInitialFetch = useRef(true);
 
-    const fetchPrices = useCallback(async () => {
-        if (tickers.length === 0) {
-            setLoading(false);
-            return;
-        }
+    // WebSocket connection
+    const { connected, prices: wsPrices, subscribe, unsubscribe } = useWebSocket({
+        autoConnect: true,
+        reconnectInterval: 3000,
+        maxReconnectAttempts: 3,
+    });
 
-        // Store initial fetch state before any changes
+    // Update prices from WebSocket
+    useEffect(() => {
+        if (connected && useWs && Object.keys(wsPrices).length > 0) {
+            setPrices((prev) => {
+                const updated = { ...prev };
+                for (const [ticker, data] of Object.entries(wsPrices)) {
+                    updated[ticker] = {
+                        ticker,
+                        price: data.price,
+                        change: data.change,
+                        changePercent: data.changePercent,
+                        name: data.name,
+                        high52w: data.high52w,
+                        lastUpdated: Date.now(),
+                    };
+                }
+                return updated;
+            });
+            setLastUpdated(new Date());
+
+            if (isInitialFetch.current) {
+                isInitialFetch.current = false;
+                setLoading(false);
+            }
+        }
+    }, [wsPrices, connected, useWs]);
+
+    // Subscribe to tickers when they change
+    useEffect(() => {
+        if (connected && useWs && tickers.length > 0) {
+            subscribe(tickers);
+            return () => unsubscribe(tickers);
+        }
+    }, [JSON.stringify(tickers), connected, useWs, subscribe, unsubscribe]);
+
+    // HTTP Fallback — if WebSocket not connected, use polling
+    const fetchPricesHttp = useCallback(async () => {
+        if (tickers.length === 0) return;
         const wasInitialFetch = isInitialFetch.current;
-
-        // Only show loading on initial fetch
-        if (wasInitialFetch) {
-            setLoading(true);
-        }
-
-        const newPrices: MarketDataMap = {};
-
-        // Create unique list of tickers to avoid duplicate requests
-        const uniqueTickers = Array.from(new Set(tickers));
+        if (wasInitialFetch) setLoading(true);
 
         try {
-            // Split tickers into batches to avoid rate limiting
-            const batches: string[][] = [];
-            for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
-                batches.push(uniqueTickers.slice(i, i + BATCH_SIZE));
-            }
+            const uniqueTickers = Array.from(new Set(tickers));
+            const res = await fetch("/api/price-batch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tickers: uniqueTickers }),
+            });
 
-            // Process batches sequentially with delay
-            for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-                const batch = batches[batchIndex];
-
-                // Fetch batch in parallel
-                const promises = batch.map(async (ticker) => {
-                    try {
-                        const res = await fetch(`/api/price?ticker=${ticker}`);
-                        if (!res.ok) return null;
-                        const data = await res.json();
-                        return data;
-                    } catch (err) {
-                        console.error(`Failed to fetch ${ticker}`, err);
-                        return null;
-                    }
-                });
-
-                const results = await Promise.all(promises);
-
-                results.forEach((data) => {
-                    if (data && data.ticker) {
-                        newPrices[data.ticker] = {
-                            ticker: data.ticker,
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success && json.data) {
+                    const newPrices: MarketDataMap = {};
+                    for (const [ticker, data] of Object.entries(json.data) as [string, any][]) {
+                        newPrices[ticker] = {
+                            ticker,
                             price: data.price,
                             change: data.change,
                             changePercent: data.changePercent,
@@ -75,25 +88,13 @@ export function useMarketData(tickers: string[]) {
                             lastUpdated: Date.now(),
                         };
                     }
-                });
-
-                // Add delay between batches (except for the last batch)
-                if (batchIndex < batches.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+                    setPrices((prev) => ({ ...prev, ...newPrices }));
+                    setLastUpdated(new Date());
                 }
             }
-
-            setPrices((prev) => ({ ...prev, ...newPrices }));
-            setLastUpdated(new Date());
-
-            // Mark initial fetch as complete and turn off loading
-            if (wasInitialFetch) {
-                isInitialFetch.current = false;
-                setLoading(false);
-            }
-        } catch (error) {
-            console.error("Error fetching market data", error);
-            // Still set loading to false on error for initial fetch
+        } catch (err) {
+            console.error("Error fetching market data", err);
+        } finally {
             if (wasInitialFetch) {
                 isInitialFetch.current = false;
                 setLoading(false);
@@ -101,19 +102,29 @@ export function useMarketData(tickers: string[]) {
         }
     }, [JSON.stringify(tickers)]);
 
-    // Initial fetch when tickers change
+    // Detect if WebSocket is working, fallback to HTTP if not
     useEffect(() => {
-        fetchPrices();
-    }, [fetchPrices]);
+        if (!connected && useWs) {
+            // Wait 2 seconds for WS to connect, then fallback
+            const timer = setTimeout(() => {
+                if (!connected) {
+                    console.log("[MarketData] WebSocket not available, falling back to HTTP polling");
+                    setUseWs(false);
+                    fetchPricesHttp();
+                }
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [connected, useWs, fetchPricesHttp]);
 
-    // Auto refresh interval - 8 seconds for near real-time updates
+    // HTTP polling fallback interval
     useEffect(() => {
-        const interval = setInterval(() => {
-            fetchPrices();
-        }, REFRESH_INTERVAL);
+        if (useWs && connected) return; // Don't poll if WS is working
 
+        fetchPricesHttp();
+        const interval = setInterval(fetchPricesHttp, REFRESH_INTERVAL);
         return () => clearInterval(interval);
-    }, [fetchPrices]);
+    }, [useWs, connected, fetchPricesHttp]);
 
-    return { prices, loading, lastUpdated, refresh: fetchPrices };
+    return { prices, loading, lastUpdated, refresh: fetchPricesHttp, connected, useWs };
 }

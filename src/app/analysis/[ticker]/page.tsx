@@ -1,22 +1,44 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { analyzeCandlesticks, AnalysisResult } from "@/lib/analysis-utils";
-import { formatIDR, cn } from "@/lib/utils";
-import { ArrowLeft, TrendingUp, TrendingDown, Zap, Target, Rocket, Activity, Brain, BarChart3, Repeat, Users, Building2 } from "lucide-react";
+import { detectChartDrawings, detectChartMarkers } from "@/lib/patternDetection";
+import { formatIDR, cn, formatCompactIDR } from "@/lib/utils";
+import { ArrowLeft, Search, Loader2, ShieldCheck, Building2, Users, Briefcase, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFundamentals } from "@/hooks/useFundamentals";
+import { useCompanyDetail, useTradingDaily, useFinancialStatement } from "@/hooks/useIdxExtended";
+import TechnicalSignals from "@/components/TechnicalSignals";
+import StockStatistics from "@/components/StockStatistics";
+import FundamentalSummary from "@/components/FundamentalSummary";
+import NewsPanel from "@/components/NewsPanel";
+import FinancialReports from "@/components/FinancialReports";
+import ShareholderChart from "@/components/ShareholderChart";
+import ChartPatterns from "@/components/ChartPatterns";
 
 const StockChart = dynamic(() => import("@/components/StockChart"), {
     ssr: false,
     loading: () => (
-        <div className="h-[480px] bg-muted rounded-[2.5rem] flex items-center justify-center">
-            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.4rem]">Initializing Graphics...</p>
+        <div className="h-[400px] flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
-    )
+    ),
 });
+
+type Tab = "overview" | "chart" | "summary" | "financial" | "company" | "news" | "ownership" | "technical";
+
+const TABS: { key: Tab; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "chart", label: "Chart" },
+    { key: "summary", label: "Summary" },
+    { key: "financial", label: "Financials" },
+    { key: "company", label: "Company" },
+    { key: "news", label: "News" },
+    { key: "ownership", label: "Ownership" },
+    { key: "technical", label: "Technical" },
+];
 
 export default function StockAnalysisPage({ params }: { params: Promise<{ ticker: string }> }) {
     const { ticker } = use(params);
@@ -26,420 +48,637 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
     const [data, setData] = useState<any[]>([]);
     const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState("3mo");
-    const [selectedPredictionIndex, setSelectedPredictionIndex] = useState(0);
+    const [period, setPeriod] = useState("1y");
+    const [activeTab, setActiveTab] = useState<Tab>("chart");
 
-    const { data: smartMoney, loading: smartMoneyLoading } = useFundamentals(ticker);
-
-    // Auto redirect: /analysis/BBCA → /analysis/BBCA.JK
-    useEffect(() => {
-        if (ticker && !ticker.includes('.')) {
-            router.replace(`/analysis/${ticker}.JK`);
-        }
-    }, [ticker]);
-
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            let ticker = searchQuery.trim().toUpperCase();
-            if (!ticker.includes('.')) ticker += '.JK';
-            router.push(`/analysis/${ticker}`);
-            setSearchQuery("");
-        }
-    };
+    const { data: smartMoney } = useFundamentals(ticker);
+    const companyCode = ticker.replace('.JK', '');
+    const { data: companyDetail } = useCompanyDetail(companyCode);
+    const { data: tradingDaily } = useTradingDaily(companyCode);
+    const { data: idxFinancial } = useFinancialStatement(companyCode);
 
     useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const res = await fetch(`/api/stocks/history?ticker=${ticker}&period=${period}&interval=1d`);
-                const json = await res.json();
-
-                if (json.success && json.data && json.data.length > 0) {
+        if (!ticker) return;
+        setLoading(true);
+        fetch(`/api/stocks/history?ticker=${ticker}&period=${period}&interval=1d`)
+            .then((r) => r.json())
+            .then((json) => {
+                if (json.success && json.data?.length > 0) {
                     setData(json.data);
                     setAnalysis(analyzeCandlesticks(json.data));
                 } else {
                     setData([]);
                     setAnalysis(null);
                 }
-            } catch (err) {
-                console.error("Failed to fetch history:", err);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchData();
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
     }, [ticker, period]);
 
-    const activePrediction = analysis?.predictions[selectedPredictionIndex];
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            let t = searchQuery.trim().toUpperCase();
+            if (!t.includes(".")) t += ".JK";
+            router.push(`/analysis/${t}`);
+            setSearchQuery("");
+        }
+    };
 
-    const smStatus = smartMoney?.foreignAccumulationStatus || '';
-    const smIsBuy = smStatus === 'Akumulasi';
-    const smIsSell = smStatus === 'Distribusi';
+    const lastCandle = data.length > 0 ? data[data.length - 1] : null;
+    const currentPrice = smartMoney?.currentPrice ?? lastCandle?.close ?? 0;
+    const changePercent = smartMoney?.priceChangePercent ?? 0;
+    const isUp = changePercent >= 0;
+
+    // Deteksi pola chart untuk digambar langsung di chart (pakai data period terpilih, default 1 tahun)
+    const chartDrawings = useMemo(() => detectChartDrawings(data), [data]);
+    const chartMarkers = useMemo(() => detectChartMarkers(data), [data]);
+
+    const periodMap: Record<string, string> = {
+        "1D": "1d", "1W": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", "1Y": "1y", "5Y": "5y",
+    };
 
     return (
-        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6 min-h-screen bg-background text-foreground">
-            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 text-left">
-                    <div className="flex items-center gap-4">
-                        <Link href="/" className="p-2 border border-border rounded-xl hover:bg-muted transition-colors">
-                            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                        </Link>
-                        <div>
-                            <h1 className="text-2xl font-black text-foreground uppercase tracking-tight">{ticker}</h1>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Multi-Model engine v7.0</p>
-                        </div>
+        <div className="space-y-4">
+            {/* Breadcrumb */}
+            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Link href="/" className="hover:text-foreground transition-colors">Market</Link>
+                <span>/</span>
+                <span className="text-foreground font-medium">{ticker.replace(".JK", "")}</span>
+            </nav>
+
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                        <h1 className="text-2xl font-bold text-foreground">{ticker.replace(".JK", "")}</h1>
+                        {smartMoney?.sharia && (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-success/10 text-success text-[10px] font-bold rounded">
+                                <ShieldCheck className="w-3 h-3" /> Syariah
+                            </span>
+                        )}
                     </div>
-
-                    <form onSubmit={handleSearch} className="flex-1 max-w-xs">
-                        <input
-                            type="text"
-                            placeholder="Ticker (e.g. TLKM)..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full px-4 py-2 bg-muted border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        />
-                    </form>
+                    {smartMoney?.sector && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                            <span>{smartMoney.sector}</span>
+                            {smartMoney?.industry && <><span>·</span><span>{smartMoney.industry}</span></>}
+                        </div>
+                    )}
+                    {currentPrice > 0 && (
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-3xl font-bold text-foreground tabular-nums">Rp {currentPrice.toLocaleString("id-ID")}</span>
+                            <span className={cn("text-lg font-bold", isUp ? "text-success" : "text-destructive")}>
+                                {isUp ? "+" : ""}{(changePercent * 100).toFixed(2)}%
+                            </span>
+                        </div>
+                    )}
                 </div>
+                {lastCandle && (
+                    <div className="flex gap-6 text-xs">
+                        <div><p className="text-muted-foreground mb-0.5">Open</p><p className="font-bold text-foreground tabular-nums">{(lastCandle.open || 0).toLocaleString("id-ID")}</p></div>
+                        <div><p className="text-muted-foreground mb-0.5">High</p><p className="font-bold text-success tabular-nums">{(lastCandle.high || 0).toLocaleString("id-ID")}</p></div>
+                        <div><p className="text-muted-foreground mb-0.5">Low</p><p className="font-bold text-destructive tabular-nums">{(lastCandle.low || 0).toLocaleString("id-ID")}</p></div>
+                        <div><p className="text-muted-foreground mb-0.5">Volume</p><p className="font-bold text-foreground tabular-nums">{formatCompactIDR(lastCandle.volume || 0).replace("Rp", "")}</p></div>
+                    </div>
+                )}
+            </div>
 
-                <div className="flex items-center gap-2 bg-muted p-1 rounded-xl border border-border">
-                    {['1mo', '3mo', '6mo', '1y'].map((p) => (
+            <div className="space-y-4">
+                <div className="flex gap-1 overflow-x-auto">
+                    {["1D", "1W", "1M", "3M", "6M", "1Y", "5Y"].map((p) => (
                         <button
                             key={p}
-                            onClick={() => setPeriod(p)}
+                            onClick={() => setPeriod(periodMap[p] || "3mo")}
                             className={cn(
-                                "px-3 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all",
-                                period === p ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground"
+                                "px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
+                                period === (periodMap[p] || "3mo")
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-muted"
                             )}
                         >
                             {p}
                         </button>
                     ))}
                 </div>
-            </header>
 
-            {loading ? (
-                <div className="h-[480px] bg-muted rounded-[2.5rem] border border-border/50 p-6 animate-pulse flex items-center justify-center">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.4rem]">Calculating Models...</p>
-                </div>
-            ) : data.length === 0 ? (
-                <div className="h-[480px] bg-muted rounded-[2.5rem] border border-border/10 p-6 flex items-center justify-center">
-                    <p className="text-xs font-black uppercase text-muted-foreground tracking-widest">No market data discovered for {ticker}</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-700">
-                    <div className="lg:col-span-8 space-y-4">
-                        <div className="bg-card rounded-[2.5rem] border border-border shadow-2xl overflow-hidden relative group">
-                            <StockChart
-                                data={data}
-                                markers={analysis?.markers || []}
-                                prediction={activePrediction?.data || []}
-                                buyPrice={analysis?.levels.dayTrade.buy}
-                                maLines={analysis?.maLines}
-                            />
-
-                            <div className="absolute top-4 left-6 pointer-events-none flex items-center gap-3">
-                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] group-hover:text-primary/40 transition-colors">{activePrediction?.name || 'Neural Terminal'}</span>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-primary" />
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase">MA20</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-destructive" />
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase">MA50</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {['scalping', 'dayTrade', 'swing'].map((type) => {
-                                const level = (analysis?.levels as any)?.[type];
-                                const icons: any = { scalping: <Zap />, dayTrade: <Target />, swing: <Rocket /> };
-                                const colors: any = { scalping: 'text-warning', dayTrade: 'text-primary', swing: 'text-primary' };
-                                return (
-                                    <div key={type} className="bg-muted/40 p-5 rounded-3xl border border-border flex flex-col items-center group hover:bg-muted/60 transition-all">
-                                        <div className="flex items-center gap-2 mb-2 opacity-50 group-hover:opacity-100 uppercase text-[10px] font-black">
-                                            <span className={colors[type]}>{icons[type]}</span>
-                                            <span className="text-muted-foreground">{type.replace(/([A-Z])/g, ' $1')}</span>
-                                        </div>
-                                        <div className="text-base font-black text-foreground">{formatIDR(level?.buy || 0)}</div>
-                                        <div className="text-[9px] font-bold text-success mt-1 uppercase">TP: {formatIDR(level?.target || 0)}</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                {lastCandle && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>O <b className="text-foreground">{lastCandle.open?.toLocaleString("id-ID")}</b></span>
+                        <span>H <b className="text-foreground">{lastCandle.high?.toLocaleString("id-ID")}</b></span>
+                        <span>L <b className="text-foreground">{lastCandle.low?.toLocaleString("id-ID")}</b></span>
+                        <span>C <b className="text-foreground">{lastCandle.close?.toLocaleString("id-ID")}</b></span>
+                        {analysis && analysis.indicators.ma20 > 0 && <span>MA20 <b className="text-chart-3">{analysis.indicators.ma20.toLocaleString("id-ID")}</b></span>}
+                        {analysis && analysis.indicators.ma50 > 0 && <span>MA50 <b className="text-chart-1">{analysis.indicators.ma50.toLocaleString("id-ID")}</b></span>}
+                        <span className="ml-auto">Vol <b className="text-foreground">{formatCompactIDR(lastCandle.volume || 0).replace("Rp", "")}</b></span>
                     </div>
+                )}
 
-                    <div className="lg:col-span-4 space-y-6">
-                        <div className={cn(
-                            "p-6 rounded-[2.5rem] border overflow-hidden relative transition-all duration-700",
-                            analysis?.recommendation.includes('BUY') ? "bg-success/5 border-success/20 shadow-lg shadow-success/10" :
-                                analysis?.recommendation.includes('SELL') ? "bg-destructive/5 border-destructive/20 shadow-lg shadow-destructive/10" :
-                                    "bg-muted/10 border-border"
-                        )}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground text-left">Master Signal</h3>
-                                <div className={cn(
-                                    "p-2.5 rounded-xl",
-                                    analysis?.recommendation.includes('BUY') ? "bg-success/20 text-success" :
-                                        analysis?.recommendation.includes('SELL') ? "bg-destructive/20 text-destructive" :
-                                            "bg-muted text-muted-foreground"
-                                )}>
-                                    {analysis?.recommendation.includes('BUY') ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                                </div>
-                            </div>
-                            <div className="space-y-1 text-left">
-                                <div className={cn(
-                                    "text-5xl font-black italic uppercase tracking-tighter transition-all duration-500",
-                                    analysis?.recommendation.includes('STRONG_BUY') ? "text-success" :
-                                        analysis?.recommendation.includes('BUY') ? "text-success" :
-                                            analysis?.recommendation.includes('STRONG_SELL') ? "text-destructive" :
-                                                analysis?.recommendation.includes('SELL') ? "text-destructive" :
-                                                    "text-muted-foreground"
-                                )}>
-                                    {analysis?.recommendation.replace('_', ' ')}
-                                </div>
-                                <p className="text-xs font-bold text-muted-foreground leading-relaxed mt-4 bg-muted/5 p-4 rounded-3xl border border-border/5 shadow-inner">
-                                    {analysis?.advice}
-                                </p>
-                            </div>
+                {/* Legend pola chart */}
+                {chartDrawings.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
+                        {[
+                            ["sr-zone", "RANGE", "#6366f1"],
+                            ["support", "SUPPORT", "#0eaa68"],
+                            ["resistance", "RESISTANCE", "#df4b61"],
+                            ["trendline-up", "UPTREND", "#14b8a6"],
+                            ["trendline-down", "DOWNTREND", "#eaa82e"],
+                            ["neckline", "NECKLINE", "#a967ff"],
+                            ["target", "TARGET", "#10b981"],
+                        ]
+                            .filter(([k]) => chartDrawings.some(d => d.id.startsWith(k)))
+                            .map(([k, label, color]) => (
+                                <span key={k} className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
+                                    {label}
+                                </span>
+                            ))}
+                    </div>
+                )}
+
+                <div className="card p-0 overflow-hidden">
+                    {loading ? (
+                        <div className="h-[400px] flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-primary animate-spin" />
                         </div>
+                    ) : data.length === 0 ? (
+                        <div className="h-[400px] flex items-center justify-center text-sm text-muted-foreground">
+                            Tidak ada data harga
+                        </div>
+                    ) : (
+                        <StockChart
+                            data={data}
+                            markers={analysis?.markers || []}
+                            prediction={[]}
+                            buyPrice={analysis?.levels.dayTrade.buy}
+                            maLines={analysis?.maLines}
+                            drawings={chartDrawings}
+                            patternMarkers={chartMarkers}
+                        />
+                    )}
+                </div>
 
-                        {/* Volume Flow Analysis */}
-                        {analysis?.volume && (
-                            <div className="bg-card p-6 rounded-[2.5rem] border border-border shadow-2xl space-y-5">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2rem] text-muted-foreground flex items-center gap-2 text-left">
-                                    <BarChart3 className="w-4 h-4 text-primary" /> Volume Flow
-                                </h3>
-
-                                <div className={cn(
-                                    "p-4 rounded-2xl border flex items-center gap-3",
-                                    analysis.volume.signal === 'ACCUMULATION' ? "bg-success/10 border-success/20" :
-                                    analysis.volume.signal === 'DISTRIBUTION' ? "bg-destructive/10 border-destructive/20" :
-                                    "bg-muted/5 border-border/30"
-                                )}>
-                                    <div className={cn(
-                                        "p-1.5 rounded-lg",
-                                        analysis.volume.signal === 'ACCUMULATION' ? "bg-success/20" :
-                                        analysis.volume.signal === 'DISTRIBUTION' ? "bg-destructive/20" : "bg-muted"
-                                    )}>
-                                        <TrendingUp className={cn(
-                                            "w-4 h-4",
-                                            analysis.volume.signal === 'ACCUMULATION' ? "text-success" :
-                                            analysis.volume.signal === 'DISTRIBUTION' ? "text-destructive" : "text-muted-foreground"
-                                        )} />
-                                    </div>
-                                    <div>
-                                        <p className={cn(
-                                            "text-xs font-black uppercase tracking-wider",
-                                            analysis.volume.signal === 'ACCUMULATION' ? "text-success" :
-                                            analysis.volume.signal === 'DISTRIBUTION' ? "text-destructive" : "text-muted-foreground"
-                                        )}>
-                                            {analysis.volume.signal === 'ACCUMULATION' ? 'Strong Accumulation' :
-                                             analysis.volume.signal === 'DISTRIBUTION' ? 'Distribution in Progress' : 'Neutral Flow'}
-                                        </p>
-                                        <p className="text-[9px] font-medium text-muted-foreground mt-0.5 leading-snug">
-                                            Score: {analysis.volume.score > 0 ? '+' : ''}{analysis.volume.score} &middot;
-                                            OBV: {analysis.volume.obvTrend === 'UP' ? 'Rising' : analysis.volume.obvTrend === 'DOWN' ? 'Falling' : 'Flat'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 bg-muted/40 rounded-2xl border border-border/50">
-                                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-wider mb-1">MFI</p>
-                                        <p className={cn(
-                                            "text-sm font-black",
-                                            analysis.volume.mfioversold ? "text-success" :
-                                            analysis.volume.mfioverbought ? "text-destructive" : "text-foreground"
-                                        )}>
-                                            {analysis.volume.mfi}
-                                        </p>
-                                        <p className="text-[7px] font-bold text-muted-foreground uppercase mt-0.5">
-                                            {analysis.volume.mfioversold ? 'Oversold' : analysis.volume.mfioverbought ? 'Overbought' : 'Neutral'}
-                                        </p>
-                                    </div>
-                                    <div className="p-3 bg-muted/40 rounded-2xl border border-border/50">
-                                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-wider mb-1">Volume</p>
-                                        <div className="flex items-center gap-1.5">
-                                            {analysis.volume.volumeSurge ? (
-                                                <Zap className={cn("w-3.5 h-3.5", analysis.volume.obvTrend === 'UP' ? "text-success" : "text-destructive")} />
-                                            ) : (
-                                                <Activity className="w-3.5 h-3.5 text-muted-foreground" />
-                                            )}
-                                            <p className={cn(
-                                                "text-sm font-black",
-                                                analysis.volume.volumeSurge ? (
-                                                    analysis.volume.obvTrend === 'UP' ? "text-success" : "text-destructive"
-                                                ) : "text-foreground"
-                                            )}>
-                                                {analysis.volume.volumeSurge ? 'Surge' : 'Normal'}
-                                            </p>
-                                        </div>
-                                        <p className="text-[7px] font-bold text-muted-foreground uppercase mt-0.5">+{analysis.volume.obvTrend === 'UP' ? 'Bullish' : analysis.volume.obvTrend === 'DOWN' ? 'Bearish' : 'Flat'} OBV</p>
-                                    </div>
-                                </div>
-
-                                {analysis.volume.keySupport > 0 && analysis.volume.keyResistance > 0 && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="p-3 bg-success/5 rounded-2xl border border-success/20">
-                                            <p className="text-[8px] font-black text-success uppercase tracking-wider mb-1">Key Support</p>
-                                            <p className="text-sm font-black text-success">
-                                                {formatIDR(analysis.volume.keySupport)}
-                                            </p>
-                                        </div>
-                                        <div className="p-3 bg-destructive/5 rounded-2xl border border-destructive/20">
-                                            <p className="text-[8px] font-black text-destructive uppercase tracking-wider mb-1">Key Resistance</p>
-                                            <p className="text-sm font-black text-destructive">
-                                                {formatIDR(analysis.volume.keyResistance)}
-                                            </p>
-                                        </div>
-                                    </div>
+                {/* Tabs */}
+                <div className="border-b border-border">
+                    <div className="flex gap-0 overflow-x-auto scrollbar-hide">
+                        {TABS.map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveTab(tab.key)}
+                                className={cn(
+                                    "px-4 py-2.5 text-xs font-bold whitespace-nowrap border-b-2 transition-colors",
+                                    activeTab === tab.key
+                                        ? "border-foreground text-foreground"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
                                 )}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                                <div className="flex items-center gap-2 text-[8px] font-bold text-muted-foreground/60 uppercase tracking-wider justify-center">
-                                    <span>Chaikin A/D</span>
-                                    <div className={cn(
-                                        "px-1.5 py-0.5 rounded text-[8px] font-black",
-                                        analysis.volume.score > 0 ? "bg-success/10 text-success" :
-                                        analysis.volume.score < 0 ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
-                                    )}>
-                                        {analysis.volume.score > 0 ? 'Bullish' : analysis.volume.score < 0 ? 'Bearish' : 'Flat'}
+                {/* Overview tab */}
+                {activeTab === "overview" && (
+                    <div className="space-y-6">
+                        {/* Key Metrics */}
+                        {smartMoney && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {[
+                                    { label: "Market Cap", value: smartMoney.marketCap ? `Rp ${formatCompactIDR(smartMoney.marketCap)}` : "-" },
+                                    { label: "PER (TTM)", value: smartMoney.peRatio ? `${smartMoney.peRatio.toFixed(1)}x` : "-" },
+                                    { label: "PBV", value: smartMoney.pbRatio ? `${smartMoney.pbRatio.toFixed(1)}x` : "-" },
+                                    { label: "ROE (TTM)", value: smartMoney.roe ? `${smartMoney.roe.toFixed(1)}%` : "-" },
+                                    { label: "EPS (TTM)", value: smartMoney.trailingEps ? `Rp ${smartMoney.trailingEps.toLocaleString("id-ID")}` : "-" },
+                                    { label: "Dividend Yield", value: smartMoney.dividendYield ? `${smartMoney.dividendYield.toFixed(1)}%` : "-" },
+                                    { label: "52W High", value: smartMoney.fiftyTwoWeekHigh ? `Rp ${smartMoney.fiftyTwoWeekHigh.toLocaleString("id-ID")}` : "-" },
+                                    { label: "52W Low", value: smartMoney.fiftyTwoWeekLow ? `Rp ${smartMoney.fiftyTwoWeekLow.toLocaleString("id-ID")}` : "-" },
+                                ].map(m => (
+                                    <div key={m.label} className="bg-card border border-border rounded-lg p-3">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">{m.label}</p>
+                                        <p className="text-sm font-bold text-foreground tabular-nums">{m.value}</p>
                                     </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Smart Money Flow — real data from IDX */}
-                        {smartMoney && (smartMoney.dataSource === 'yahoo_institutions' || smartMoney.dataSource === 'idx' || smartMoney.dataSource === 'firecrawl') && (
-                            <div className="bg-card p-6 rounded-[2.5rem] border border-border shadow-2xl space-y-5">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2rem] text-muted-foreground flex items-center gap-2 text-left">
-                                    <Users className="w-4 h-4 text-warning" /> Smart Money Flow
-                                </h3>
-
-                                <div className={cn(
-                                    "p-4 rounded-2xl border flex items-center gap-3",
-                                    smIsBuy ? "bg-success/10 border-success/20" :
-                                    smIsSell ? "bg-destructive/10 border-destructive/20" :
-                                    "bg-muted/5 border-border/30"
-                                )}>
-                                    <div className={cn(
-                                        "p-1.5 rounded-lg",
-                                        smIsBuy ? "bg-success/20" : smIsSell ? "bg-destructive/20" : "bg-muted"
-                                    )}>
-                                        <TrendingUp className={cn(
-                                            "w-4 h-4",
-                                            smIsBuy ? "text-success" : smIsSell ? "text-destructive" : "text-muted-foreground"
-                                        )} />
-                                    </div>
-                                    <div>
-                                        <p className={cn(
-                                            "text-xs font-black uppercase tracking-wider",
-                                            smIsBuy ? "text-success" : smIsSell ? "text-destructive" : "text-muted-foreground"
-                                        )}>
-                                            {smartMoney.smartMoneyPhase || 'Neutral'}
-                                        </p>
-                                        <p className="text-[9px] font-medium text-muted-foreground mt-0.5 leading-snug">
-                                            {smartMoney.smartMoneyDescription}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Foreign Flow */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-3 bg-success/5 rounded-2xl border border-success/20">
-                                        <p className="text-[8px] font-black text-success uppercase tracking-wider mb-1">Foreign Buy</p>
-                                        <p className="text-sm font-black text-success">
-                                            Rp{(smartMoney.foreignBuyValue / 1e9).toFixed(1)}M
-                                        </p>
-                                    </div>
-                                    <div className="p-3 bg-destructive/5 rounded-2xl border border-destructive/20">
-                                        <p className="text-[8px] font-black text-destructive uppercase tracking-wider mb-1">Foreign Sell</p>
-                                        <p className="text-sm font-black text-destructive">
-                                            Rp{(smartMoney.foreignSellValue / 1e9).toFixed(1)}M
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Top Brokers */}
-                                {smartMoney.topBuyBrokers?.length > 0 && (
-                                    <div>
-                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2">Top Net Buy Brokers</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {smartMoney.topBuyBrokers.slice(0, 5).map((b: any, i: number) => (
-                                                <span key={i} className="px-2 py-0.5 bg-success/10 border border-success/20 rounded text-[9px] font-bold text-success font-mono">{b.code || b.name?.substring(0, 4).toUpperCase() || b}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {smartMoney.topSellBrokers?.length > 0 && (
-                                    <div>
-                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mb-2">Top Net Sell Brokers</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {smartMoney.topSellBrokers.slice(0, 5).map((b: any, i: number) => (
-                                                <span key={i} className="px-2 py-0.5 bg-destructive/10 border border-destructive/20 rounded text-[9px] font-bold text-destructive font-mono">{b.code || b.name?.substring(0, 4).toUpperCase() || b}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-2 text-[8px] font-bold text-muted-foreground/60 uppercase tracking-wider justify-center">
-                                    <Building2 className="w-3 h-3" />
-                                    <span>Data dari Yahoo Finance</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Forecast Selector */}
-                        <div className="bg-card p-6 rounded-[2.5rem] border border-border shadow-2xl space-y-4">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2rem] text-muted-foreground mb-4 flex items-center gap-2 text-left">
-                                <Activity className="w-4 h-4 text-success" /> Model Selection
-                            </h3>
-                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                                {analysis?.predictions.map((p, i) => (
-                                    <button
-                                        key={p.name}
-                                        onClick={() => setSelectedPredictionIndex(i)}
-                                        className={cn(
-                                            "flex flex-col items-center p-3 rounded-2xl border transition-all min-w-[90px]",
-                                            selectedPredictionIndex === i ? "bg-primary/10 border-primary/40" : "bg-muted border-border grayscale hover:grayscale-0"
-                                        )}
-                                    >
-                                        <span className={cn("p-2 rounded-lg mb-2", selectedPredictionIndex === i ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-                                            {i === 0 ? <Brain className="w-4 h-4" /> : i === 1 ? <BarChart3 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-                                        </span>
-                                        <span className="text-[8px] font-black uppercase text-center">{p.name.split(' ')[0]}</span>
-                                    </button>
                                 ))}
                             </div>
+                        )}
 
-                            {activePrediction && (
-                                <div className="p-4 bg-muted/5 rounded-2xl border border-border/5 text-left animate-in slide-in-from-right-4 duration-300">
-                                    <h4 className="text-[10px] font-black text-primary uppercase mb-1">{activePrediction.name}</h4>
-                                    <p className="text-[9px] font-medium text-muted-foreground leading-normal">{activePrediction.description}</p>
+                        {/* About */}
+                        {smartMoney && (
+                            <div className="bg-card border border-border rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="card-title">About {ticker.replace(".JK", "")}</h3>
                                 </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    {smartMoney.sector && <div><span className="text-muted-foreground">Sector: </span><span className="font-medium text-foreground">{smartMoney.sector}</span></div>}
+                                    {smartMoney.industry && <div><span className="text-muted-foreground">Industry: </span><span className="font-medium text-foreground">{smartMoney.industry}</span></div>}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Chart preview */}
+                        <div className="card-flush">
+                            <div className="px-4 py-3 border-b border-border">
+                                <h3 className="card-title">Price Chart</h3>
+                            </div>
+                            {loading ? (
+                                <div className="h-[300px] flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
+                            ) : data.length > 0 ? (
+                                <StockChart data={data} markers={analysis?.markers || []} prediction={[]} buyPrice={analysis?.levels.dayTrade.buy} maLines={analysis?.maLines} drawings={chartDrawings} />
+                            ) : (
+                                <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">Tidak ada data harga</div>
                             )}
+                        </div>
 
-                            <div className="space-y-2.5 pt-2">
-                                {activePrediction?.data.map((p, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3.5 bg-muted/40 rounded-2xl border border-border/50 group hover:border-primary/40 transition-all">
-                                        <div className="flex flex-col text-left">
-                                            <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter">{new Date(p.time * 1000).toLocaleDateString('id-ID', { weekday: 'long' })}</span>
-                                            <span className="text-[9px] font-bold text-muted-foreground">{new Date(p.time * 1000).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}</span>
-                                        </div>
-                                        <div className="text-base font-black text-primary group-hover:scale-105 transition-transform tracking-tight">
-                                            {formatIDR(p.value).replace('Rp', '')}
-                                        </div>
+                        {/* Financial summary */}
+                        {smartMoney && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-card border border-border rounded-lg p-4">
+                                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Valuation</h3>
+                                    <div className="space-y-2">
+                                        {smartMoney.peRatio && <div className="flex justify-between text-xs"><span className="text-muted-foreground">P/E Ratio</span><span className="font-bold text-foreground">{smartMoney.peRatio.toFixed(1)}x</span></div>}
+                                        {smartMoney.pbRatio && <div className="flex justify-between text-xs"><span className="text-muted-foreground">P/B Ratio</span><span className="font-bold text-foreground">{smartMoney.pbRatio.toFixed(1)}x</span></div>}
+                                        {smartMoney.psRatio && <div className="flex justify-between text-xs"><span className="text-muted-foreground">P/S Ratio</span><span className="font-bold text-foreground">{smartMoney.psRatio.toFixed(1)}x</span></div>}
+                                    </div>
+                                </div>
+                                <div className="bg-card border border-border rounded-lg p-4">
+                                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Profitability</h3>
+                                    <div className="space-y-2">
+                                        {smartMoney.roe && <div className="flex justify-between text-xs"><span className="text-muted-foreground">ROE</span><span className="font-bold text-foreground">{smartMoney.roe.toFixed(1)}%</span></div>}
+                                        {smartMoney.roa && <div className="flex justify-between text-xs"><span className="text-muted-foreground">ROA</span><span className="font-bold text-foreground">{smartMoney.roa.toFixed(1)}%</span></div>}
+                                        {smartMoney.profitMargin && <div className="flex justify-between text-xs"><span className="text-muted-foreground">Net Margin</span><span className="font-bold text-foreground">{smartMoney.profitMargin.toFixed(1)}%</span></div>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === "chart" && (
+                    <div className="space-y-4">
+                        {analysis && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {[
+                                    { label: "RSI (14)", value: analysis.indicators.rsi.toFixed(1), color: analysis.indicators.rsi > 70 ? "text-danger" : analysis.indicators.rsi < 30 ? "text-success" : "" },
+                                    { label: "MACD", value: analysis.indicators.macd.histogram.toFixed(2), color: analysis.indicators.macd.histogram > 0 ? "text-success" : "text-danger" },
+                                    { label: "Signal", value: analysis.recommendation.replace("_", " "), color: analysis.recommendation.includes("BUY") ? "text-success" : analysis.recommendation.includes("SELL") ? "text-danger" : "text-warning" },
+                                    { label: "Trend", value: analysis.indicators.trend, color: analysis.indicators.trend === "UP" ? "text-success" : analysis.indicators.trend === "DOWN" ? "text-danger" : "text-muted-foreground" },
+                                ].map((item) => (
+                                    <div key={item.label} className="card text-center py-3">
+                                        <p className="text-[10px] text-muted-foreground uppercase mb-1">{item.label}</p>
+                                        <p className={cn("text-sm font-bold uppercase", item.color)}>{item.value}</p>
                                     </div>
                                 ))}
                             </div>
+                        )}
+
+                        <div className="card">
+                            <h3 className="text-sm font-semibold mb-3">Sinyal Teknikal</h3>
+                            <TechnicalSignals analysis={analysis} />
+                        </div>
+
+                        <div className="card">
+                            <h3 className="text-sm font-semibold mb-3">Pola Chart</h3>
+                            <ChartPatterns data={data} />
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+
+                {activeTab === "summary" && (
+                    <div className="space-y-4">
+                        {smartMoney && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-3">Statistik</h3>
+                                <StockStatistics data={smartMoney} />
+                            </div>
+                        )}
+
+                        {smartMoney && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-3">Fundamental</h3>
+                                <FundamentalSummary data={smartMoney} />
+                            </div>
+                        )}
+
+                        {/* Broker Summary per Ticker */}
+                        {smartMoney && ((smartMoney as any).topBuyBrokers?.length > 0 || (smartMoney as any).topSellBrokers?.length > 0) && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-3">Broker Summary ({ticker.replace('.JK', '')})</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <TrendingUp className="w-4 h-4 text-success" />
+                                            <span className="text-[10px] font-black text-success uppercase tracking-wider">Top Net Buy</span>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            {(smartMoney as any).topBuyBrokers?.slice(0, 8).map((b: string, i: number) => (
+                                                <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-b-0">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}</span>
+                                                        <span className="text-xs font-semibold text-foreground truncate">{b}</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-success flex-shrink-0">BUY</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <TrendingDown className="w-4 h-4 text-destructive" />
+                                            <span className="text-[10px] font-black text-destructive uppercase tracking-wider">Top Net Sell</span>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            {(smartMoney as any).topSellBrokers?.slice(0, 8).map((b: string, i: number) => (
+                                                <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-b-0">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}</span>
+                                                        <span className="text-xs font-semibold text-foreground truncate">{b}</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-destructive flex-shrink-0">SELL</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {analysis && analysis.volume.keySupport > 0 && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-3">Support & Resistance</h3>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-success font-bold">Support</span>
+                                        <span className="font-mono">{formatIDR(analysis.volume.keySupport)}</span>
+                                    </div>
+                                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                                        <div className="absolute inset-y-0 left-0 bg-success/30 rounded-full" style={{ width: "45%" }} />
+                                        <div className="absolute inset-y-0 right-0 bg-danger/30 rounded-full" style={{ width: "55%" }} />
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-danger font-bold">Resistance</span>
+                                        <span className="font-mono">{formatIDR(analysis.volume.keyResistance)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {analysis && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-3">Analisis Volume</h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="text-center py-2 bg-muted/50 rounded-lg">
+                                        <p className="text-[10px] text-muted-foreground">Signal</p>
+                                        <p className={cn("text-sm font-bold",
+                                            analysis.volume.signal === "ACCUMULATION" ? "text-success" :
+                                            analysis.volume.signal === "DISTRIBUTION" ? "text-danger" : "text-muted-foreground"
+                                        )}>{analysis.volume.signal}</p>
+                                    </div>
+                                    <div className="text-center py-2 bg-muted/50 rounded-lg">
+                                        <p className="text-[10px] text-muted-foreground">MFI</p>
+                                        <p className={cn("text-sm font-bold",
+                                            analysis.volume.mfi > 70 ? "text-danger" :
+                                            analysis.volume.mfi < 30 ? "text-success" : ""
+                                        )}>{analysis.volume.mfi}</p>
+                                    </div>
+                                    <div className="text-center py-2 bg-muted/50 rounded-lg">
+                                        <p className="text-[10px] text-muted-foreground">OBV Trend</p>
+                                        <p className="text-sm font-bold">{analysis.volume.obvTrend}</p>
+                                    </div>
+                                    <div className="text-center py-2 bg-muted/50 rounded-lg">
+                                        <p className="text-[10px] text-muted-foreground">Volume Surge</p>
+                                        <p className={cn("text-sm font-bold", analysis.volume.volumeSurge ? "text-warning" : "")}>
+                                            {analysis.volume.volumeSurge ? "Ya" : "Tidak"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {analysis && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-2">Rekomendasi</h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{analysis.advice}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === "financial" && <FinancialReports data={smartMoney} idxData={idxFinancial} code={companyCode} />}
+
+                {activeTab === "company" && (
+                    <div className="space-y-4">
+                        {/* Order Book */}
+                        {tradingDaily && (
+                            <div className="card">
+                                <h3 className="text-sm font-semibold mb-3">Order Book</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-3 bg-success/5 rounded-xl border border-success/20">
+                                        <p className="text-[10px] font-bold text-success uppercase mb-2">Bid (Beli)</p>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between">
+                                                <span className="text-xs text-muted-foreground">Harga</span>
+                                                <span className="text-sm font-bold text-success">{tradingDaily.orderBook?.bid ? tradingDaily.orderBook.bid.toLocaleString("id-ID") : '-'}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-xs text-muted-foreground">Volume</span>
+                                                <span className="text-sm font-bold text-foreground">{tradingDaily.orderBook?.bidVolume ? formatCompactIDR(tradingDaily.orderBook.bidVolume).replace('Rp', '') : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-destructive/5 rounded-xl border border-destructive/20">
+                                        <p className="text-[10px] font-bold text-destructive uppercase mb-2">Offer (Jual)</p>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between">
+                                                <span className="text-xs text-muted-foreground">Harga</span>
+                                                <span className="text-sm font-bold text-destructive">{tradingDaily.orderBook?.offer ? tradingDaily.orderBook.offer.toLocaleString("id-ID") : '-'}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-xs text-muted-foreground">Volume</span>
+                                                <span className="text-sm font-bold text-foreground">{tradingDaily.orderBook?.offerVolume ? formatCompactIDR(tradingDaily.orderBook.offerVolume).replace('Rp', '') : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {tradingDaily.market && (
+                                    <div className="mt-3 pt-3 border-t border-border">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-muted-foreground">Individual Index</span>
+                                            <span className="font-bold">{tradingDaily.market.individualIndex?.toFixed(2) || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs mt-1">
+                                            <span className="text-muted-foreground">Foreign Shares</span>
+                                            <span className="font-bold">{tradingDaily.market.foreignShares ? formatCompactIDR(tradingDaily.market.foreignShares).replace('Rp', '') : '-'}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Company Profile */}
+                        {companyDetail && (
+                            <>
+                                <div className="card">
+                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                        <Building2 className="w-4 h-4" />
+                                        Profil Perusahaan
+                                    </h3>
+                                    <div className="space-y-2 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Nama</span>
+                                            <span className="font-bold text-right">{companyDetail.profile?.name || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Sektor</span>
+                                            <span className="font-bold">{companyDetail.profile?.sector || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Sub Sektor</span>
+                                            <span className="font-bold">{companyDetail.profile?.subSector || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Industri</span>
+                                            <span className="font-bold">{companyDetail.profile?.industry || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Papan</span>
+                                            <span className="font-bold">{companyDetail.profile?.board || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Listing Date</span>
+                                            <span className="font-bold">{companyDetail.profile?.listingDate || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Website</span>
+                                            <a href={companyDetail.profile?.website} target="_blank" rel="noopener" className="font-bold text-primary hover:underline">{companyDetail.profile?.website || '-'}</a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Directors */}
+                                {companyDetail.directors && companyDetail.directors.length > 0 && (
+                                    <div className="card">
+                                        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                            <Users className="w-4 h-4" />
+                                            Direksi
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {companyDetail.directors.map((d: any, i: number) => (
+                                                <div key={i} className="flex justify-between text-xs">
+                                                    <span className="font-medium">{d.name}</span>
+                                                    <span className="text-muted-foreground">{d.position}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Commissioners */}
+                                {companyDetail.commissioners && companyDetail.commissioners.length > 0 && (
+                                    <div className="card">
+                                        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                            <Users className="w-4 h-4" />
+                                            Komisaris
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {companyDetail.commissioners.map((c: any, i: number) => (
+                                                <div key={i} className="flex justify-between text-xs">
+                                                    <span className="font-medium">{c.name}</span>
+                                                    <span className="text-muted-foreground">{c.position}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Shareholders */}
+                                {companyDetail.shareholders && companyDetail.shareholders.length > 0 && (
+                                    <div className="card">
+                                        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                            <Briefcase className="w-4 h-4" />
+                                            Pemegang Saham Utama
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {companyDetail.shareholders.map((s: any, i: number) => (
+                                                <div key={i} className="flex justify-between text-xs">
+                                                    <span className="font-medium">{s.name}</span>
+                                                    <span className="font-bold">{s.percentage?.toFixed(2)}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Subsidiaries */}
+                                {companyDetail.subsidiaries && companyDetail.subsidiaries.length > 0 && (
+                                    <div className="card">
+                                        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                            <Building2 className="w-4 h-4" />
+                                            Anak Perusahaan
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {companyDetail.subsidiaries.slice(0, 10).map((s: any, i: number) => (
+                                                <div key={i} className="text-xs">
+                                                    <div className="flex justify-between">
+                                                        <span className="font-medium">{s.name}</span>
+                                                        <span className="text-muted-foreground">{s.percentage?.toFixed(1)}%</span>
+                                                    </div>
+                                                    <p className="text-muted-foreground text-[10px]">{s.type} · {s.location}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {!companyDetail && (
+                            <div className="card p-8 text-center">
+                                <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
+                                <p className="text-xs text-muted-foreground">Memuat data perusahaan...</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === "news" && (
+                    <div className="card"><NewsPanel symbol={ticker} /></div>
+                )}
+
+                {activeTab === "ownership" && (
+                    <div className="bg-card border border-border rounded-lg p-4">
+                        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Ownership Structure</h3>
+                        <ShareholderChart
+                            insidersPercent={(smartMoney as any)?.insidersPercentHeld}
+                            institutionsPercent={(smartMoney as any)?.institutionsPercentHeld}
+                            institutionsCount={(smartMoney as any)?.institutionsCount}
+                            sharia={smartMoney?.sharia}
+                        />
+                    </div>
+                )}
+
+                {activeTab === "technical" && (
+                    <div className="space-y-4">
+                        {analysis && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {[
+                                    { label: "RSI (14)", value: analysis.indicators.rsi.toFixed(1), color: analysis.indicators.rsi > 70 ? "text-destructive" : analysis.indicators.rsi < 30 ? "text-success" : "" },
+                                    { label: "MACD", value: analysis.indicators.macd.histogram.toFixed(2), color: analysis.indicators.macd.histogram > 0 ? "text-success" : "text-destructive" },
+                                    { label: "Signal", value: analysis.recommendation.replace("_", " "), color: analysis.recommendation.includes("BUY") ? "text-success" : analysis.recommendation.includes("SELL") ? "text-destructive" : "text-warning" },
+                                    { label: "Trend", value: analysis.indicators.trend, color: analysis.indicators.trend === "UP" ? "text-success" : analysis.indicators.trend === "DOWN" ? "text-destructive" : "text-muted-foreground" },
+                                ].map(item => (
+                                    <div key={item.label} className="bg-card border border-border rounded-lg p-3 text-center">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">{item.label}</p>
+                                        <p className={cn("text-sm font-bold uppercase", item.color)}>{item.value}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="bg-card border border-border rounded-lg p-4">
+                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Technical Signals</h3>
+                            <TechnicalSignals analysis={analysis} />
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

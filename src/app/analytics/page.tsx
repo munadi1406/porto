@@ -4,12 +4,9 @@ import { useMemo, useEffect } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
-import { EquityGrowthChart } from "@/components/EquityGrowthChart";
-import { AllocationTabs } from "@/components/AllocationTabs";
-import { GainLossChart } from "@/components/GainLossChart";
+import dynamic from "next/dynamic";
 import { PerformanceMetrics } from "@/components/PerformanceMetrics";
 import { DiversificationScore } from "@/components/DiversificationScore";
-import { CostBasisAnalysis } from "@/components/CostBasisAnalysis";
 import { HoldingPeriodAnalysis } from "@/components/HoldingPeriodAnalysis";
 import { EquityReturnTable } from "@/components/EquityReturnTable";
 import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
@@ -18,6 +15,11 @@ import { EquityGrowthChartSkeleton, ChartSkeleton, CardSkeleton } from "@/compon
 import { DashboardTabs } from "@/components/DashboardTabs";
 import { TrendingUp, LayoutList } from "lucide-react";
 import { DecisionAdvisor } from "@/components/DecisionAdvisor";
+
+const EquityGrowthChart = dynamic(() => import("@/components/EquityGrowthChart").then(m => m.EquityGrowthChart), { ssr: false, loading: () => <EquityGrowthChartSkeleton /> });
+const AllocationTabs = dynamic(() => import("@/components/AllocationTabs").then(m => m.AllocationTabs), { ssr: false, loading: () => <ChartSkeleton /> });
+const GainLossChart = dynamic(() => import("@/components/GainLossChart").then(m => m.GainLossChart), { ssr: false, loading: () => <ChartSkeleton /> });
+const CostBasisAnalysis = dynamic(() => import("@/components/CostBasisAnalysis").then(m => m.CostBasisAnalysis), { ssr: false, loading: () => <CardSkeleton /> });
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();

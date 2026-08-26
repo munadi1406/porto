@@ -123,10 +123,10 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
     };
 
     return (
-        <div className="bg-card p-6 rounded-3xl border border-border shadow-xl overflow-hidden relative">
+        <div className="bg-card p-6 rounded-xl border border-border shadow-xl overflow-hidden relative">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-primary/10 rounded-2xl">
+                    <div className="p-2.5 bg-primary/10 rounded-xl">
                         <CalendarIcon className="w-6 h-6 text-primary" />
                     </div>
                     <div>
@@ -135,7 +135,7 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
                     </div>
                 </div>
 
-                <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border border-border">
+                <div className="flex items-center bg-muted/50 p-1.5 rounded-xl border border-border">
                     <button
                         onClick={prevMonth}
                         className="p-2 hover:bg-muted rounded-xl transition-all text-muted-foreground hover:text-primary"
@@ -174,7 +174,7 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
                         <div
                             key={date.toISOString()}
                             className={cn(
-                                "aspect-square rounded-2xl p-1.5 sm:p-2 flex flex-col items-center justify-between transition-all duration-300 border relative group",
+                                "aspect-square rounded-xl p-1.5 sm:p-2 flex flex-col items-center justify-between transition-all duration-300 border relative group",
                                 _isToday ? "ring-2 ring-primary ring-offset-2" : "",
                                 !hasPerf ? "bg-muted/50 bg-muted/20 border-border/50 text-muted-foreground" :
                                     perf > 0 ? "bg-success/10 border-success/20 text-success" :
@@ -205,7 +205,7 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
                             </div>
 
                             {/* Hover Tooltip - simple implementation */}
-                            <div className="absolute inset-0 z-10 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity bg-background/90 rounded-2xl flex items-center justify-center p-2 text-center shadow-lg border border-border">
+                            <div className="absolute inset-0 z-10 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity bg-background/90 rounded-xl flex items-center justify-center p-2 text-center shadow-lg border border-border">
                                 <span className="text-[10px] font-bold text-foreground">
                                     {date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
                                     <br />
@@ -218,7 +218,7 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
             </div>
 
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-2xl border border-border">
+                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-xl border border-border">
                     <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
                         Persentase harian dihitung dari perbandingan <span className="font-bold text-muted-foreground">Total Equity</span> (Saham + Cash)
@@ -229,11 +229,11 @@ export function DailyPerformanceCalendar({ history }: DailyPerformanceCalendarPr
                 <div className="flex items-center justify-end gap-4 px-2">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded bg-success/20 border border-success/40"></div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Profit</span>
+                        <span className="card-title">Profit</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded bg-destructive/20 border border-destructive/40"></div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Loss</span>
+                        <span className="card-title">Loss</span>
                     </div>
                 </div>
             </div>

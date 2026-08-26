@@ -59,6 +59,18 @@ export interface AnalysisResult {
         ma20: { time: string | number; value: number }[];
         ma50: { time: string | number; value: number }[];
     };
+    series: {
+        rsi: number[];
+        macd: number[];
+        macdSignal: number[];
+        macdHist: number[];
+        bbUpper: number[];
+        bbMiddle: number[];
+        bbLower: number[];
+        stochK: number[];
+        stochD: number[];
+        volume: number[];
+    };
 }
 
 export function analyzeCandlesticks(data: OHLCData[]): AnalysisResult {
@@ -79,7 +91,10 @@ export function analyzeCandlesticks(data: OHLCData[]): AnalysisResult {
             },
             predictions: [],
             advice: 'Need at least 50 points of data for accurate analysis.',
-            maLines: { ma20: [], ma50: [] }
+            maLines: { ma20: [], ma50: [] },
+            series: {
+                rsi: [], macd: [], macdSignal: [], macdHist: [], bbUpper: [], bbMiddle: [], bbLower: [], stochK: [], stochD: [], volume: []
+            }
         };
     }
 
@@ -150,6 +165,13 @@ export function analyzeCandlesticks(data: OHLCData[]): AnalysisResult {
     else if (score >= 1) rec = 'BUY';
     else if (score <= -2) rec = 'SELL';
 
+    const closes = data.map((d) => d.close);
+    const rsiSeriesArr = rsiSeries(closes, 14);
+    const macdCalc = macdSeries(closes, 12, 26, 9);
+    const boll = bollingerSeries(closes, 20, 2);
+    const stoch = stochasticSeries(data, 14, 3);
+    const volSeries = data.map((d) => d.volume || 0);
+
     return {
         recommendation: rec,
         patterns,
@@ -163,7 +185,19 @@ export function analyzeCandlesticks(data: OHLCData[]): AnalysisResult {
         },
         predictions: generateMultiPredictions(latest, data, latestMA20),
         advice,
-        maLines: { ma20: ma20Data, ma50: ma50Data }
+        maLines: { ma20: ma20Data, ma50: ma50Data },
+        series: {
+            rsi: rsiSeriesArr,
+            macd: macdCalc.macd,
+            macdSignal: macdCalc.signal,
+            macdHist: macdCalc.hist,
+            bbUpper: boll.up,
+            bbMiddle: boll.mid,
+            bbLower: boll.low,
+            stochK: stoch.k,
+            stochD: stoch.d,
+            volume: volSeries
+        }
     };
 }
 
@@ -351,4 +385,92 @@ function generateMultiPredictions(latest: OHLCData, data: OHLCData[], ma20: numb
             data: reversionData
         }
     ];
+}
+
+function emaSeries(values: number[], period: number): number[] {
+    const k = 2 / (period + 1);
+    const out: number[] = [];
+    let prev = values[0] ?? 0;
+    for (let i = 0; i < values.length; i++) {
+        prev = i === 0 ? values[0] : values[i] * k + prev * (1 - k);
+        out.push(prev);
+    }
+    return out;
+}
+
+function rsiSeries(closes: number[], period = 14): number[] {
+    const out = new Array(closes.length).fill(50);
+    if (closes.length <= period) return out;
+    let gainSum = 0, lossSum = 0;
+    for (let i = 1; i <= period; i++) {
+        const d = closes[i] - closes[i - 1];
+        if (d >= 0) gainSum += d; else lossSum -= d;
+    }
+    let avgGain = gainSum / period;
+    let avgLoss = lossSum / period;
+    out[period] = 100 - 100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss));
+    for (let i = period + 1; i < closes.length; i++) {
+        const d = closes[i] - closes[i - 1];
+        const g = d > 0 ? d : 0;
+        const l = d < 0 ? -d : 0;
+        avgGain = (avgGain * (period - 1) + g) / period;
+        avgLoss = (avgLoss * (period - 1) + l) / period;
+        out[i] = 100 - 100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss));
+    }
+    return out;
+}
+
+function macdSeries(closes: number[], fast = 12, slow = 26, signalP = 9) {
+    const emaFast = emaSeries(closes, fast);
+    const emaSlow = emaSeries(closes, slow);
+    const macd = closes.map((_, i) => emaFast[i] - emaSlow[i]);
+    const signal = emaSeries(macd, signalP);
+    const hist = macd.map((m, i) => m - signal[i]);
+    return { macd, signal, hist };
+}
+
+function bollingerSeries(closes: number[], period = 20, mult = 2) {
+    const mid: number[] = [];
+    const up: number[] = [];
+    const low: number[] = [];
+    for (let i = 0; i < closes.length; i++) {
+        if (i < period - 1) {
+            mid.push(closes[i]);
+            up.push(closes[i]);
+            low.push(closes[i]);
+            continue;
+        }
+        const slice = closes.slice(i - period + 1, i + 1);
+        const mean = slice.reduce((a, b) => a + b, 0) / period;
+        const variance = slice.reduce((a, b) => a + (b - mean) ** 2, 0) / period;
+        const sd = Math.sqrt(variance);
+        mid.push(mean);
+        up.push(mean + mult * sd);
+        low.push(mean - mult * sd);
+    }
+    return { mid, up, low };
+}
+
+function stochasticSeries(data: OHLCData[], kPeriod = 14, dPeriod = 3) {
+    const k: number[] = [];
+    for (let i = 0; i < data.length; i++) {
+        if (i < kPeriod) {
+            k.push(50);
+            continue;
+        }
+        const slice = data.slice(i - kPeriod + 1, i + 1);
+        const low = Math.min(...slice.map((d) => d.low));
+        const high = Math.max(...slice.map((d) => d.high));
+        k.push(high === low ? 50 : ((data[i].close - low) / (high - low)) * 100);
+    }
+    const d: number[] = [];
+    for (let i = 0; i < k.length; i++) {
+        if (i < dPeriod - 1) {
+            d.push(k[i]);
+            continue;
+        }
+        const slice = k.slice(i - dPeriod + 1, i + 1);
+        d.push(slice.reduce((a, b) => a + b, 0) / dPeriod);
+    }
+    return { k, d };
 }

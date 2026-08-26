@@ -12,7 +12,7 @@ const CACHE_TTL = 5 * 1000; // 5 seconds - matches ultra-fast refresh interval
 const cache: Record<string, CacheItem> = {};
 
 // Initialize Yahoo Finance instance for v3.x
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -26,10 +26,13 @@ export async function GET(request: Request) {
     const now = Date.now();
     if (cache[ticker] && (now - cache[ticker].timestamp < CACHE_TTL)) {
         return NextResponse.json({
-            ticker,
-            price: cache[ticker].price,
-            change: cache[ticker].change,
-            changePercent: cache[ticker].changePercent,
+            success: true,
+            data: {
+                ticker,
+                price: cache[ticker].price,
+                change: cache[ticker].change,
+                changePercent: cache[ticker].changePercent,
+            },
             source: 'cache'
         });
     }
@@ -54,12 +57,15 @@ export async function GET(request: Request) {
         };
 
         return NextResponse.json({
-            ticker,
-            price,
-            change,
-            changePercent,
-            name,
-            high52w,
+            success: true,
+            data: {
+                ticker,
+                price,
+                change,
+                changePercent,
+                name,
+                high52w,
+            },
             source: 'live'
         });
 
@@ -68,10 +74,13 @@ export async function GET(request: Request) {
 
         // Return fallback 0 as graceful degradation
         return NextResponse.json({
-            ticker,
-            price: 0,
-            change: 0,
-            changePercent: 0,
+            success: true,
+            data: {
+                ticker,
+                price: 0,
+                change: 0,
+                changePercent: 0,
+            },
             source: 'error_fallback'
         });
     }

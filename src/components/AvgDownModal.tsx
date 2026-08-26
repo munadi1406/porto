@@ -78,7 +78,7 @@ export function AvgDownModal({ item, currentPrice, onClose }: AvgDownModalProps)
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-2 sm:p-4 backdrop-blur-md">
-            <div className="bg-card p-5 sm:p-8 rounded-3xl w-full max-w-4xl shadow-2xl border border-white/20 dark:border-border relative overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+            <div className="bg-card p-5 sm:p-8 rounded-xl w-full max-w-4xl shadow-2xl border border-white/20 dark:border-border relative overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-warning" />
 
                 <div className="flex justify-between items-start mb-4 sm:mb-6 flex-shrink-0">
@@ -107,7 +107,7 @@ export function AvgDownModal({ item, currentPrice, onClose }: AvgDownModalProps)
 
                         <div className="space-y-4 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar flex-1 pb-4">
                             {levels.map((level, index) => (
-                                <div key={level.id} className="group relative p-4 sm:p-5 bg-muted/40 border border-border rounded-2xl hover:border-warning/30 transition-all">
+                                <div key={level.id} className="group relative p-4 sm:p-5 bg-muted/40 border border-border rounded-xl hover:border-warning/30 transition-all">
                                     <div className="absolute -left-1 sm:-left-2 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 bg-warning text-warning-foreground text-[9px] sm:text-[10px] font-black rounded-full flex items-center justify-center shadow-lg z-10">
                                         {index + 1}
                                     </div>
@@ -183,7 +183,7 @@ export function AvgDownModal({ item, currentPrice, onClose }: AvgDownModalProps)
 
                     {/* Right side: Results Summary */}
                     <div className="lg:col-span-2 flex flex-col space-y-4 overflow-y-auto lg:overflow-visible pr-1 sm:pr-0">
-                        <div className="p-5 sm:p-6 bg-muted/50 rounded-3xl border border-border shadow-sm">
+                        <div className="p-5 sm:p-6 bg-muted/50 rounded-xl border border-border shadow-sm">
                             <div className="flex justify-between items-center mb-5 pb-5 border-b border-border">
                                 <div>
                                     <div className="text-[9px] sm:text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1">Rata-rata Lama</div>
@@ -219,14 +219,14 @@ export function AvgDownModal({ item, currentPrice, onClose }: AvgDownModalProps)
                                             "text-base font-black",
                                             analysis.newGainLossPercent >= 0 ? "text-success" : "text-destructive"
                                         )}>
-                                            {analysis.newGainLossPercent > 0 ? "+" : ""}{formatPercentage(analysis.newGainLossPercent)}
+                                            {formatPercentage(analysis.newGainLossPercent)}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-4 sm:p-5 bg-warning/5 border border-warning/10 rounded-2xl sm:rounded-3xl shadow-sm">
+                        <div className="p-4 sm:p-5 bg-warning/5 border border-warning/10 rounded-xl sm:rounded-xl shadow-sm">
                             <div className="text-[10px] text-warning font-black uppercase tracking-widest mb-3">Ringkasan Modal</div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-xs font-medium">
@@ -245,13 +245,13 @@ export function AvgDownModal({ item, currentPrice, onClose }: AvgDownModalProps)
                         <div className="flex flex-col sm:flex-row gap-3 pt-2 lg:pt-4">
                             <button
                                 onClick={onClose}
-                                className="order-2 sm:order-1 flex-1 py-4 bg-muted text-foreground rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-muted transition-all"
+                                className="order-2 sm:order-1 flex-1 py-4 bg-muted text-foreground rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-muted transition-all"
                             >
                                 TUTUP
                             </button>
                             <button
                                 onClick={onClose}
-                                className="order-1 sm:order-2 flex-[2] py-4 bg-warning text-warning-foreground rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-warning/80 transition-all shadow-lg shadow-warning/25 active:scale-[0.98]"
+                                className="order-1 sm:order-2 flex-[2] py-4 bg-warning text-warning-foreground rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-warning/80 transition-all shadow-lg shadow-warning/25 active:scale-[0.98]"
                             >
                                 SIMPAN RENCANA
                             </button>

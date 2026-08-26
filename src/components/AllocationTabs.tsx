@@ -112,7 +112,7 @@ export function AllocationTabs({ portfolio, prices, allocationData }: Allocation
     };
 
     return (
-        <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
             {/* Header with Tabs */}
             <div className="p-4 sm:p-6 pb-0">
                 <div className="flex items-center gap-2 mb-4">

@@ -3,7 +3,7 @@
 // This module provides equivalent data through Yahoo Finance.
 import YahooFinance from 'yahoo-finance2';
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 export interface BrokerSummaryItem {
     BRK_NAME: string;

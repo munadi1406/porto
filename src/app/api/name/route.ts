@@ -4,7 +4,7 @@ import YahooFinance from 'yahoo-finance2';
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const cache: Record<string, { name: string; timestamp: number }> = {};
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);

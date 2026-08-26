@@ -96,8 +96,8 @@ export function MonthlyPerformanceHeatmap({ history }: MonthlyPerformanceHeatmap
 
     if (!performanceData || performanceData.length === 0) {
         return (
-            <div className="bg-card p-8 rounded-3xl border border-border text-center">
-                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="bg-card p-8 rounded-xl border border-border text-center">
+                <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                     <Calendar className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground mb-2">Belum Ada Data Historis</h3>
@@ -109,7 +109,7 @@ export function MonthlyPerformanceHeatmap({ history }: MonthlyPerformanceHeatmap
     }
 
     return (
-        <div className="bg-card p-6 rounded-3xl border border-border shadow-xl overflow-hidden relative">
+        <div className="bg-card p-6 rounded-xl border border-border shadow-xl overflow-hidden relative">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-destructive/10 rounded-xl">
@@ -176,7 +176,7 @@ export function MonthlyPerformanceHeatmap({ history }: MonthlyPerformanceHeatmap
                 </table>
             </div>
 
-            <div className="mt-6 flex items-start gap-3 p-4 bg-muted/50 rounded-2xl border border-border">
+            <div className="mt-6 flex items-start gap-3 p-4 bg-muted/50 rounded-xl border border-border">
                 <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
                     Heatmap ini dihitung berdasarkan <span className="font-bold text-muted-foreground">Total Equity</span> (Saham + Cash).

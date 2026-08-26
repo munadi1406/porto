@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getSmartMoneyData } from '@/lib/idxFirecrawl';
+import { getSmartMoneyData } from '@/lib/idxSmartMoney';
 
 export async function GET() {
     try {
         const data = await getSmartMoneyData();
-        return NextResponse.json({ success: true, data, source: 'firecrawl' });
+        return NextResponse.json({ success: true, data, source: 'idx_direct' });
     } catch (error: any) {
         // Fallback ke Yahoo
         try {

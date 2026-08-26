@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, PieChart, TrendingUp, History, Building2, Layers, Menu, Activity, Moon, Sun, Search, BarChart3, FileText, SwitchCamera } from "lucide-react";
+import { PieChart, TrendingUp, History, Building2, Menu, Moon, Sun, Search, BarChart3, FileText, Layers, SwitchCamera } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -12,23 +12,26 @@ import { PortfolioSelector } from "./PortfolioSelector";
 import { SidebarPortfolios } from "./SidebarPortfolios";
 
 const portfolioNav = [
-    { name: "Ringkasan", href: "/", icon: Layers, desc: "All portfolios consolidated" },
-    { name: "Dashboard", href: "/dashboard", icon: Home, desc: "Per-portfolio view" },
-    { name: "Portofolio", href: "/portfolio", icon: PieChart, desc: "Asset holdings" },
+    { name: "Dashboard", href: "/portfolio-dashboard", icon: PieChart, desc: "Portfolio dashboard" },
+    { name: "Performance", href: "/analytics", icon: TrendingUp, desc: "Growth & returns" },
     { name: "History", href: "/history", icon: History, desc: "Transaction history" },
-    { name: "Analytics", href: "/analytics", icon: TrendingUp, desc: "Growth & returns" },
 ];
 
 const stocksNav = [
-    { name: "Market", href: "/stocks", icon: BarChart3, desc: "IDX market overview" },
-    { name: "Screener", href: "/screener", icon: Search, desc: "959 stocks scanned" },
-    { name: "Teknikal", href: "/analysis/BBCA.JK", icon: Activity, desc: "Chart & indicators" },
-    { name: "Fundamental", href: "/fundamentals", icon: Building2, desc: "PER, PBV, ROE" },
-    { name: "Prospektus", href: "/stocks/prospectus", icon: FileText, desc: "IPO Analysis" },
+    { name: "Market", href: "/", icon: BarChart3, desc: "Market overview" },
+    { name: "Screener", href: "/screener", icon: Search, desc: "Stock screener" },
+    { name: "Fundamental", href: "/fundamentals", icon: Building2, desc: "Fundamental analysis" },
+];
+
+const researchNav = [
+    { name: "Fundamentals", href: "/fundamentals", icon: Building2, desc: "Fundamental analysis" },
+    { name: "Dividends", href: "/stocks/dividends", icon: FileText, desc: "Dividend calendar" },
+    { name: "Sharia", href: "/stocks/sharia", icon: Layers, desc: "Sharia stocks" },
+    { name: "Prospectus", href: "/stocks/prospectus", icon: FileText, desc: "IPO analysis" },
 ];
 
 const isPortfolioPage = (path: string) =>
-    path === '/' || path.startsWith('/dashboard') || path.startsWith('/portfolio') || path.startsWith('/history') || path.startsWith('/analytics');
+    path.startsWith('/portfolio') || path.startsWith('/history') || path.startsWith('/analytics');
 
 export function MobileNav() {
     const pathname = usePathname();
@@ -39,7 +42,7 @@ export function MobileNav() {
     const currentNav = isPortfolioMode ? portfolioNav : stocksNav;
     const modeTitle = isPortfolioMode ? 'Portfolio' : 'Stocks';
     const modeColor = isPortfolioMode ? 'text-primary' : 'text-warning';
-    const otherModeHref = isPortfolioMode ? '/stocks' : '/';
+    const otherModeHref = isPortfolioMode ? '/' : '/';
 
     return (
         <>
@@ -73,34 +76,34 @@ export function MobileNav() {
                 <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom">
                     <div className="grid grid-cols-4 h-14">
                         <Link
-                            href="/"
+                            href="/portfolio-dashboard"
                             className={cn(
                                 "flex flex-col items-center justify-center gap-0.5 transition-colors",
-                                pathname === "/" ? "text-primary" : "text-muted-foreground"
+                                isPortfolioMode ? "text-primary" : "text-muted-foreground"
                             )}
                         >
-                            <Layers className="w-5 h-5" />
+                            <PieChart className="w-5 h-5" />
                             <span className="text-[10px] font-medium">Portfolio</span>
                         </Link>
                         <Link
-                            href="/stocks"
+                            href="/"
                             className={cn(
                                 "flex flex-col items-center justify-center gap-0.5 transition-colors",
-                                pathname === "/stocks" ? "text-warning" : "text-muted-foreground"
+                                !isPortfolioMode ? "text-warning" : "text-muted-foreground"
                             )}
                         >
                             <BarChart3 className="w-5 h-5" />
                             <span className="text-[10px] font-medium">Stocks</span>
                         </Link>
                         <Link
-                            href="/portfolio"
+                            href="/fundamentals"
                             className={cn(
                                 "flex flex-col items-center justify-center gap-0.5 transition-colors",
-                                pathname === "/portfolio" ? "text-primary" : "text-muted-foreground"
+                                pathname.startsWith("/fundamentals") || pathname.startsWith("/stocks/") ? "text-success" : "text-muted-foreground"
                             )}
                         >
-                            <PieChart className="w-5 h-5" />
-                            <span className="text-[10px] font-medium">Portofolio</span>
+                            <Building2 className="w-5 h-5" />
+                            <span className="text-[10px] font-medium">Research</span>
                         </Link>
                         <SheetTrigger
                             className={cn(
@@ -181,14 +184,16 @@ export function MobileNav() {
             </Sheet>
 
             {/* Desktop sidebar */}
-            <nav className="hidden md:flex md:flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:w-64 bg-sidebar border-r z-50">
-                <div className="p-5 border-b">
+            <nav className="hidden md:flex md:flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:w-[238px] bg-sidebar border-r border-sidebar-border z-50">
+                <div className="p-5 border-b border-sidebar-border">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className={cn("h-3 w-3 rounded-full", isPortfolioMode ? 'bg-primary' : 'bg-warning')} />
+                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-[#8b1a00] flex items-center justify-center">
+                                <TrendingUp className="w-5 h-5 text-white" />
+                            </div>
                             <div>
-                                <h1 className="font-semibold text-sm text-sidebar-foreground">{modeTitle}</h1>
-                                <p className="text-xs text-muted-foreground">Porto</p>
+                                <h1 className="font-semibold text-[17px] leading-tight text-sidebar-foreground tracking-tight">Porto</h1>
+                                <p className="text-[11px] text-muted-foreground">Analyze. Invest. Grow.</p>
                             </div>
                         </div>
                         <Link
@@ -206,8 +211,8 @@ export function MobileNav() {
                     {isPortfolioMode && <SidebarPortfolios />}
 
                     {/* Navigation */}
-                    <div className={cn(isPortfolioMode ? "mt-2 pt-3 border-t border-border" : "")}>
-                        <div className="space-y-0.5">
+                    <div className={cn(isPortfolioMode ? "mt-2 pt-3 border-t border-sidebar-border" : "")}>
+                        <div className="space-y-1">
                             {currentNav.map((item) => {
                                 const isActive = pathname === item.href;
                                 return (
@@ -217,11 +222,12 @@ export function MobileNav() {
                                         className={cn(
                                             "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                                             isActive
-                                                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                                                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                                ? "text-white font-medium shadow-[0_7px_18px_rgba(64,80,190,.16)]"
+                                                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                                         )}
+                                        style={isActive ? { background: "linear-gradient(90deg,#c8300a,#8b1a00)" } : undefined}
                                     >
-                                        <item.icon className={cn("w-4 h-4", isActive ? (isPortfolioMode ? "text-primary" : "text-warning") : "")} />
+                                        <item.icon className={cn("w-4 h-4", isActive ? "" : "")} />
                                         <div>
                                             <span>{item.name}</span>
                                             {!isActive && <p className="text-[9px] text-sidebar-foreground/40">{item.desc}</p>}
@@ -231,9 +237,23 @@ export function MobileNav() {
                             })}
                         </div>
                     </div>
+
+                    {/* Premium upgrade card */}
+                    <div className="mt-5 mx-1 p-4 rounded-xl border border-primary/15 bg-primary/5">
+                        <h4 className="text-sm font-semibold text-foreground mb-1.5">Upgrade ke Premium</h4>
+                        <p className="text-[11px] leading-snug text-muted-foreground mb-3">Dapatkan data real-time, AI insight, dan fitur premium lainnya.</p>
+                        <Button className="w-full h-9 text-[12px] bg-primary hover:bg-primary/90">Upgrade Sekarang ›</Button>
+                    </div>
+
+                    {/* IHSG mini */}
+                    <div className="mt-4 mx-1 p-4 rounded-xl border border-border bg-card">
+                        <span className="text-[12px] text-muted-foreground">IHSG</span>
+                        <span className="block text-2xl font-semibold text-foreground mt-1">7.845,23</span>
+                        <span className="text-[11px] text-success">+96,45 (+1,24%)</span>
+                    </div>
                 </div>
 
-                <div className="p-4 border-t">
+                <div className="p-4 border-t border-sidebar-border">
                     <div className="flex items-center justify-between">
                         <Button variant="ghost" size="sm" onClick={toggle} className="gap-2 text-sidebar-foreground/70">
                             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

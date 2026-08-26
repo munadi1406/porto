@@ -20,7 +20,7 @@ interface SectionProps {
 // --- Helper Components ---
 
 const Section = ({ title, icon, subtitle, children, className }: SectionProps) => (
-    <div className={cn("bg-card rounded-3xl border border-border shadow-sm overflow-hidden", className)}>
+    <div className={cn("bg-card rounded-xl border border-border shadow-sm overflow-hidden", className)}>
         <div className="px-6 py-5 border-b border-border/50 flex items-center justify-between bg-muted/30">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-muted rounded-xl text-muted-foreground">
@@ -39,7 +39,7 @@ const Section = ({ title, icon, subtitle, children, className }: SectionProps) =
 );
 
 const MetricCard = ({ label, value, subtext, trend, colorClass }: { label: string; value: string | number; subtext?: string; trend?: 'up' | 'down' | 'neutral'; colorClass?: string }) => (
-    <div className="p-4 bg-muted/50 rounded-2xl border border-border/50 group hover:border-primary/20 transition-all">
+    <div className="p-4 bg-muted/50 rounded-xl border border-border/50 group hover:border-primary/20 transition-all">
         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1.5">{label}</p>
         <div className="flex items-end gap-2">
             <span className={cn("text-xl font-black tracking-tight text-foreground", colorClass)}>{value}</span>
@@ -131,11 +131,11 @@ export default function FundamentalsPage() {
     const isJK = selectedTicker.includes('.JK');
 
     return (
-        <div className="min-h-screen bg-background transition-colors">
+        <div className="space-y-6">
             {/* --- Navigation & Search --- */}
-            <div className="bg-card border-b border-border sticky top-0 z-50">
-                <div className="container mx-auto px-4 max-w-7xl h-20 flex items-center gap-6">
-                    <Link href="/analytics" className="p-2.5 hover:bg-muted rounded-2xl transition-colors">
+            <div className="bg-card border-b border-border sticky top-0 z-50 -mx-4 lg:-mx-6 px-4 lg:px-6">
+                <div className="h-20 flex items-center gap-6">
+                    <Link href="/analytics" className="p-2.5 hover:bg-muted rounded-xl transition-colors">
                         <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                     </Link>
                     
@@ -146,7 +146,7 @@ export default function FundamentalsPage() {
                             value={searchTicker}
                             onChange={(e) => setSearchTicker(e.target.value)}
                             placeholder="Cari Ticker (e.g: BBCA.JK, TLKM, AAPL)..."
-                            className="w-full pl-11 pr-4 py-3 bg-muted border border-input rounded-2xl text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-foreground"
+                            className="w-full pl-11 pr-4 py-3 bg-muted border border-input rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-foreground"
                         />
                     </form>
 
@@ -160,9 +160,8 @@ export default function FundamentalsPage() {
                 </div>
             </div>
 
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
-                {/* --- States --- */}
-                {loading && (
+            {/* --- States --- */}
+            {loading && (
                     <div className="flex flex-col items-center justify-center py-32 gap-4">
                         <Loader2 className="w-10 h-10 text-primary animate-spin" />
                         <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Synchronizing Market Data...</p>
@@ -194,7 +193,7 @@ export default function FundamentalsPage() {
                         
                         {/* --- Hero Header Section --- */}
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                            <div className="lg:col-span-8 bg-card rounded-[2.5rem] p-8 border border-border shadow-sm relative overflow-hidden group">
+                            <div className="lg:col-span-8 bg-card rounded-xl p-8 border border-border shadow-sm relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-12 opacity-[0.02] group-hover:scale-110 transition-transform duration-1000 pointer-events-none">
                                     <Activity className="w-48 h-48 text-primary" />
                                 </div>
@@ -253,7 +252,7 @@ export default function FundamentalsPage() {
                                 </div>
                             </div>
 
-                            <div className="lg:col-span-4 bg-primary rounded-[2.5rem] p-8 text-primary-foreground shadow-xl flex flex-col justify-between relative overflow-hidden">
+                            <div className="lg:col-span-4 bg-primary rounded-xl p-8 text-primary-foreground shadow-sm flex flex-col justify-between relative overflow-hidden">
                                 <div>
                                     <div className="flex items-center gap-2 mb-6">
                                         <div className="p-2 bg-primary-foreground/20 backdrop-blur-md rounded-xl">
@@ -300,17 +299,17 @@ export default function FundamentalsPage() {
                                             
                                             <div className="space-y-4">
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    <div className="p-3 bg-success/10 rounded-2xl border border-success/20">
+                                                    <div className="p-3 bg-success/10 rounded-xl border border-success/20">
                                                         <p className="text-[9px] text-success font-black uppercase mb-1">Buy</p>
                                                         <p className="text-sm font-black text-success">{formatCompactIDR(data.foreignBuyValue || 0)}</p>
                                                     </div>
-                                                    <div className="p-3 bg-destructive/10 rounded-2xl border border-destructive/20">
+                                                    <div className="p-3 bg-destructive/10 rounded-xl border border-destructive/20">
                                                         <p className="text-[9px] text-destructive font-black uppercase mb-1">Sell</p>
                                                         <p className="text-sm font-black text-destructive">{formatCompactIDR(data.foreignSellValue || 0)}</p>
                                                     </div>
                                                 </div>
 
-                                                <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                                <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                     <div className="flex justify-between items-center mb-2">
                                                         <span className="text-[10px] text-muted-foreground font-bold uppercase">Net Foreign</span>
                                                         <span className={cn("text-lg font-black", data.foreignNetBuyValue >= 0 ? "text-success" : "text-destructive")}>
@@ -345,17 +344,17 @@ export default function FundamentalsPage() {
                                             
                                             <div className="space-y-4">
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    <div className="p-3 bg-success/10 rounded-2xl border border-success/20">
+                                                    <div className="p-3 bg-success/10 rounded-xl border border-success/20">
                                                         <p className="text-[9px] text-success font-black uppercase mb-1">Buy</p>
                                                         <p className="text-sm font-black text-success">{formatCompactIDR(data.domesticBuyValue || 0)}</p>
                                                     </div>
-                                                    <div className="p-3 bg-destructive/10 rounded-2xl border border-destructive/20">
+                                                    <div className="p-3 bg-destructive/10 rounded-xl border border-destructive/20">
                                                         <p className="text-[9px] text-destructive font-black uppercase mb-1">Sell</p>
                                                         <p className="text-sm font-black text-destructive">{formatCompactIDR(data.domesticSellValue || 0)}</p>
                                                     </div>
                                                 </div>
 
-                                                <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                                <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                     <div className="flex justify-between items-center mb-2">
                                                         <span className="text-[10px] text-muted-foreground font-bold uppercase">Net Domestic</span>
                                                         <span className={cn("text-lg font-black", data.domesticNetBuyValue >= 0 ? "text-success" : "text-destructive")}>
@@ -389,7 +388,7 @@ export default function FundamentalsPage() {
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                                <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                     <p className="text-[10px] text-muted-foreground font-bold uppercase mb-3 tracking-widest">Top Buyers</p>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {smartMoney?.topBuy.map((b, idx) => (
@@ -397,7 +396,7 @@ export default function FundamentalsPage() {
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                                <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                     <p className="text-[10px] text-muted-foreground font-bold uppercase mb-3 tracking-widest text-right">Top Sellers</p>
                                                     <div className="flex flex-wrap gap-1.5 justify-end">
                                                         {smartMoney?.topSell.map((b, idx) => (
@@ -407,7 +406,7 @@ export default function FundamentalsPage() {
                                                 </div>
                                             </div>
                                             
-                                            <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                            <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                 <div className="flex justify-between items-center mb-3">
                                                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Concentration Score</p>
                                                     <span className={cn("text-xs font-black", smartMoney?.colorClass)}>{smartMoney?.power || '0%'}</span>
@@ -418,7 +417,7 @@ export default function FundamentalsPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="mt-6 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                                    <div className="mt-6 p-4 bg-primary/5 rounded-xl border border-primary/10">
                                         <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed">
                                             "{smartMoney?.message || 'Data aliran dana menunjukkan aktivitas pasar yang normal.'}"
                                         </p>
@@ -437,7 +436,7 @@ export default function FundamentalsPage() {
                                         </div>
                                         
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                            <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                 <div className="flex items-center gap-2 mb-2 text-destructive">
                                                     <Wallet className="w-4 h-4" />
                                                     <span className="text-[9px] font-black uppercase">Buy Area</span>
@@ -446,7 +445,7 @@ export default function FundamentalsPage() {
                                                     {data.fiftyTwoWeekLow ? (isJK ? formatIDR(data.fiftyTwoWeekLow * 1.1) : `$${(data.fiftyTwoWeekLow * 1.1).toFixed(2)}`) : '-'}
                                                 </p>
                                             </div>
-                                            <div className="p-4 bg-muted/50 rounded-2xl border border-border/50">
+                                            <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
                                                 <div className="flex items-center gap-2 mb-2 text-success">
                                                     <Target className="w-4 h-4" />
                                                     <span className="text-[9px] font-black uppercase">Take Profit</span>
@@ -547,7 +546,7 @@ export default function FundamentalsPage() {
                                             </ResponsiveContainer>
                                         </div>
 
-                                        <div className="p-4 bg-card border border-border rounded-2xl">
+                                        <div className="p-4 bg-card border border-border rounded-xl">
                                             <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Analyst Target Price</p>
                                             <p className="text-2xl font-black text-foreground">{data.targetMeanPrice ? (isJK ? formatIDR(data.targetMeanPrice) : `$${data.targetMeanPrice.toFixed(2)}`) : 'N/A'}</p>
                                             {data.targetMeanPrice && data.currentPrice && (
@@ -562,7 +561,7 @@ export default function FundamentalsPage() {
                                 <Section title="Detailed Insights" icon={<CheckCircle className="w-4 h-4" />} subtitle="Critical Observations">
                                     <div className="space-y-3">
                                         {analysis.insights.map((insight, index) => (
-                                            <div key={index} className={cn("p-4 rounded-2xl border flex items-start gap-3", insight.status === 'good' ? "bg-success/10 border-success/20" : insight.status === 'warning' ? "bg-warning/10 border-warning/20" : "bg-destructive/10 border-destructive/20")}>
+                                            <div key={index} className={cn("p-4 rounded-xl border flex items-start gap-3", insight.status === 'good' ? "bg-success/10 border-success/20" : insight.status === 'warning' ? "bg-warning/10 border-warning/20" : "bg-destructive/10 border-destructive/20")}>
                                                 {insight.status === 'good' ? <CheckCircle className="w-4 h-4 text-success mt-0.5" /> : insight.status === 'warning' ? <AlertCircle className="w-4 h-4 text-warning mt-0.5" /> : <XCircle className="w-4 h-4 text-destructive mt-0.5" />}
                                                 <div>
                                                     <p className="text-[10px] font-black text-muted-foreground uppercase mb-0.5">{insight.category}</p>
@@ -584,8 +583,7 @@ export default function FundamentalsPage() {
                         </div>
 
                     </div>
-                )}
-            </div>
-        </div>
-    );
+        )}
+    </div>
+);
 }
