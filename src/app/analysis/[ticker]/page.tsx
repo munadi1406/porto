@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { analyzeCandlesticks, AnalysisResult } from "@/lib/analysis-utils";
 import { detectChartDrawings, detectChartMarkers } from "@/lib/patternDetection";
 import { formatIDR, cn, formatCompactIDR } from "@/lib/utils";
-import { ArrowLeft, Search, Loader2, ShieldCheck, Building2, Users, Briefcase, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Search, Loader2, ShieldCheck, Building2, Users, Briefcase, TrendingUp, TrendingDown, Share2, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFundamentals } from "@/hooks/useFundamentals";
@@ -85,6 +85,20 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
         }
     };
 
+    // Share handler — Web Share API atau clipboard fallback
+    const [copied, setCopied] = useState(false);
+    const handleShare = async () => {
+        const url = typeof window !== "undefined" ? window.location.href : "";
+        const text = `Analisis ${ticker.replace(".JK", "")} — Porto`;
+        if (navigator.share) {
+            try { await navigator.share({ title: text, text, url }); } catch {}
+        } else if (navigator.clipboard) {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
     const lastCandle = data.length > 0 ? data[data.length - 1] : null;
     const currentPrice = smartMoney?.currentPrice ?? lastCandle?.close ?? 0;
     const changePercent = smartMoney?.priceChangePercent ?? 0;
@@ -107,6 +121,15 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                 <span className="text-foreground font-medium">{ticker.replace(".JK", "")}</span>
             </nav>
 
+            {/* Metadata untuk SEO & share (React 19) */}
+            <title>{ticker.replace(".JK", "")} — Analisis Saham | Porto</title>
+            <meta name="description" content={`Analisis lengkap ${ticker.replace(".JK", "")}: grafik harga, pola chart, laporan keuangan, broker summary, dan proyeksi AI. IDX Indonesia.`} />
+            <meta property="og:title" content={`${ticker.replace(".JK", "")} — Analisis Saham | Porto`} />
+            <meta property="og:description" content={`Grafik live, pola teknikal, keuangan, dan proyeksi AI untuk ${ticker.replace(".JK", "")}.`} />
+            <meta property="og:type" content="website" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content={`${ticker.replace(".JK", "")} — Analisis Saham | Porto`} />
+
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="flex-1">
@@ -117,6 +140,13 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                 <ShieldCheck className="w-3 h-3" /> Syariah
                             </span>
                         )}
+                        <button
+                            onClick={handleShare}
+                            className="ml-1 p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors cursor-pointer"
+                            title="Bagikan link analisis"
+                        >
+                            {copied ? <Link2 className="w-3.5 h-3.5 text-success" /> : <Share2 className="w-3.5 h-3.5" />}
+                        </button>
                     </div>
                     {smartMoney?.sector && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
