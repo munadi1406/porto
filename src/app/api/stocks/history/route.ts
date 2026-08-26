@@ -69,6 +69,8 @@ function getPeriodStartDate(period: string): Date {
         case '3mo': return new Date(now.setMonth(now.getMonth() - 3));
         case '6mo': return new Date(now.setMonth(now.getMonth() - 6));
         case '1y': return new Date(now.setFullYear(now.getFullYear() - 1));
+        case '2y': return new Date(now.setFullYear(now.getFullYear() - 2));
+        case '5y': return new Date(now.setFullYear(now.getFullYear() - 5));
         case 'ytd': return new Date(now.getFullYear(), 0, 1);
         case 'max': return new Date(now.setFullYear(now.getFullYear() - 20));
         default: return new Date(now.setMonth(now.getMonth() - 3));

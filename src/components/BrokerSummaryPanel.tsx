@@ -96,7 +96,7 @@ export default function BrokerSummaryPanel() {
     // Hitung mundur auto-retry selama sumber belum terjangkau
     useEffect(() => {
         if (!unavailable) return;
-        setSecs(60);
+        setSecs(20);
         const t = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000);
         return () => clearInterval(t);
     }, [unavailable]);
@@ -104,7 +104,7 @@ export default function BrokerSummaryPanel() {
     useEffect(() => {
         if (unavailable && secs === 0) {
             setLoading(true);
-            load().finally(() => setSecs(60));
+            load().finally(() => setSecs(20));
         }
     }, [secs, unavailable, load]);
 

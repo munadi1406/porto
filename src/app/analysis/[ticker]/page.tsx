@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useFundamentals } from "@/hooks/useFundamentals";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { AlertsPopover } from "@/components/AlertsPopover";
-import { useCompanyDetail, useTradingDaily, useFinancialStatement } from "@/hooks/useIdxExtended";
+import { useCompanyDetail, useFinancialStatement } from "@/hooks/useIdxExtended";
 import TechnicalSignals from "@/components/TechnicalSignals";
 import StockStatistics from "@/components/StockStatistics";
 import FundamentalSummary from "@/components/FundamentalSummary";
@@ -19,6 +19,10 @@ import NewsPanel from "@/components/NewsPanel";
 import FinancialReports from "@/components/FinancialReports";
 import ShareholderChart from "@/components/ShareholderChart";
 import ChartPatterns from "@/components/ChartPatterns";
+import OrderBookPanel from "@/components/OrderBookPanel";
+import RiskMetricsCard from "@/components/RiskMetricsCard";
+import SeasonalityHeatmap from "@/components/SeasonalityHeatmap";
+import FairValueCard from "@/components/FairValueCard";
 
 const StockChart = dynamic(() => import("@/components/StockChart"), {
     ssr: false,
@@ -56,7 +60,6 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
     const { data: smartMoney } = useFundamentals(ticker);
     const companyCode = ticker.replace('.JK', '');
     const { data: companyDetail } = useCompanyDetail(companyCode);
-    const { data: tradingDaily } = useTradingDaily(companyCode);
     const { data: idxFinancial } = useFinancialStatement(companyCode);
 
     useEffect(() => {
@@ -323,6 +326,9 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                             </div>
                         )}
 
+                        {/* Risiko vs IHSG */}
+                        <RiskMetricsCard ticker={ticker} />
+
                         {/* Chart preview */}
                         <div className="card-flush">
                             <div className="px-4 py-3 border-b border-border">
@@ -358,6 +364,9 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                 </div>
                             </div>
                         )}
+
+                        {/* Pola musiman bulanan */}
+                        <SeasonalityHeatmap ticker={ticker} />
                     </div>
                 )}
 
@@ -406,6 +415,13 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                 <FundamentalSummary data={smartMoney} />
                             </div>
                         )}
+
+                        {/* Estimasi fair value (Graham Number) */}
+                        <FairValueCard
+                            price={smartMoney?.currentPrice ?? null}
+                            eps={smartMoney?.trailingEps ?? null}
+                            bvps={smartMoney?.bookValue ?? null}
+                        />
 
                         {/* Broker Summary per Ticker */}
                         {smartMoney && ((smartMoney as any).topBuyBrokers?.length > 0 || (smartMoney as any).topSellBrokers?.length > 0) && (
@@ -516,51 +532,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                 {activeTab === "company" && (
                     <div className="space-y-4">
                         {/* Order Book */}
-                        {tradingDaily && (
-                            <div className="card">
-                                <h3 className="text-sm font-semibold mb-3">Order Book</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-3 bg-success/5 rounded-xl border border-success/20">
-                                        <p className="text-[10px] font-bold text-success uppercase mb-2">Bid (Beli)</p>
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between">
-                                                <span className="text-xs text-muted-foreground">Harga</span>
-                                                <span className="text-sm font-bold text-success">{tradingDaily.orderBook?.bid ? tradingDaily.orderBook.bid.toLocaleString("id-ID") : '-'}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-xs text-muted-foreground">Volume</span>
-                                                <span className="text-sm font-bold text-foreground">{tradingDaily.orderBook?.bidVolume ? formatCompactIDR(tradingDaily.orderBook.bidVolume).replace('Rp', '') : '-'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="p-3 bg-destructive/5 rounded-xl border border-destructive/20">
-                                        <p className="text-[10px] font-bold text-destructive uppercase mb-2">Offer (Jual)</p>
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between">
-                                                <span className="text-xs text-muted-foreground">Harga</span>
-                                                <span className="text-sm font-bold text-destructive">{tradingDaily.orderBook?.offer ? tradingDaily.orderBook.offer.toLocaleString("id-ID") : '-'}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-xs text-muted-foreground">Volume</span>
-                                                <span className="text-sm font-bold text-foreground">{tradingDaily.orderBook?.offerVolume ? formatCompactIDR(tradingDaily.orderBook.offerVolume).replace('Rp', '') : '-'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {tradingDaily.market && (
-                                    <div className="mt-3 pt-3 border-t border-border">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-muted-foreground">Individual Index</span>
-                                            <span className="font-bold">{tradingDaily.market.individualIndex?.toFixed(2) || '-'}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs mt-1">
-                                            <span className="text-muted-foreground">Foreign Shares</span>
-                                            <span className="font-bold">{tradingDaily.market.foreignShares ? formatCompactIDR(tradingDaily.market.foreignShares).replace('Rp', '') : '-'}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <OrderBookPanel code={companyCode} />
 
                         {/* Company Profile */}
                         {companyDetail && (

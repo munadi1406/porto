@@ -14,6 +14,7 @@ import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCountUp } from "@/hooks/useCountUp";
 import { AlertChecker, AlertBadge } from "@/components/AlertChecker";
+import { TechnicalAlertChecker } from "@/components/TechnicalAlertChecker";
 import { useAlerts } from "@/hooks/useAlerts";
 
 const IHSGChart = dynamic(() => import("@/components/IHSGChart"), { ssr: false, loading: () => <div className="h-[300px] bg-muted animate-pulse rounded-lg" /> });
@@ -351,6 +352,7 @@ export default function MarketPage() {
         <div className="space-y-6">
             <MarketStatusBar />
             <AlertChecker prices={livePrices} />
+            <TechnicalAlertChecker />
 
             {/* Hero header ala terminal */}
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-r from-primary/10 via-card to-card p-5">

@@ -10,7 +10,18 @@ function fakeRes(ok: boolean, body: any) {
 describe('useFundamentals', () => {
     afterEach(() => vi.unstubAllGlobals());
 
-    it('memuat data fundamental', async () => {
+    it('memuat data fundamental (envelope nested dari route)', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => fakeRes(true, { success: true, data: { ticker: 'BBCA', peRatio: 20 }, source: 'api' }))
+        );
+        const { result } = renderHook(() => useFundamentals('BBCA'));
+        await waitFor(() => expect(result.current.data).not.toBeNull());
+        expect(result.current.data?.ticker).toBe('BBCA');
+        expect(result.current.data?.peRatio).toBe(20);
+    });
+
+    it('tetap terima body flat (kompatibilitas ke belakang)', async () => {
         vi.stubGlobal(
             'fetch',
             vi.fn(async () => fakeRes(true, { ticker: 'BBCA', peRatio: 20 }))

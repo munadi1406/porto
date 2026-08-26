@@ -751,7 +751,9 @@ export async function resilientFetch<T>(path: string, timeout = 15000): Promise<
 // ═══════════════════════════════════════════════════════════════════
 
 export async function getBrokerSummaryResilient(date?: string, length = 50) {
-    const d = date || todayStr();
-    const data = await resilientFetch<any>(`/primary/TradingSummary/GetBrokerSummary?length=${length}&start=0&date=${d}`);
-    return { data: data?.data || data?.Data || data || [], source: 'idx_direct' as const, date: d };
+    // Tanpa `date`, IDX otomatis memakai tanggal terbaru yang punya data
+    // (ringkasan broker di IDX berlag ~1-2 hari — tanggal eksplisit sering kosong).
+    const qs = date ? `&date=${date}` : '';
+    const data = await resilientFetch<any>(`/primary/TradingSummary/GetBrokerSummary?length=${length}&start=0${qs}`);
+    return { data: data?.data || data?.Data || data || [], source: 'idx_direct' as const, date };
 }

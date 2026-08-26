@@ -136,7 +136,14 @@ export function useFundamentals(ticker: string) {
                 }
 
                 const result = await response.json();
-                setData(result);
+                // Route mengembalikan { success, data: {...}, source } — unwrap,
+                // tapi tetap terima body flat untuk kompatibilitas ke belakang.
+                const payload =
+                    result && typeof result === 'object' && 'data' in result &&
+                    result.data && typeof result.data === 'object'
+                        ? result.data
+                        : result;
+                setData(payload ?? null);
             } catch (err: any) {
                 setError(err.message);
                 setData(null);

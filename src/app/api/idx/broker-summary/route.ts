@@ -13,7 +13,7 @@ const STALE_RETRY = 5 * 60 * 1000; // coba refresh lagi jika cache > 5 menit
 // Simpan di OS temp — BUKAN folder project, agar file-watcher Next dev
 // tidak menganggapnya perubahan source (memicu reload halaman).
 const DISK_FILE = path.join(os.tmpdir(), 'porto-broksum-cache-v2.json');
-let inFlight = false;
+let inFlightPromise: Promise<void> | null = null;
 
 function normalize(d: any): any | null {
     if (!d?.data?.summary || !(d.data.summary.brokerCount > 0)) return null;
@@ -25,13 +25,14 @@ function normalize(d: any): any | null {
     return d;
 }
 
-function loadDisk() {
+function loadDisk(): { data: any; ts: number } | null {
     try {
         if (fs.existsSync(DISK_FILE)) {
             const parsed = JSON.parse(fs.readFileSync(DISK_FILE, 'utf8'));
-            cache = normalize(parsed) ? parsed : null;
+            if (normalize(parsed)) return parsed;
         }
     } catch {}
+    return null;
 }
 
 function saveDisk() {
@@ -40,14 +41,36 @@ function saveDisk() {
     } catch {}
 }
 
-async function fetchBrokerSummary() {
-    const { getLastTradingDate, getBrokerSummaryResilient } = await import('@/lib/idxApiClient');
-    const { getBrokerName } = await import('@/lib/brokerCodes');
-    const { dateStr } = await import('@/lib/idxApiClient');
+// Akses modul-var lewat fungsi agar TypeScript tidak menarik kesimpulan
+// narrowing yang salah (background fetch mengubah cache secara asinkron).
+function currentCache(): { data: any; ts: number } | null {
+    return cache;
+}
 
-    const lastDate = await getLastTradingDate();
-    const { data: brokers } = await getBrokerSummaryResilient(lastDate);
-    if (!brokers || brokers.length === 0) return null;
+async function fetchBrokerSummary() {
+    const { getBrokerSummaryResilient, dateStr } = await import('@/lib/idxApiClient');
+    const { getBrokerName } = await import('@/lib/brokerCodes');
+    const { lastTradingDayWIB } = await import('@/lib/market-hours');
+
+    // 1) Tanpa date → IDX pakai tanggal terbaru yang punya data (ringkasan broker berlag).
+    // 2) Fallback: tanggal bursa lokal (kalkulasi murni, tanpa network lambat).
+    let brokers: any[] = [];
+    try {
+        const r = await getBrokerSummaryResilient(undefined, 500);
+        brokers = r.data || [];
+    } catch {}
+    if (!brokers.length) {
+        const d = lastTradingDayWIB();
+        try {
+            const r = await getBrokerSummaryResilient(d, 500);
+            brokers = r.data || [];
+        } catch {}
+    }
+    if (!brokers.length) return null;
+
+    // Tanggal aktual dari baris hasil ("2026-08-24T00:00:00" → "20260824")
+    const rawDate = String(brokers[0]?.Date || brokers[0]?.date || '');
+    const lastDate = rawDate.slice(0, 10).replace(/-/g, '') || lastTradingDayWIB();
 
     const foreignKeywords = /foreign|asing|nomura|jp morgan|credit suisse|ubs|deutsche|goldman|citi|morgan stanley|macquarie|dbs|hsbc|bnp|abn|ing|standard chartered|bofa|barclays|societe|generale|jpmorgan/i;
 
@@ -96,20 +119,22 @@ async function fetchBrokerSummary() {
     };
 }
 
-function kickBackgroundFetch() {
-    if (inFlight) return;
-    inFlight = true;
-    (async () => {
+function kickBackgroundFetch(): Promise<void> {
+    if (inFlightPromise) return inFlightPromise;
+    const p = (async () => {
         try {
             const result = await fetchBrokerSummary();
-            if (result && normalize(result)) {
-                cache = { data: normalize(result), ts: Date.now() };
+            const norm = result ? normalize(result) : null;
+            if (norm) {
+                cache = { data: norm, ts: Date.now() };
                 saveDisk();
             }
         } catch {} finally {
-            inFlight = false;
+            inFlightPromise = null;
         }
     })();
+    inFlightPromise = p;
+    return p;
 }
 
 // Cron ringan: pastikan data broksum selalu siap — kick saat boot + tiap 30 menit
@@ -121,7 +146,7 @@ if (!g2.__broksumCron) {
 }
 
 export async function GET() {
-    if (!cache) loadDisk(); // pulihkan dari restart sebelumnya
+    if (!cache) cache = loadDisk(); // pulihkan dari restart sebelumnya
     const age = cache ? Date.now() - cache.ts : Infinity;
 
     // Cache fresh → langsung (normalisasi bentuk lama bila perlu)
@@ -140,8 +165,16 @@ export async function GET() {
         return NextResponse.json({ ...(norm || cache.data), cachedAt: new Date(cache.ts).toISOString(), refreshing: true });
     }
 
-    // Belum pernah sukses — pastikan background berjalan sejak awal
-    kickBackgroundFetch();
+    // Belum pernah sukses — jalankan background dan TUNGGU sampai 40 detik
+    // agar request pertama dari browser langsung mendapat data bila memungkinkan.
+    const bg = kickBackgroundFetch();
+    await Promise.race([bg, new Promise(r => setTimeout(r, 40_000))]);
+    // Snapshot ulang — background fetch bisa saja sudah mengisi cache
+    const c = currentCache();
+    if (c) {
+        const norm = normalize(c.data);
+        if (norm) return NextResponse.json({ ...norm, cachedAt: new Date(c.ts).toISOString() });
+    }
     return NextResponse.json({
         success: true,
         data: {

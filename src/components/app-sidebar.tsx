@@ -43,6 +43,8 @@ import {
   Layers,
   CandlestickChart,
   SlidersHorizontal,
+  FlaskConical,
+  Columns2,
   Star,
   X,
 } from "lucide-react"
@@ -53,6 +55,8 @@ const MENU_GROUPS = [
     items: [
       { title: "Ringkasan Pasar", url: "/", icon: CandlestickChart },
       { title: "Screener", url: "/screener", icon: SlidersHorizontal },
+      { title: "Backtest", url: "/backtest", icon: FlaskConical },
+      { title: "Bandingkan", url: "/compare", icon: Columns2 },
       { title: "Aksi Korporasi", url: "/corporate-actions", icon: Rocket },
     ],
   },
