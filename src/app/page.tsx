@@ -343,18 +343,24 @@ export default function MarketPage() {
                         <h1 className="text-2xl font-black tracking-tight"><span className="text-gradient">Market Overview</span></h1>
                         <p className="text-xs text-muted-foreground mt-1">Pantau pasar real-time — indeks, breadth, arus dana & sektor</p>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 shrink-0">
-                        {[
-                            { label: "Naik", value: breadth.advancing, cls: "text-success" },
-                            { label: "Turun", value: breadth.declining, cls: "text-destructive" },
-                            { label: "Tetap", value: breadth.unchanged, cls: "text-muted-foreground" },
-                            { label: "Saham", value: totalStocks, cls: "text-foreground" },
-                        ].map(s => (
-                            <div key={s.label} className="rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-center backdrop-blur-sm">
-                                <p className={cn("text-lg font-black tabular-nums leading-none", s.cls)}>{s.value}</p>
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">{s.label}</p>
-                            </div>
-                        ))}
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 shrink-0">
+                        {(() => {
+                            const foreignNet = foreignFlow.find(f => f.investor === "Foreign")?.netValue;
+                            const hasForeign = foreignNet != null;
+                            return [
+                                { label: "Naik", value: breadth.advancing, cls: "text-success" },
+                                { label: "Turun", value: breadth.declining, cls: "text-destructive" },
+                                { label: "Tetap", value: breadth.unchanged, cls: "text-muted-foreground" },
+                                { label: "Net Foreign", value: hasForeign ? formatCompactIDR(foreignNet!) : "—", cls: hasForeign ? (foreignNet! >= 0 ? "text-success" : "text-destructive") : "text-muted-foreground", sub: hasForeign ? "All Market" : undefined },
+                                { label: "Saham", value: totalStocks, cls: "text-foreground" },
+                            ].map(s => (
+                                <div key={s.label} className="rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-center backdrop-blur-sm">
+                                    <p className={cn("text-lg font-black tabular-nums leading-none", s.cls)}>{s.value}</p>
+                                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">{s.label}</p>
+                                    {s.sub && <p className="text-[8px] text-muted-foreground/70 leading-none">{s.sub}</p>}
+                                </div>
+                            ));
+                        })()}
                     </div>
                 </div>
                 {lastUpdate && (

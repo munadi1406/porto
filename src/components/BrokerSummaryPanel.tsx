@@ -199,13 +199,20 @@ export default function BrokerSummaryPanel() {
 
             {subTab === "all" && hasData && (
                 <>
-                    {/* Statistik utama */}
+                    {/* Statistik utama — Net Foreign dikembalikan agar terlihat jelas */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <StatCard label="Total Nilai" value={formatCompactIDR(data.summary.totalBuyValue)} cls="text-foreground" />
-                        <StatCard label="Total Volume" value={fmtVol(data.summary.totalVolume ?? 0)} cls="text-primary" />
+                        <StatCard
+                            label="Net Foreign"
+                            value={`${(ff.Foreign?.netValue ?? 0) >= 0 ? "+" : ""}${formatCompactIDR(ff.Foreign?.netValue ?? 0)}`}
+                            cls={(ff.Foreign?.netValue ?? 0) >= 0 ? "text-success" : "text-destructive"}
+                        />
                         <StatCard label="Frekuensi" value={(data.summary.totalFreq ?? 0).toLocaleString("id-ID")} cls="text-chart-3" />
                         <StatCard label="Jumlah Broker" value={String(data.summary.brokerCount)} />
                     </div>
+                    <p className="text-[11px] text-muted-foreground -mt-1">
+                        Total Volume {fmtVol(data.summary.totalVolume ?? 0)} · Domestic {formatCompactIDR(ff.Domestic?.buyValue ?? 0)} ({((ff.Domestic?.buyValue ?? 0) / (data.summary.totalBuyValue || 1) * 100).toFixed(1)}%)
+                    </p>
 
                     {/* Foreign vs Domestic */}
                     {(ff.Foreign || ff.Domestic) && (
