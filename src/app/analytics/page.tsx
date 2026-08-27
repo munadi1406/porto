@@ -6,13 +6,13 @@ import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
 import { cn, formatIDR } from "@/lib/utils";
 import {
-    TrendingUp, TrendingDown, Activity, Shield, Target,
-    BarChart3, PieChart as PieChartIcon, AlertTriangle, ArrowUpRight, ArrowDownRight
+    TrendingUp, TrendingDown, Activity, Target,
+    BarChart3, ArrowUpRight, ArrowDownRight, Info
 } from "lucide-react";
 import {
     AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip,
-    PieChart, Pie, Cell, BarChart, Bar, CartesianGrid,
-    ReferenceLine
+    BarChart, Bar, CartesianGrid,
+    ReferenceLine, Line, LineChart
 } from "recharts";
 
 const COLORS = ['#c8300a', '#4ade80', '#0ea5e9', '#a855f7', '#f59e0b', '#ef4444', '#10b981', '#6366f1'];
@@ -25,6 +25,7 @@ export default function AnalyticsPage() {
 
     const [ihsgData, setIhsgData] = useState<{ date: string; close: number }[]>([]);
     const [riskMetrics, setRiskMetrics] = useState({ beta: 0, correlation: 0, volatility: 0 });
+    const [period, setPeriod] = useState<'1W'|'1M'|'3M'|'YTD'|'1Y'|'All'>('YTD');
 
     useEffect(() => {
         if (!tickers.length) return;
@@ -44,11 +45,11 @@ export default function AnalyticsPage() {
     }, [tickers]);
 
     useEffect(() => {
-        fetch(`/api/idx/index-chart?period=1y&interval=1d`)
+        const apiPeriod = period === '1W' ? '1mo' : period === 'All' ? '5y' : period === 'YTD' ? '1y' : period === '1Y' ? '1y' : period.toLowerCase();
+        fetch(`/api/idx/index-chart?period=${apiPeriod}&interval=1d`)
             .then(r => r.json())
             .then(j => {
                 if (j.success && Array.isArray(j.data) && j.data.length) {
-                    // API returns { Date, Close, Open, High, Low } -> map to { date, close }
                     const mapped = j.data
                         .filter((d: any) => d.Close != null && d.Date)
                         .map((d: any) => ({ date: String(d.Date).slice(0, 10), close: Number(d.Close) }));
@@ -56,7 +57,7 @@ export default function AnalyticsPage() {
                 }
             })
             .catch(() => {});
-    }, []);
+    }, [period]);
 
     const analysis = useMemo(() => {
         const totalValue = portfolio.reduce((sum, item) => {
@@ -124,53 +125,75 @@ export default function AnalyticsPage() {
 
     const performanceData = useMemo(() => {
         if (!ihsgData.length) return [];
-        // Jika history kosong / hanya 1 snapshot, buat seri normalized dari IHSG saja
-        // supaya chart tidak kosong – portfolio dianggap flat di nilai sekarang
+        const toPct = (cur: number, base: number) => base > 0 ? ((cur / base) - 1) * 100 : 0;
+        let basePort: number, baseIhsg: number;
+        let raw: { date: string; label: string; portfolio: number|null; ihsg: number|null }[];
+
         if (!history.length) {
-            const base = ihsgData[0]?.close || 1;
-            return ihsgData.map(d => ({
+            baseIhsg = ihsgData[0]?.close || 1;
+            raw = ihsgData.map(d => ({
                 date: d.date,
-                portfolio: 100,
-                ihsg: (d.close / base) * 100,
+                label: d.date.slice(5).replace('-', '/'),
+                portfolio: 0,
+                ihsg: toPct(d.close, baseIhsg),
             }));
-        }
-        if (history.length < 2) {
-            const basePort = history[0].totalValue || 1;
-            const baseIhsg = ihsgData[0]?.close || 1;
-            return history.map((h: any) => {
+        } else if (history.length < 2) {
+            basePort = history[0].totalValue || 1;
+            baseIhsg = ihsgData[0]?.close || 1;
+            raw = history.map((h: any) => {
                 const date = new Date(h.timestamp).toISOString().slice(0, 10);
                 const ihsg = ihsgData.find(i => i.date === date);
                 return {
                     date,
-                    portfolio: (h.totalValue / basePort) * 100,
-                    ihsg: ihsg ? (ihsg.close / baseIhsg) * 100 : null,
+                    label: date.slice(5).replace('-', '/'),
+                    portfolio: toPct(h.totalValue, basePort),
+                    ihsg: ihsg ? toPct(ihsg.close, baseIhsg) : null,
                 };
-            }).filter(d => d.ihsg !== null);
+            }).filter((d: any) => d.ihsg !== null);
+        } else {
+            basePort = history[0].totalValue || 1;
+            baseIhsg = ihsgData[0]?.close || 1;
+            const ihsgMap = new Map(ihsgData.map(d => [d.date, d.close]));
+            raw = history.map((h: any) => {
+                const date = new Date(h.timestamp).toISOString().slice(0, 10);
+                const ihsgClose = ihsgMap.get(date);
+                if (ihsgClose == null) return null;
+                return {
+                    date,
+                    label: date.slice(5).replace('-', '/'),
+                    portfolio: toPct(h.totalValue, basePort),
+                    ihsg: toPct(ihsgClose, baseIhsg),
+                };
+            }).filter(Boolean) as any;
+            if (raw.length < 2) {
+                raw = ihsgData.map(d => ({
+                    date: d.date,
+                    label: d.date.slice(5).replace('-', '/'),
+                    portfolio: 0,
+                    ihsg: toPct(d.close, baseIhsg),
+                }));
+            }
         }
-        // Normalisasi kedua seri ke 100 di titik awal agar skala comparable
-        const basePort = history[0].totalValue || 1;
-        const baseIhsg = ihsgData[0]?.close || 1;
-        const ihsgMap = new Map(ihsgData.map(d => [d.date, d.close]));
-        const data = history.map((h: any) => {
-            const date = new Date(h.timestamp).toISOString().slice(0, 10);
-            const ihsgClose = ihsgMap.get(date);
-            if (ihsgClose == null) return null;
-            return {
-                date,
-                portfolio: (h.totalValue / basePort) * 100,
-                ihsg: (ihsgClose / baseIhsg) * 100,
-            };
-        }).filter(Boolean) as { date: string; portfolio: number; ihsg: number }[];
-        // Jika tidak ada tanggal yang overlap (timezone / snapshot sparse), fallback ke semua ihsg
-        if (data.length < 2) {
-            return ihsgData.map(d => ({
-                date: d.date,
-                portfolio: 100,
-                ihsg: (d.close / baseIhsg) * 100,
-            }));
-        }
-        return data;
-    }, [ihsgData, history]);
+        // Filter by period
+        if (period === 'All') return raw as any;
+        const now = raw[raw.length-1]?.date ? new Date(raw[raw.length-1].date).getTime() : Date.now();
+        let cutoff = 0;
+        if (period === '1W') cutoff = now - 7*86400000;
+        else if (period === '1M') cutoff = now - 30*86400000;
+        else if (period === '3M') cutoff = now - 90*86400000;
+        else if (period === 'YTD') cutoff = new Date(new Date().getFullYear(),0,1).getTime();
+        else if (period === '1Y') cutoff = now - 365*86400000;
+        const filtered = raw.filter(d => new Date(d.date).getTime() >= cutoff);
+        // re-normalize filtered to start at 0%
+        if (filtered.length < 2) return raw as any;
+        const p0 = filtered[0].portfolio ?? 0;
+        const i0 = filtered[0].ihsg ?? 0;
+        return filtered.map(d => ({
+            ...d,
+            portfolio: d.portfolio != null ? d.portfolio - p0 : 0,
+            ihsg: d.ihsg != null ? d.ihsg - i0 : 0,
+        }));
+    }, [ihsgData, history, period]);
 
     const drawdownData = useMemo(() => {
         if (!history.length) return [];
@@ -233,50 +256,72 @@ export default function AnalyticsPage() {
                     <KPICard label="Max DD" value={`${metrics.maxDrawdown.toFixed(1)}%`} sub="drawdown" color="destructive" />
                 </div>
 
-                {/* Performance Chart */}
-                <div className="card p-5 border-border/50 shadow-lg">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 className="text-sm font-bold">Portfolio vs IHSG</h3>
-                            <p className="text-[10px] text-muted-foreground">
-                                {performanceData.length ? 'Kinerja ternormalisasi (base = 100)' : 'Menunggu data...'}
-                            </p>
+                {/* Performance Chart - dark style like reference */}
+                <div className="rounded-xl overflow-hidden border shadow-lg bg-[#0a0a0a] border-neutral-800">
+                    <div className="p-4 pb-2">
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <h3 className="text-sm font-bold text-white">Cumulative Portfolio Return</h3>
+                            <span className="w-4 h-4 rounded-full border border-neutral-600 flex items-center justify-center text-[10px] text-neutral-400">i</span>
                         </div>
-                        <div className="flex items-center gap-3 text-[10px]">
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" />Portfolio</span>
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success" />IHSG</span>
-                        </div>
+                        {performanceData.length >= 2 ? (() => {
+                            const last = performanceData[performanceData.length-1] as any;
+                            const pVal = Number(last.portfolio);
+                            const iVal = Number(last.ihsg);
+                            return (
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div className="flex items-center justify-between px-3 py-2 rounded bg-neutral-900 border border-neutral-800">
+                                        <span className="flex items-center gap-2 text-xs text-neutral-300">
+                                            <span className="w-0.5 h-4 bg-emerald-500 rounded" /> Portfolio
+                                        </span>
+                                        <span className={cn("text-sm font-bold tabular-nums", pVal >= 0 ? "text-emerald-500" : "text-red-500")}>
+                                            {pVal > 0 ? "+" : ""}{pVal.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between px-3 py-2 rounded bg-neutral-900 border border-neutral-800">
+                                        <span className="flex items-center gap-2 text-xs text-neutral-300">
+                                            <span className="w-0.5 h-4 bg-purple-500 rounded" /> IHSG
+                                        </span>
+                                        <span className={cn("text-sm font-bold tabular-nums", iVal >= 0 ? "text-emerald-500" : "text-red-500")}>
+                                            {iVal > 0 ? "+" : ""}{iVal.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })() : null}
                     </div>
-                    <div className="h-64">
+                    <div className="h-64 px-2">
                         {performanceData.length < 2 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                            <div className="h-full flex flex-col items-center justify-center text-neutral-500">
                                 <Activity className="w-8 h-8 mb-2 opacity-30" />
                                 <p className="text-xs">Belum cukup data historis</p>
-                                <p className="text-[10px]">Portfolio butuh ≥2 snapshot harian. Data snapshot dibuat otomatis setiap ada perubahan.</p>
+                                <p className="text-[10px]">Butuh ≥2 snapshot harian</p>
                             </div>
                         ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={performanceData}>
-                                <defs>
-                                    <linearGradient id="colorPort" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorIHSG" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--success)" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => String(v).slice(5)} />
-                                <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${Number(v).toFixed(0)}`} domain={['dataMin - 2', 'dataMax + 2']} />
-                                <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} formatter={(v) => `${Number(v).toFixed(2)}`} />
-                                <Area type="monotone" dataKey="portfolio" stroke="var(--primary)" fill="url(#colorPort)" strokeWidth={2} name="Portfolio" dot={false} />
-                                <Area type="monotone" dataKey="ihsg" stroke="var(--success)" fill="url(#colorIHSG)" strokeWidth={2} name="IHSG" dot={false} />
-                                <ReferenceLine y={100} stroke="var(--border)" strokeDasharray="4 4" />
-                            </AreaChart>
+                            <LineChart data={performanceData} margin={{ left: 0, right: 32, top: 8, bottom: 0 }}>
+                                <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#a3a3a3" }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={40} />
+                                <YAxis tick={{ fontSize: 10, fill: "#a3a3a3" }} axisLine={false} tickLine={false} width={42} orientation="right" tickFormatter={(v) => `${v > 0 ? "" : ""}${Number(v).toFixed(0)}%`} domain={['auto','auto']} />
+                                <Tooltip
+                                    contentStyle={{ background: '#171717', border: '1px solid #404040', borderRadius: 8, fontSize: 11, color: '#fff' }}
+                                    formatter={(v: any, name: any) => [`${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(2)}%`, name === 'portfolio' ? 'Portfolio' : 'IHSG']}
+                                    labelFormatter={(label) => `Tanggal ${label}`}
+                                />
+                                <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="4 4" />
+                                <Line type="monotone" dataKey="portfolio" stroke="#10b981" strokeWidth={1.8} dot={false} name="portfolio" />
+                                <Line type="monotone" dataKey="ihsg" stroke="#a855f7" strokeWidth={1.8} dot={false} name="ihsg" />
+                            </LineChart>
                         </ResponsiveContainer>
                         )}
+                    </div>
+                    <div className="flex items-center justify-center gap-6 py-3 border-t border-neutral-800 text-xs">
+                        {(['1W','1M','3M','YTD','1Y','All'] as const).map(p => (
+                            <button
+                                key={p}
+                                onClick={() => setPeriod(p)}
+                                className={cn("pb-1 border-b-2 transition-colors", period === p ? "border-emerald-500 text-white font-bold" : "border-transparent text-neutral-500 hover:text-neutral-300")}
+                            >{p}</button>
+                        ))}
                     </div>
                 </div>
 
