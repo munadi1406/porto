@@ -44,13 +44,15 @@ export default function AnalyticsPage() {
     }, [tickers]);
 
     useEffect(() => {
-        const end = Math.floor(Date.now() / 1000);
-        const start = end - 365 * 24 * 60 * 60;
         fetch(`/api/idx/index-chart?period=1y&interval=1d`)
             .then(r => r.json())
             .then(j => {
-                if (j.success && j.data) {
-                    setIhsgData(j.data);
+                if (j.success && Array.isArray(j.data) && j.data.length) {
+                    // API returns { Date, Close, Open, High, Low } -> map to { date, close }
+                    const mapped = j.data
+                        .filter((d: any) => d.Close != null && d.Date)
+                        .map((d: any) => ({ date: String(d.Date).slice(0, 10), close: Number(d.Close) }));
+                    setIhsgData(mapped);
                 }
             })
             .catch(() => {});
@@ -121,16 +123,52 @@ export default function AnalyticsPage() {
     }, [analysis, history]);
 
     const performanceData = useMemo(() => {
-        if (!ihsgData.length || !history.length) return [];
+        if (!ihsgData.length) return [];
+        // Jika history kosong / hanya 1 snapshot, buat seri normalized dari IHSG saja
+        // supaya chart tidak kosong – portfolio dianggap flat di nilai sekarang
+        if (!history.length) {
+            const base = ihsgData[0]?.close || 1;
+            return ihsgData.map(d => ({
+                date: d.date,
+                portfolio: 100,
+                ihsg: (d.close / base) * 100,
+            }));
+        }
+        if (history.length < 2) {
+            const basePort = history[0].totalValue || 1;
+            const baseIhsg = ihsgData[0]?.close || 1;
+            return history.map((h: any) => {
+                const date = new Date(h.timestamp).toISOString().slice(0, 10);
+                const ihsg = ihsgData.find(i => i.date === date);
+                return {
+                    date,
+                    portfolio: (h.totalValue / basePort) * 100,
+                    ihsg: ihsg ? (ihsg.close / baseIhsg) * 100 : null,
+                };
+            }).filter(d => d.ihsg !== null);
+        }
+        // Normalisasi kedua seri ke 100 di titik awal agar skala comparable
+        const basePort = history[0].totalValue || 1;
+        const baseIhsg = ihsgData[0]?.close || 1;
+        const ihsgMap = new Map(ihsgData.map(d => [d.date, d.close]));
         const data = history.map((h: any) => {
             const date = new Date(h.timestamp).toISOString().slice(0, 10);
-            const ihsg = ihsgData.find(i => i.date && i.date.slice(0, 10) === date);
+            const ihsgClose = ihsgMap.get(date);
+            if (ihsgClose == null) return null;
             return {
                 date,
-                portfolio: h.totalValue || 0,
-                ihsg: ihsg ? ihsg.close * 1000 : null,
+                portfolio: (h.totalValue / basePort) * 100,
+                ihsg: (ihsgClose / baseIhsg) * 100,
             };
-        }).filter(d => d.ihsg !== null);
+        }).filter(Boolean) as { date: string; portfolio: number; ihsg: number }[];
+        // Jika tidak ada tanggal yang overlap (timezone / snapshot sparse), fallback ke semua ihsg
+        if (data.length < 2) {
+            return ihsgData.map(d => ({
+                date: d.date,
+                portfolio: 100,
+                ihsg: (d.close / baseIhsg) * 100,
+            }));
+        }
         return data;
     }, [ihsgData, history]);
 
@@ -200,14 +238,23 @@ export default function AnalyticsPage() {
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h3 className="text-sm font-bold">Portfolio vs IHSG</h3>
-                            <p className="text-[10px] text-muted-foreground">Value comparison (IDR Million)</p>
+                            <p className="text-[10px] text-muted-foreground">
+                                {performanceData.length ? 'Kinerja ternormalisasi (base = 100)' : 'Menunggu data...'}
+                            </p>
                         </div>
                         <div className="flex items-center gap-3 text-[10px]">
                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" />Portfolio</span>
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success" />IHSG (x1000)</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success" />IHSG</span>
                         </div>
                     </div>
                     <div className="h-64">
+                        {performanceData.length < 2 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                                <Activity className="w-8 h-8 mb-2 opacity-30" />
+                                <p className="text-xs">Belum cukup data historis</p>
+                                <p className="text-[10px]">Portfolio butuh ≥2 snapshot harian. Data snapshot dibuat otomatis setiap ada perubahan.</p>
+                            </div>
+                        ) : (
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={performanceData}>
                                 <defs>
@@ -221,14 +268,15 @@ export default function AnalyticsPage() {
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} />
-                                <YAxis yAxisId="left" tick={{ fontSize: 9 }} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />
-                                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}`} />
-                                <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} />
-                                <Area yAxisId="left" type="monotone" dataKey="portfolio" stroke="var(--primary)" fill="url(#colorPort)" strokeWidth={2} name="Portfolio (Rp)" />
-                                <Area yAxisId="right" type="monotone" dataKey="ihsg" stroke="var(--success)" fill="url(#colorIHSG)" strokeWidth={2} name="IHSG (points)" />
+                                <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => String(v).slice(5)} />
+                                <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${Number(v).toFixed(0)}`} domain={['dataMin - 2', 'dataMax + 2']} />
+                                <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} formatter={(v) => `${Number(v).toFixed(2)}`} />
+                                <Area type="monotone" dataKey="portfolio" stroke="var(--primary)" fill="url(#colorPort)" strokeWidth={2} name="Portfolio" dot={false} />
+                                <Area type="monotone" dataKey="ihsg" stroke="var(--success)" fill="url(#colorIHSG)" strokeWidth={2} name="IHSG" dot={false} />
+                                <ReferenceLine y={100} stroke="var(--border)" strokeDasharray="4 4" />
                             </AreaChart>
                         </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
 
@@ -238,6 +286,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-sm font-bold mb-1">Drawdown</h3>
                         <p className="text-[10px] text-muted-foreground mb-4">Portfolio peak-to-trough decline</p>
                         <div className="h-48">
+                        {drawdownData.length < 2 ? (
+                            <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Belum ada data drawdown</div>
+                        ) : (
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={drawdownData}>
                                     <defs>
@@ -247,14 +298,15 @@ export default function AnalyticsPage() {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} />
+                                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => String(v).slice(5)} />
                                     <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${v}%`} />
                                     <ReferenceLine y={0} stroke="var(--border)" />
-                                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} />
-                                    <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="url(#colorDD)" strokeWidth={2} name="Drawdown" />
+                                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} formatter={(v) => `${Number(v).toFixed(2)}%`} />
+                                    <Area type="monotone" dataKey="drawdown" stroke="var(--destructive)" fill="url(#colorDD)" strokeWidth={2} name="Drawdown" dot={false} />
                                 </AreaChart>
                             </ResponsiveContainer>
-                        </div>
+                        )}
+                    </div>
                     </div>
 
                     <div className="card p-5 border-border/50 shadow-lg">
