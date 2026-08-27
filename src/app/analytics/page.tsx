@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
         if (!ihsgData.length || !history.length) return [];
         const data = history.map((h: any) => {
             const date = new Date(h.timestamp).toISOString().slice(0, 10);
-            const ihsg = ihsgData.find(i => i.date.slice(0, 10) === date);
+            const ihsg = ihsgData.find(i => i.date && i.date.slice(0, 10) === date);
             return {
                 date,
                 portfolio: h.totalValue || 0,
