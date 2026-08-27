@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FlaskConical, Loader2, Search, Target, Trophy } from "lucide-react";
+import { FlaskConical, Loader2, Search, Target, Trophy, BarChart3, Bot, Calculator, LayoutGrid, TrendingUp, AlertCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
 import { STRATEGIES, type StrategyId } from "@/lib/quant";
+import { PositionCalculator } from "@/components/PositionCalculator";
+import { BacktestAiSummary } from "@/components/BacktestAiSummary";
 
 interface BtTrade {
     entryDate: string;
@@ -61,6 +63,7 @@ export default function BacktestPage() {
     const [rank, setRank] = useState<RankResponse | null>(null);
     const [rankLoading, setRankLoading] = useState(false);
     const [rankError, setRankError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<"hasil" | "ai" | "posisi" | "ranking">("hasil");
 
     const run = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -69,11 +72,16 @@ export default function BacktestPage() {
         setLoading(true);
         setError(null);
         setResult(null);
+        setActiveTab("hasil");
         try {
             const res = await fetch(`/api/backtest?ticker=${t}&strategy=${strategy}&years=${years}`);
             const json = await res.json();
             if (!json.success) throw new Error(json.error || "Gagal menjalankan backtest");
             setResult(json.data);
+
+            if (!rank || rank.ticker !== t || rank.years !== years) {
+                fetchRanking(t, years);
+            }
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -81,18 +89,15 @@ export default function BacktestPage() {
         }
     };
 
-    const runRank = async (e?: React.MouseEvent) => {
-        e?.preventDefault();
-        const t = ticker.trim().toUpperCase().replace(".JK", "");
-        if (!t) return;
+    const fetchRanking = async (t: string, y: number) => {
         setRankLoading(true);
         setRankError(null);
-        setRank(null);
         try {
-            const res = await fetch(`/api/backtest/rank?ticker=${t}&years=${years}`);
+            const res = await fetch(`/api/backtest/rank?ticker=${t}&years=${y}`);
             const json = await res.json();
-            if (!json.success) throw new Error(json.error || "Gagal menjalankan ranking");
-            setRank(json.data);
+            if (json.success) {
+                setRank(json.data);
+            }
         } catch (err: any) {
             setRankError(err.message);
         } finally {
@@ -100,43 +105,198 @@ export default function BacktestPage() {
         }
     };
 
+    const runRank = async (e?: React.MouseEvent) => {
+        e?.preventDefault();
+        const t = ticker.trim().toUpperCase().replace(".JK", "");
+        if (!t) return;
+        setRank(null);
+        await fetchRanking(t, years);
+    };
+
+    const tabs = [
+        { id: "hasil" as const, label: "Statistik", icon: BarChart3 },
+        { id: "ai" as const, label: "Entry AI", icon: Bot },
+        { id: "posisi" as const, label: "Kalkulator", icon: Calculator },
+        { id: "ranking" as const, label: "Banding", icon: LayoutGrid },
+    ];
+
     return (
-        <div className="space-y-4">
-            <div>
-                <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-                    <FlaskConical className="w-6 h-6 text-primary" />
-                    Backtest Strategi
-                </h1>
-                <p className="text-xs text-muted-foreground mt-1">
-                    Uji strategi teknikal ke data historis — bandingkan dengan beli-dan-tahan
-                </p>
+        <div className="space-y-3">
+            {/* Header + Form */}
+            <div className="card p-0 overflow-hidden">
+                <div className="p-4 border-b border-border bg-muted/20">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
+                                <FlaskConical className="w-5 h-5 text-primary" />
+                                Backtest Strategi
+                            </h1>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Uji strategi teknikal ke data historis IDX
+                            </p>
+                        </div>
+                        {result && (
+                            <div className="text-right">
+                                <p className="text-base font-black text-primary">{result.ticker}</p>
+                                <p className="text-[10px] text-muted-foreground">{result.strategyLabel}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <form onSubmit={run} className="p-3 flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="flex-1">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Kode Saham</label>
+                        <div className="relative mt-1">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                            <input
+                                value={ticker}
+                                onChange={e => setTicker(e.target.value)}
+                                placeholder="BBCA"
+                                className="w-full bg-background border border-border rounded-lg pl-8 pr-3 py-2 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex-1">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Strategi</label>
+                        <select
+                            value={strategy}
+                            onChange={e => setStrategy(e.target.value as StrategyId)}
+                            className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        >
+                            {STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                        </select>
+                    </div>
+                    <div className="w-28">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Periode</label>
+                        <select
+                            value={years}
+                            onChange={e => setYears(Number(e.target.value))}
+                            className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        >
+                            {YEARS.map(y => <option key={y} value={y}>{y} tahun</option>)}
+                        </select>
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-5 py-2 text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+                        Jalankan
+                    </button>
+                </form>
             </div>
 
-            <BacktestForm
-                ticker={ticker} setTicker={setTicker}
-                strategy={strategy} setStrategy={setStrategy}
-                years={years} setYears={setYears}
-                loading={loading} onSubmit={run}
-            />
-
+            {/* Error */}
             {error && !loading && (
-                <div className="card border-destructive/40 text-xs text-destructive">{error}</div>
-            )}
-
-            {loading && (
-                <div className="card h-40 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin text-primary" /> Menghitung…
+                <div className="card flex items-center gap-2 p-3 border-destructive/40 bg-destructive/5 text-xs text-destructive">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    {error}
                 </div>
             )}
 
-            {!loading && result && <BacktestResultView result={result} />}
+            {/* Loading */}
+            {loading && (
+                <div className="card h-32 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    <span>Menghitung backtest…</span>
+                </div>
+            )}
 
-            {/* Ranking semua strategi */}
-            <RankingSection
-                ticker={ticker} years={years}
-                rank={rank} loading={rankLoading} error={rankError}
-                onRun={runRank}
-            />
+            {/* Tabs */}
+            <div className="card p-0 overflow-hidden">
+                <div className="flex items-center border-b border-border bg-muted/10">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            disabled={!result && tab.id !== "ranking"}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-5 py-3 text-xs font-bold border-b-2 -mb-px transition-colors",
+                                activeTab === tab.id
+                                    ? "border-primary text-primary bg-background"
+                                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                                !result && tab.id !== "ranking" && "opacity-40 cursor-not-allowed hover:text-muted-foreground hover:bg-transparent"
+                            )}
+                        >
+                            <tab.icon className="w-3.5 h-3.5" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-4 min-h-[400px]">
+                    {!result && activeTab !== "ranking" && (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                            <FlaskConical className="w-12 h-12 mb-4 text-muted-foreground/30" />
+                            <p className="text-sm font-medium">Belum ada hasil backtest</p>
+                            <p className="text-xs mt-1">Isi form di atas dan klik "Jalankan"</p>
+                        </div>
+                    )}
+
+                    {activeTab === "hasil" && result && <BacktestResultView result={result} />}
+
+                    {activeTab === "ai" && result && (
+                        <div className="space-y-4">
+                            <BacktestAiSummary
+                                backtestResult={result}
+                                positionCalc={null}
+                                ticker={result.ticker}
+                                strategyLabel={result.strategyLabel}
+                            />
+                            <div className="card p-4 border-primary/30">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Target className="w-4 h-4 text-primary" />
+                                    <h3 className="text-sm font-bold">Entry & Alokasi AI</h3>
+                                    <span className="ml-auto text-[9px] text-muted-foreground">Berbasis ranking semua strategi</span>
+                                </div>
+                                <PositionCalculator
+                                    ticker={result.ticker}
+                                    lastClose={result.nextEntry?.lastClose}
+                                    technicalData={{
+                                        nextEntry: result.nextEntry,
+                                        indicators: result.nextEntry?.indicatorNow
+                                            ? { indicatorNow: result.nextEntry.indicatorNow }
+                                            : {},
+                                    }}
+                                    strategyLabel={result.strategyLabel}
+                                    showCalculator={false}
+                                    ranking={rank}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === "posisi" && result && (
+                        <PositionCalculator
+                            ticker={result.ticker}
+                            lastClose={result.nextEntry?.lastClose}
+                            technicalData={{
+                                nextEntry: result.nextEntry,
+                                indicators: result.nextEntry?.indicatorNow
+                                    ? { indicatorNow: result.nextEntry.indicatorNow }
+                                    : {},
+                            }}
+                            strategyLabel={result.strategyLabel}
+                            showCalculator={true}
+                            ranking={rank}
+                        />
+                    )}
+
+                    {activeTab === "ranking" && (
+                        <RankingSection
+                            ticker={ticker}
+                            years={years}
+                            rank={rank}
+                            loading={rankLoading}
+                            error={rankError}
+                            onRun={runRank}
+                        />
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
@@ -179,34 +339,37 @@ function RankingSection({
         <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                    <h2 className="text-lg font-black tracking-tight">Peringkat Semua Strategi</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                        Jalankan 8 strategi sekaligus — skor komposit dari win rate, profit factor &amp; Sharpe
+                    <p className="text-[11px] text-muted-foreground">
+                        Bandingkan 8 strategi sekaligus — skor komposit dari win rate, profit factor &amp; Sharpe
                     </p>
                 </div>
                 <button
                     onClick={onRun}
                     disabled={loading || !t}
-                    className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 text-primary px-4 py-2 text-sm font-bold hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 text-primary px-3 py-1.5 text-xs font-bold hover:bg-primary/20 disabled:opacity-50 transition-colors"
                 >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
-                    Uji Semua ({years} tahun)
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
+                    Uji Semua ({years}t)
                 </button>
             </div>
 
             {error && !loading && (
-                <div className="card border-destructive/40 text-xs text-destructive">{error}</div>
+                <div className="card flex items-center gap-2 p-3 border-destructive/40 bg-destructive/5 text-xs text-destructive">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    {error}
+                </div>
             )}
 
             {!loading && !rank && !error && (
-                <div className="card py-8 text-center text-xs text-muted-foreground">
-                    Tekan &quot;Uji Semua&quot; untuk melihat strategi dengan peluang terbaik untuk {t || "saham"}.
+                <div className="text-center py-10 text-xs text-muted-foreground">
+                    Tekan &quot;Uji Semua&quot; untuk melihat strategi terbaik untuk {t || "saham"}.
                 </div>
             )}
 
             {loading && (
-                <div className="card h-24 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" /> Menguji 8 strategi…
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <span>Menguji 8 strategi…</span>
                 </div>
             )}
 
@@ -220,134 +383,81 @@ function RankTable({ data }: { data: RankResponse }) {
     return (
         <div className="space-y-3">
             {data.best && (
-                <div className="card border-success/40 bg-success/5">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-success mb-1">
-                        🏆 Probabilitas Terbaik · {data.ticker} · {data.years} tahun
-                    </p>
-                    <p className="text-base font-black">{data.best.label}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Skor {data.best.score.toFixed(0)}/100 · return{" "}
-                        <b className={data.best.stats.totalReturnPct >= 0 ? "text-success" : "text-destructive"}>
+                <div className="card p-3 border-success/40 bg-success/5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Trophy className="w-4 h-4 text-success" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-success">
+                            Strategi Terbaik · {data.ticker} · {data.years} tahun
+                        </span>
+                    </div>
+                    <p className="text-sm font-black">{data.best.label}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[11px]">
+                        <span>Skor <b className="text-success">{data.best.score.toFixed(0)}/100</b></span>
+                        <span>Return <b className={data.best.stats.totalReturnPct >= 0 ? "text-success" : "text-destructive"}>
                             {data.best.stats.totalReturnPct >= 0 ? "+" : ""}{data.best.stats.totalReturnPct.toFixed(1)}%
-                        </b>{" "}
-                        (vs beli-tahan {data.best.stats.buyHoldReturnPct >= 0 ? "+" : ""}{data.best.stats.buyHoldReturnPct.toFixed(1)}%)
-                        · win rate {data.best.stats.winRatePct.toFixed(0)}% dari {data.best.tradeCount} trade
-                        · Sharpe {data.best.stats.sharpeRatio.toFixed(2)}
-                        {data.best.lowSample && " · ⚠ sampel trade sedikit"}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground/80 mt-1.5">{data.best.description}</p>
+                        </b></span>
+                        <span>vs B&H <b className={data.best.stats.buyHoldReturnPct >= 0 ? "text-success" : "text-destructive"}>
+                            {data.best.stats.buyHoldReturnPct >= 0 ? "+" : ""}{data.best.stats.buyHoldReturnPct.toFixed(1)}%
+                        </b></span>
+                        <span>WR <b>{data.best.stats.winRatePct.toFixed(0)}%</b></span>
+                        <span>Sharpe <b>{data.best.stats.sharpeRatio.toFixed(2)}</b></span>
+                        {data.best.lowSample && <span className="text-warning">⚠ sampel sedikit</span>}
+                    </div>
                 </div>
             )}
 
-            <div className="card overflow-x-auto">
-                <table className="w-full text-xs tabular-nums min-w-[720px]">
+            <div className="card overflow-x-auto p-0">
+                <table className="w-full text-xs tabular-nums min-w-[680px]">
                     <thead>
-                        <tr className="text-left text-muted-foreground border-b border-border">
-                            <th className="py-2 pr-2">#</th>
-                            <th className="py-2 pr-3">Strategi</th>
-                            <th className="py-2 pr-3">Skor</th>
-                            <th className="py-2 pr-3 text-right">Return</th>
-                            <th className="py-2 pr-3 text-right">vs B&amp;H</th>
-                            <th className="py-2 pr-3 text-right">Win</th>
-                            <th className="py-2 pr-3 text-right">Trade</th>
-                            <th className="py-2 pr-3 text-right">Sharpe</th>
-                            <th className="py-2 pr-3 text-right">PF</th>
-                            <th className="py-2 text-right">Exposure</th>
+                        <tr className="text-left text-muted-foreground border-b border-border bg-muted/30">
+                            <th className="py-2 px-3">#</th>
+                            <th className="py-2 px-3">Strategi</th>
+                            <th className="py-2 px-3">Skor</th>
+                            <th className="py-2 px-3 text-right">Return</th>
+                            <th className="py-2 px-3 text-right">vs B&H</th>
+                            <th className="py-2 px-3 text-right">Win</th>
+                            <th className="py-2 px-3 text-right">Trade</th>
+                            <th className="py-2 px-3 text-right">Sharpe</th>
+                            <th className="py-2 px-3 text-right">Exposure</th>
                         </tr>
                     </thead>
                     <tbody>
                         {data.ranked.map((r, i) => (
                             <tr key={r.strategy} className={cn("border-b border-border/40 last:border-b-0", i === 0 && "bg-primary/5")}>
-                                <td className="py-2 pr-2 font-bold text-muted-foreground">
+                                <td className="py-2 px-3 font-bold text-muted-foreground">
                                     {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
                                 </td>
-                                <td className="py-2 pr-3 font-semibold max-w-[220px] truncate" title={r.description}>{r.label}</td>
-                                <td className="py-2 pr-3">
-                                    <div className="flex items-center gap-2 min-w-[110px]">
+                                <td className="py-2 px-3 font-semibold max-w-[200px] truncate" title={r.description}>{r.label}</td>
+                                <td className="py-2 px-3">
+                                    <div className="flex items-center gap-2 min-w-[90px]">
                                         <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                                             <div className="h-full bg-primary rounded-full" style={{ width: `${(r.score / maxScore) * 100}%` }} />
                                         </div>
-                                        <span className="font-bold w-7 text-right">{r.score.toFixed(0)}</span>
+                                        <span className="font-bold w-6 text-right">{r.score.toFixed(0)}</span>
                                     </div>
                                 </td>
-                                <td className={cn("py-2 pr-3 text-right font-bold", r.stats.totalReturnPct >= 0 ? "text-success" : "text-destructive")}>
+                                <td className={cn("py-2 px-3 text-right font-bold", r.stats.totalReturnPct >= 0 ? "text-success" : "text-destructive")}>
                                     {r.stats.totalReturnPct >= 0 ? "+" : ""}{r.stats.totalReturnPct.toFixed(0)}%
                                 </td>
-                                <td className={cn("py-2 pr-3 text-right", r.stats.totalReturnPct - r.stats.buyHoldReturnPct >= 0 ? "text-success" : "text-destructive")}>
+                                <td className={cn("py-2 px-3 text-right", r.stats.totalReturnPct - r.stats.buyHoldReturnPct >= 0 ? "text-success" : "text-destructive")}>
                                     {r.stats.totalReturnPct - r.stats.buyHoldReturnPct >= 0 ? "+" : ""}
                                     {(r.stats.totalReturnPct - r.stats.buyHoldReturnPct).toFixed(0)}%
                                 </td>
-                                <td className="py-2 pr-3 text-right">{r.stats.winRatePct.toFixed(0)}%</td>
-                                <td className="py-2 pr-3 text-right">
-                                    {r.tradeCount}{r.lowSample && <span title="<5 trade — sampel lemah"> ⚠</span>}
+                                <td className="py-2 px-3 text-right">{r.stats.winRatePct.toFixed(0)}%</td>
+                                <td className="py-2 px-3 text-right">
+                                    {r.tradeCount}{r.lowSample && <span title="<5 trade"> ⚠</span>}
                                 </td>
-                                <td className="py-2 pr-3 text-right">{Number.isFinite(r.stats.sharpeRatio) ? r.stats.sharpeRatio.toFixed(2) : "-"}</td>
-                                <td className="py-2 pr-3 text-right">{r.stats.profitFactor == null ? "∞" : Number.isFinite(r.stats.profitFactor) ? r.stats.profitFactor.toFixed(2) : "-"}</td>
-                                <td className="py-2 text-right">{r.stats.exposurePct.toFixed(0)}%</td>
+                                <td className="py-2 px-3 text-right">{Number.isFinite(r.stats.sharpeRatio) ? r.stats.sharpeRatio.toFixed(2) : "-"}</td>
+                                <td className="py-2 px-3 text-right">{r.stats.exposurePct.toFixed(0)}%</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-                <p className="mt-2 text-[9px] text-muted-foreground/70">
-                    Skor = 45% win rate + 25% profit factor (PF3→100) + 30% Sharpe (−1→0, 2→100); ×0.6 bila trade &lt;5.
-                    Return sudah net biaya 0.15%/0.25%. Data historis bukan jaminan masa depan.
-                </p>
             </div>
+            <p className="text-[9px] text-muted-foreground/60 px-1">
+                Skor = 45% win rate + 25% profit factor + 30% Sharpe. Return net biaya 0.15%/0.25%.
+            </p>
         </div>
-    );
-}
-
-function BacktestForm({
-    ticker, setTicker, strategy, setStrategy, years, setYears, loading, onSubmit,
-}: {
-    ticker: string; setTicker: (v: string) => void;
-    strategy: StrategyId; setStrategy: (v: StrategyId) => void;
-    years: number; setYears: (v: number) => void;
-    loading: boolean; onSubmit: (e?: React.FormEvent) => void;
-}) {
-    return (
-        <form onSubmit={onSubmit} className="card flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div className="flex-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Kode Saham</label>
-                <div className="relative mt-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                        value={ticker}
-                        onChange={e => setTicker(e.target.value)}
-                        placeholder="BBCA"
-                        className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                </div>
-            </div>
-            <div className="flex-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Strategi</label>
-                <select
-                    value={strategy}
-                    onChange={e => setStrategy(e.target.value as StrategyId)}
-                    className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
-                >
-                    {STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
-            </div>
-            <div>
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Periode</label>
-                <select
-                    value={years}
-                    onChange={e => setYears(Number(e.target.value))}
-                    className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
-                >
-                    {YEARS.map(y => <option key={y} value={y}>{y} tahun</option>)}
-                </select>
-            </div>
-            <button
-                type="submit"
-                disabled={loading}
-                className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-5 py-2 text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Jalankan
-            </button>
-        </form>
     );
 }
 
@@ -357,68 +467,115 @@ function BacktestResultView({ result }: { result: BtResponse }) {
         label: p.date.slice(2).replace("-", "/"),
     }));
 
-    return (
-        <>
-            <p className="text-xs text-muted-foreground">{result.strategyDescription}</p>
+    const returnVsBH = result.stats.totalReturnPct - result.stats.buyHoldReturnPct;
 
-            {/* Peringatan validitas SMA200 */}
+    return (
+        <div className="space-y-4">
+            {/* Strategy badge */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">{result.strategyLabel}</span>
+                <span>·</span>
+                <span>{result.from} → {result.to}</span>
+                <span>·</span>
+                <span>{result.barsUsed} hari</span>
+            </div>
+
+            {/* Warning SMA200 */}
             {result.strategyLabel.includes("200") && result.barsUsed < 210 && (
-                <div className="card border-warning/40 bg-warning/5 text-xs text-warning">
-                    Data hanya {result.barsUsed} hari — SMA200 baru valid di akhir periode, sinyal golden cross
-                    sangat terbatas. Gunakan periode 3–5 tahun untuk hasil bermakna.
+                <div className="card flex items-center gap-2 p-3 border-warning/40 bg-warning/5 text-xs text-warning">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Data {result.barsUsed} hari — SMA200 belum valid. Gunakan 3–5 tahun.</span>
                 </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {[
-                    { label: "Return Strategi", value: `${result.stats.totalReturnPct >= 0 ? "+" : ""}${result.stats.totalReturnPct.toFixed(1)}%`, cls: result.stats.totalReturnPct >= 0 ? "text-success" : "text-destructive" },
-                    { label: "Beli & Tahan", value: `${result.stats.buyHoldReturnPct >= 0 ? "+" : ""}${result.stats.buyHoldReturnPct.toFixed(1)}%`, cls: result.stats.buyHoldReturnPct >= 0 ? "text-success" : "text-destructive" },
-                    { label: "CAGR", value: `${result.stats.annualizedReturnPct >= 0 ? "+" : ""}${result.stats.annualizedReturnPct.toFixed(1)}%`, cls: result.stats.annualizedReturnPct >= 0 ? "text-success" : "text-destructive" },
-                    { label: "Win Rate", value: `${result.stats.winRatePct.toFixed(0)}%`, cls: "" },
-                    { label: "Jumlah Trade", value: String(result.stats.tradeCount), cls: "" },
-                    { label: "Max DD Strategi", value: `${result.stats.maxDrawdownPct.toFixed(1)}%`, cls: "text-destructive" },
-                ].map(s => (
-                    <div key={s.label} className="bg-card border border-border rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">{s.label}</p>
-                        <p className={cn("text-sm font-black tabular-nums", s.cls)}>{s.value}</p>
-                    </div>
-                ))}
+            {/* Main stats */}
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                <StatCard
+                    label="Return"
+                    value={`${result.stats.totalReturnPct >= 0 ? "+" : ""}${result.stats.totalReturnPct.toFixed(1)}%`}
+                    color={result.stats.totalReturnPct >= 0 ? "success" : "destructive"}
+                />
+                <StatCard
+                    label="vs B&H"
+                    value={`${returnVsBH >= 0 ? "+" : ""}${returnVsBH.toFixed(1)}%`}
+                    color={returnVsBH >= 0 ? "success" : "destructive"}
+                />
+                <StatCard
+                    label="CAGR"
+                    value={`${result.stats.annualizedReturnPct >= 0 ? "+" : ""}${result.stats.annualizedReturnPct.toFixed(1)}%`}
+                    color={result.stats.annualizedReturnPct >= 0 ? "success" : "destructive"}
+                />
+                <StatCard
+                    label="Win Rate"
+                    value={`${result.stats.winRatePct.toFixed(0)}%`}
+                    color={result.stats.winRatePct >= 50 ? "success" : result.stats.winRatePct >= 40 ? "warning" : "destructive"}
+                />
+                <StatCard
+                    label="Max DD"
+                    value={`${result.stats.maxDrawdownPct.toFixed(1)}%`}
+                    color="destructive"
+                />
+                <StatCard
+                    label="Trades"
+                    value={String(result.stats.tradeCount)}
+                    color="default"
+                />
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                    {
-                        label: "Sharpe Ratio",
-                        value: result.stats.sharpeRatio.toFixed(2),
-                        sub: result.stats.sharpeRatio >= 1 ? "baik" : result.stats.sharpeRatio >= 0.5 ? "cukup" : "lemah",
-                    },
-                    {
-                        label: "Profit Factor",
-                        value: result.stats.profitFactor == null ? "∞" : result.stats.profitFactor.toFixed(2),
-                        sub: "gross win ÷ loss",
-                    },
-                    { label: "Exposure", value: `${result.stats.exposurePct.toFixed(0)}%`, sub: "waktu di pasar" },
-                    { label: "Rata-rata Pegang", value: `${Math.round(result.stats.avgDaysHeld)} hari`, sub: `${result.stats.tradeCount} trade` },
-                ].map(s => (
-                    <div key={s.label} className="bg-card border border-border rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">{s.label}</p>
-                        <p className="text-sm font-black tabular-nums">{s.value}</p>
-                        {s.sub && <p className="text-[9px] text-muted-foreground/80">{s.sub}</p>}
-                    </div>
-                ))}
+            {/* Secondary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="card p-2.5 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Sharpe</p>
+                    <p className={cn("text-sm font-black", result.stats.sharpeRatio >= 1 ? "text-success" : result.stats.sharpeRatio >= 0.5 ? "text-warning" : "text-destructive")}>
+                        {result.stats.sharpeRatio.toFixed(2)}
+                    </p>
+                </div>
+                <div className="card p-2.5 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Profit Factor</p>
+                    <p className="text-sm font-black">
+                        {result.stats.profitFactor == null ? "∞" : result.stats.profitFactor.toFixed(2)}
+                    </p>
+                </div>
+                <div className="card p-2.5 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Exposure</p>
+                    <p className="text-sm font-black">{result.stats.exposurePct.toFixed(0)}%</p>
+                </div>
+                <div className="card p-2.5 text-center">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Avg Hold</p>
+                    <p className="text-sm font-black">{Math.round(result.stats.avgDaysHeld)} hari</p>
+                </div>
             </div>
 
-            {/* Asumsi simulasi */}
-            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-                Asumsi: eksekusi di close hari <b>setelah</b> sinyal (tanpa look-ahead) · biaya beli{" "}
-                {result.assumptions.feeBuyPct.toFixed(2)}% &amp; jual {result.assumptions.feeSellPct.toFixed(2)}%
-                (komisi + PPh final) · Buy &amp; Hold ditampilkan bruto tanpa biaya.
-            </p>
+            {/* Equity Curve */}
+            <EquityCurveCard chartData={chartData} title="Kurva Ekuitas vs Buy & Hold" />
 
-            <EquityCurveCard chartData={chartData} title={`Kurva Ekuitas · ${result.ticker} · ${result.from} → ${result.to}`} />
+            {/* Next Entry */}
             <NextEntryCard nextEntry={result.nextEntry} />
+
+            {/* Trades */}
             <TradesTable trades={result.trades} />
-        </>
+
+            {/* Assumptions */}
+            <p className="text-[9px] text-muted-foreground/60 px-1">
+                Asumsi: eksekusi next-day · biaya beli {result.assumptions.feeBuyPct.toFixed(2)}% &amp; jual {result.assumptions.feeSellPct.toFixed(2)}% · B&amp;H bruto.
+            </p>
+        </div>
+    );
+}
+
+function StatCard({ label, value, color }: { label: string; value: string; color: "success" | "destructive" | "warning" | "default" }) {
+    const colorClass = {
+        success: "text-success",
+        destructive: "text-destructive",
+        warning: "text-warning",
+        default: "text-foreground",
+    }[color];
+
+    return (
+        <div className="card p-2.5 text-center">
+            <p className="text-[9px] font-bold text-muted-foreground uppercase">{label}</p>
+            <p className={cn("text-sm font-black tabular-nums", colorClass)}>{value}</p>
+        </div>
     );
 }
 
@@ -435,46 +592,42 @@ function NextEntryCard({ nextEntry: ne }: { nextEntry: BtResponse["nextEntry"] }
     const desc = ne.price != null ? DESC[ne.kind](fmtP(ne.price)) : null;
 
     return (
-        <div className="card border-primary/40">
-            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+        <div className="card p-3 border-primary/30">
+            <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-primary" />
-                Area Beli Berikutnya
-                <span className="ml-auto text-[9px] font-normal text-muted-foreground">proyeksi close besok</span>
-            </h3>
+                <h3 className="text-sm font-bold">Area Beli Berikutnya</h3>
+                <span className="ml-auto text-[9px] text-muted-foreground">proyeksi close besok</span>
+            </div>
 
             {!ne.ready ? (
-                <p className="text-xs text-muted-foreground">{ne.reason ?? "Data tidak cukup untuk menghitung level."}</p>
+                <p className="text-xs text-muted-foreground">{ne.reason ?? "Data tidak cukup."}</p>
             ) : (
-                <>
-                    <div className="flex flex-wrap items-end gap-4">
+                <div className="space-y-2">
+                    <div className="flex items-end gap-4">
                         <div>
-                            <p className="text-[10px] text-muted-foreground uppercase font-bold">Level Pemicu</p>
-                            <p className="text-2xl font-black tabular-nums text-primary leading-none mt-0.5">
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold">Level Pemicu</p>
+                            <p className="text-xl font-black tabular-nums text-primary">
                                 {ne.price != null ? Math.round(ne.price).toLocaleString("id-ID") : "-"}
                             </p>
                         </div>
                         {ne.distancePct != null && (
-                            <div className="pb-0.5">
-                                <span className={cn(
-                                    "text-xs font-bold rounded-full px-2.5 py-1",
-                                    ne.distancePct > 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-                                )}>
-                                    {ne.distancePct > 0 ? "▲" : "▼"} {Math.abs(ne.distancePct).toFixed(1)}% dari harga sekarang
-                                </span>
-                            </div>
+                            <span className={cn(
+                                "text-[11px] font-bold rounded-full px-2 py-0.5",
+                                ne.distancePct > 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                            )}>
+                                {ne.distancePct > 0 ? "▲" : "▼"} {Math.abs(ne.distancePct).toFixed(1)}%
+                            </span>
                         )}
-                        <div className="pb-0.5 ml-auto text-right">
-                            <p className="text-[10px] text-muted-foreground">Close terakhir</p>
+                        <div className="ml-auto text-right">
+                            <p className="text-[9px] text-muted-foreground">Close</p>
                             <p className="text-sm font-bold tabular-nums">{ne.lastClose.toLocaleString("id-ID")}</p>
                         </div>
                     </div>
-
-                    {desc && <p className="mt-2.5 text-xs text-foreground/80 leading-relaxed">{desc}</p>}
-                    {ne.reason && <p className="mt-1 text-[11px] text-warning">{ne.reason}</p>}
-                    <p className="mt-2 text-[9px] text-muted-foreground/70">
-                        Kondisi indikator saat ini: {ne.indicatorNow} · proyeksi matematis dari data saat ini, bukan jaminan sinyal.
+                    {desc && <p className="text-[11px] text-foreground/80 leading-relaxed">{desc}</p>}
+                    <p className="text-[9px] text-muted-foreground/60">
+                        Indikator: {ne.indicatorNow} · proyeksi matematis, bukan jaminan.
                     </p>
-                </>
+                </div>
             )}
         </div>
     );
@@ -482,19 +635,19 @@ function NextEntryCard({ nextEntry: ne }: { nextEntry: BtResponse["nextEntry"] }
 
 function EquityCurveCard({ chartData, title }: { chartData: any[]; title: string }) {
     return (
-        <div className="card">
-            <h3 className="text-sm font-semibold mb-3">{title}</h3>
-            <div className="h-72">
+        <div className="card p-3">
+            <h3 className="text-xs font-bold mb-2">{title}</h3>
+            <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} minTickGap={40} />
-                        <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={45} tickFormatter={(v: number) => v.toFixed(0)} />
+                        <XAxis dataKey="label" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} minTickGap={50} />
+                        <YAxis domain={["auto", "auto"]} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={40} tickFormatter={(v: number) => v.toFixed(0)} />
                         <Tooltip
-                            contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                            formatter={(v: any, name: any) => [Number(v).toFixed(1), name === "strategy" ? "Strategi" : "Beli & Tahan"]}
+                            contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 6, fontSize: 11 }}
+                            formatter={(v: any, name: any) => [Number(v).toFixed(1), name === "strategy" ? "Strategi" : "B&H"]}
                         />
-                        <Legend formatter={(v) => (v === "strategy" ? "Strategi" : "Beli & Tahan")} wrapperStyle={{ fontSize: 11 }} />
+                        <Legend formatter={(v) => (v === "strategy" ? "Strategi" : "B&H")} wrapperStyle={{ fontSize: 10 }} />
                         <Line type="monotone" dataKey="strategy" stroke="var(--primary)" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="buyHold" stroke="var(--muted-foreground)" strokeWidth={1.5} dot={false} strokeDasharray="5 4" />
                     </LineChart>
@@ -505,43 +658,54 @@ function EquityCurveCard({ chartData, title }: { chartData: any[]; title: string
 }
 
 function TradesTable({ trades }: { trades: BtTrade[] }) {
+    if (trades.length === 0) {
+        return (
+            <div className="card p-3">
+                <h3 className="text-xs font-bold mb-2">Daftar Transaksi</h3>
+                <p className="text-xs text-muted-foreground py-4 text-center">Tidak ada sinyal entry pada periode ini.</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="card">
-            <h3 className="text-sm font-semibold mb-3">Daftar Transaksi ({trades.length})</h3>
-            {trades.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Tidak ada sinyal entry pada periode ini.</p>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs tabular-nums">
-                        <thead>
-                            <tr className="text-left text-muted-foreground border-b border-border">
-                                <th className="py-2 pr-3">#</th>
-                                <th className="py-2 pr-3">Entry</th>
-                                <th className="py-2 pr-3">Exit</th>
-                                <th className="py-2 pr-3 text-right">Harga Beli</th>
-                                <th className="py-2 pr-3 text-right">Harga Jual</th>
-                                <th className="py-2 pr-3 text-right">Hari</th>
-                                <th className="py-2 text-right">Return</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {trades.map((t, i) => (
-                                <tr key={i} className="border-b border-border/40 last:border-b-0">
-                                    <td className="py-1.5 pr-3 text-muted-foreground">{i + 1}</td>
-                                    <td className="py-1.5 pr-3">{t.entryDate}</td>
-                                    <td className="py-1.5 pr-3">{t.exitDate}</td>
-                                    <td className="py-1.5 pr-3 text-right">{t.entryPrice.toLocaleString("id-ID")}</td>
-                                    <td className="py-1.5 pr-3 text-right">{t.exitPrice.toLocaleString("id-ID")}</td>
-                                    <td className="py-1.5 pr-3 text-right text-muted-foreground">{t.days}</td>
-                                    <td className={cn("py-1.5 text-right font-bold", t.returnPct >= 0 ? "text-success" : "text-destructive")}>
-                                        {t.returnPct >= 0 ? "+" : ""}{t.returnPct.toFixed(2)}%
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+        <div className="card p-3">
+            <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold">Daftar Transaksi ({trades.length})</h3>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    <span>Win: {trades.filter(t => t.returnPct > 0).length}</span>
+                    <span>Loss: {trades.filter(t => t.returnPct <= 0).length}</span>
                 </div>
-            )}
+            </div>
+            <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <table className="w-full text-xs tabular-nums">
+                    <thead className="sticky top-0 bg-card">
+                        <tr className="text-left text-muted-foreground border-b border-border">
+                            <th className="py-1.5 px-2">#</th>
+                            <th className="py-1.5 px-2">Entry</th>
+                            <th className="py-1.5 px-2">Exit</th>
+                            <th className="py-1.5 px-2 text-right">Beli</th>
+                            <th className="py-1.5 px-2 text-right">Jual</th>
+                            <th className="py-1.5 px-2 text-right">Hari</th>
+                            <th className="py-1.5 px-2 text-right">Return</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {trades.map((t, i) => (
+                            <tr key={i} className="border-b border-border/30 last:border-b-0 hover:bg-muted/30">
+                                <td className="py-1 px-2 text-muted-foreground">{i + 1}</td>
+                                <td className="py-1 px-2">{t.entryDate}</td>
+                                <td className="py-1 px-2">{t.exitDate}</td>
+                                <td className="py-1 px-2 text-right">{t.entryPrice.toLocaleString("id-ID")}</td>
+                                <td className="py-1 px-2 text-right">{t.exitPrice.toLocaleString("id-ID")}</td>
+                                <td className="py-1 px-2 text-right text-muted-foreground">{t.days}</td>
+                                <td className={cn("py-1 px-2 text-right font-bold", t.returnPct >= 0 ? "text-success" : "text-destructive")}>
+                                    {t.returnPct >= 0 ? "+" : ""}{t.returnPct.toFixed(1)}%
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }

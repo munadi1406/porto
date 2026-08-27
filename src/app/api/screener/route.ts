@@ -2,8 +2,75 @@ import { NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
 import { getAllStocks } from '@/lib/screenerStockList';
 import { isSharia } from '@/lib/shariaStocks';
+import { runBacktest, STRATEGIES, type Bar, type StrategyId, type BacktestResult } from '@/lib/quant';
+
+const SCREENER_STRATEGIES: StrategyId[] = [
+    'golden_cross', 'sma_cross', 'ema_cross', 'macd_signal',
+    'bollinger_breakout', 'bollinger_reversion', 'breakout_donchian', 'rsi_reversion'
+];
+
+interface StrategyScore {
+    strategy: StrategyId;
+    label: string;
+    score: number;
+    signal: 'BUY' | 'SELL' | 'NEUTRAL';
+    stats: any;
+}
+
+function calculateStrategyScore(s: any): number {
+    const pfNorm = s.profitFactor == null ? 100 : Math.min(100, Math.max(0, (s.profitFactor / 3) * 100));
+    const sharpeNorm = Math.min(100, Math.max(0, ((s.sharpeRatio + 1) / 3) * 100));
+    const returnNorm = Math.min(100, Math.max(0, (s.totalReturnPct / 50) * 100 + 50));
+    return Math.round(0.35 * s.winRatePct + 0.20 * pfNorm + 0.25 * sharpeNorm + 0.20 * returnNorm);
+}
+
+function getStrategySignal(bt: BacktestResult): 'BUY' | 'SELL' | 'NEUTRAL' {
+    const s = bt.stats;
+    if (s.totalReturnPct > 10 && s.winRatePct > 45) return 'BUY';
+    if (s.totalReturnPct < -10 || s.maxDrawdownPct < -25) return 'SELL';
+    return 'NEUTRAL';
+}
+
+function rankStrategiesFast(bars: Bar[]): { strategies: StrategyScore[]; composite: number; consensus: string } {
+    const strategies: StrategyScore[] = [];
+    let buyCount = 0;
+    let sellCount = 0;
+
+    for (const id of SCREENER_STRATEGIES) {
+        const bt = runBacktest(bars, id);
+        if (!bt) continue;
+        const s = bt.stats;
+        if (s.totalReturnPct == null || !Number.isFinite(s.totalReturnPct)) continue;
+
+        const score = calculateStrategyScore(s);
+        const signal = getStrategySignal(bt);
+        const label = STRATEGIES.find(st => st.id === id)?.label || id;
+
+        if (signal === 'BUY') buyCount++;
+        if (signal === 'SELL') sellCount++;
+
+        strategies.push({ strategy: id, label, score, signal, stats: s });
+    }
+
+    strategies.sort((a, b) => b.score - a.score);
+
+    const topStrategies = strategies.slice(0, 3);
+    const avgScore = topStrategies.length > 0
+        ? Math.round(topStrategies.reduce((sum, s) => sum + s.score, 0) / topStrategies.length)
+        : 0;
+
+    const consensus = buyCount >= 4 ? 'STRONG_BUY' : buyCount >= 2 ? 'BUY' : sellCount >= 3 ? 'AVOID' : 'NEUTRAL';
+
+    return { strategies, composite: avgScore, consensus };
+}
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+
+const YEARS = 5;
+const BARS_MIN = 60;
+const BATCH_SIZE = 5;
+
+const EXCLUDED_TICKERS = ['FCA', 'SCMA', 'IBST'];
 
 interface ScreenerResult {
     ticker: string;
@@ -38,6 +105,29 @@ interface ScreenerResult {
     netFlow: number;
     divergence: string;
     investorIndication: string;
+    bestStrategy: string;
+    bestStrategyScore: number;
+    winRate: number;
+    sharpe: number;
+    maxDrawdown: number;
+    totalReturn: number;
+    tradeCount: number;
+}
+
+async function fetchBars(ticker: string): Promise<Bar[]> {
+    const symbol = ticker.endsWith('.JK') ? ticker : `${ticker}.JK`;
+    const result: any = await yahooFinance.chart(symbol, {
+        period1: new Date('2020-01-01'),
+        period2: new Date(),
+        interval: '1d' as any,
+    });
+    return ((result?.quotes ?? []) as any[])
+        .filter((q: any) => q.date && typeof q.close === 'number' && q.close > 0)
+        .map((q: any) => ({
+            time: Math.floor(new Date(q.date).getTime() / 1000),
+            date: new Date(q.date).toISOString().slice(0, 10),
+            open: q.open, high: q.high, low: q.low, close: q.close, volume: q.volume ?? 0,
+        }));
 }
 
 function calculateIndicators(data: any[]): Partial<ScreenerResult> {
@@ -48,18 +138,15 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     const lows = data.map((d: any) => d.low);
     const volumes = data.map((d: any) => d.volume || 0);
 
-    // MA20, MA50
     const ma20 = closes.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
     const ma50 = closes.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50;
 
-    // Check golden cross / death cross
     const prevMA20 = closes.slice(-21, -1).reduce((a: number, b: number) => a + b, 0) / 20;
     const prevMA50 = closes.slice(-51, -1).reduce((a: number, b: number) => a + b, 0) / 50;
     const goldenCross = prevMA20 <= prevMA50 && ma20 > ma50;
     const deathCross = prevMA20 >= prevMA50 && ma20 < ma50;
     const nearGoldenCross = !goldenCross && !deathCross && Math.abs(ma20 - ma50) / ma50 < 0.01;
 
-    // RSI 14
     const rsiSlice = closes.slice(-15);
     let gains = 0, losses = 0;
     for (let i = 1; i < rsiSlice.length; i++) {
@@ -71,12 +158,10 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     const rsiOversold = rsi < 30;
     const rsiOverbought = rsi > 70;
 
-    // Volume Analysis
     const avgVol = volumes.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
     const currentVol = volumes[volumes.length - 1];
     const volumeSurge = avgVol > 0 && currentVol > avgVol * 1.8;
 
-    // OBV Trend
     let obv = 0;
     const obvValues: number[] = [0];
     for (let i = 1; i < data.length; i++) {
@@ -88,7 +173,6 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     const obvLast = obvValues.slice(-Math.floor(obvValues.length / 3)).reduce((a: number, b: number) => a + b, 0) / Math.floor(obvValues.length / 3) || 0;
     const obvTrend = obvLast > obvFirst * 1.02 ? 'UP' : obvLast < obvFirst * 0.98 ? 'DOWN' : 'FLAT';
 
-    // MFI
     const mfiSlice = data.slice(-15);
     let posFlow = 0, negFlow = 0;
     for (let i = 1; i < mfiSlice.length; i++) {
@@ -99,12 +183,10 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     }
     const mfi = Math.round(100 - (100 / (1 + (negFlow > 0 ? posFlow / negFlow : 1))));
 
-    // Price trend context
     const lastClose = closes[closes.length - 1];
     const priceAboveMA20 = lastClose > ma20;
     const priceAboveMA50 = lastClose > ma50;
 
-    // Chaikin A/D trend (10 days)
     let adLine = 0;
     const adSlice = data.slice(-10);
     adSlice.forEach((d: any) => {
@@ -116,7 +198,6 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     const obvUp = obvTrend === 'UP';
     const obvDown = obvTrend === 'DOWN';
 
-    // Accumulation estimation: net money flow in IDR + percentage
     let netFlow = 0;
     const netFlowValues: number[] = [];
     data.slice(-20).forEach((d: any) => {
@@ -128,24 +209,12 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
         }
     });
     const netFlowAbs = Math.abs(netFlow);
-    const maxFlow = netFlowValues.length > 0
-        ? Math.max(...netFlowValues.map(Math.abs), 1)
-        : 1;
+    const maxFlow = netFlowValues.length > 0 ? Math.max(...netFlowValues.map(Math.abs), 1) : 1;
     const accumulationPercent = Math.min(100, Math.round((netFlow / maxFlow) * 50 + 50));
 
-    // Accumulation: both OBV AND A/D must confirm + bullish context
     const accumulation = (obvUp && adTrend) && rsi >= 30 && rsi < 65 && priceAboveMA20;
-    const strongAccumulation = accumulation && (volumeSurge || goldenCross);
-
-    // Distribution: both OBV AND A/D must confirm + bearish context
     const distribution = (obvDown && !adTrend) && rsi > 35 && rsi <= 70 && !priceAboveMA20;
-    const strongDistribution = distribution && (volumeSurge || deathCross);
 
-    // Neutral accumulation/distribution (less confident - only one indicator confirms)
-    const weakAccumulation = !accumulation && (obvUp || adTrend) && rsi < 60;
-    const weakDistribution = !distribution && (obvDown || !adTrend) && rsi > 40;
-
-    // Divergence patterns: price vs volume (14 days)
     const priceSlice14 = closes.slice(-14);
     const priceUp14 = priceSlice14[priceSlice14.length - 1] > priceSlice14[0];
     const obvSlice14 = obvValues.slice(-14);
@@ -160,114 +229,47 @@ function calculateIndicators(data: any[]): Partial<ScreenerResult> {
     let investorIndication: string;
     if (bullishDivergence) {
         divergence = 'BULLISH_DIVERGENCE';
-        investorIndication = 'Potential smart money accumulation. Price declining but volume flowing in.';
+        investorIndication = 'Smart money accumulation. Price declining but volume flowing in.';
     } else if (bearishDivergence) {
         divergence = 'BEARISH_DIVERGENCE';
-        investorIndication = 'Potential distribution. Price rising but volume declining.';
+        investorIndication = 'Distribution. Price rising but volume declining.';
     } else if (volumeSurge && rsiOverbought && priceUp14) {
         divergence = 'RETAIL_FOMO';
-        investorIndication = 'Potential retail FOMO. High volume + price spike + overbought.';
+        investorIndication = 'Retail FOMO. High volume + price spike + overbought.';
     } else if (volumeSurge && rsiOversold && priceDown14) {
         divergence = 'PANIC_SELLING';
-        investorIndication = 'Potential panic selling. Volume surge + price drop + oversold.';
+        investorIndication = 'Panic selling. Volume surge + price drop + oversold.';
     } else if (accumulation) {
         divergence = 'STEADY_ACCUMULATION';
         investorIndication = 'Steady accumulation. Volume confirms uptrend.';
     } else if (distribution) {
         divergence = 'STEADY_DISTRIBUTION';
         investorIndication = 'Steady distribution. Volume confirms downtrend.';
-    } else if (obvUp && !priceUp14) {
-        divergence = 'EARLY_ACCUMULATION';
-        investorIndication = 'Possible early accumulation. OBV rising ahead of price.';
-    } else if (obvDown && !priceDown14) {
-        divergence = 'EARLY_DISTRIBUTION';
-        investorIndication = 'Possible early distribution. OBV declining ahead of price.';
     } else {
         divergence = 'NEUTRAL';
         investorIndication = 'No clear divergence pattern.';
     }
 
-    // Composite score
-    let score = 0;
-    if (goldenCross) score += 25;
-    if (deathCross) score -= 25;
-    if (nearGoldenCross) score += 8;
-    if (strongAccumulation) score += 35;
-    else if (accumulation) score += 20;
-    else if (weakAccumulation) score += 8;
-    if (strongDistribution) score -= 35;
-    else if (distribution) score -= 20;
-    else if (weakDistribution) score -= 8;
-    if (priceAboveMA20) score += 10;
-    else score -= 10;
-    if (rsi >= 30 && rsi <= 40) score += 10;
-    else if (rsi > 70) score -= 10;
-    if (mfi < 30) score += 10;
-    else if (mfi > 70) score -= 10;
-    if (volumeSurge && obvUp) score += 10;
-    else if (volumeSurge && obvDown) score -= 10;
-    if (obvUp && adTrend) score += 10;
-    else if (obvDown && !adTrend) score -= 10;
-
-    const signal = score >= 20 ? 'BUY' : score <= -20 ? 'SELL' : 'NEUTRAL';
-
-    // Key support / resistance from recent price action
     const recentH = highs.slice(-20).reduce((a: number, b: number) => Math.max(a, b), 0);
     const recentL = lows.slice(-20).reduce((a: number, b: number) => Math.min(a, b), Infinity);
     const keySupport = Math.min(recentL, ma20);
     const keyResistance = Math.max(recentH, ma50);
 
-    // Entry / SL / TP
-    const entryPrice = Math.round(lastClose);
-    const stopLoss = signal === 'SELL'
-        ? Math.round(keyResistance * 1.03)
-        : Math.round(keySupport * 0.95);
-    const takeProfit = signal === 'SELL'
-        ? Math.round(keySupport * 0.95)
-        : Math.round(keyResistance * 0.97);
-
-    // Generate reason
-    const reasons: string[] = [];
-    if (goldenCross) reasons.push('Golden Cross confirmed');
-    if (deathCross) reasons.push('Death Cross confirmed');
-    if (strongAccumulation) reasons.push('Strong accumulation (OBV↑ A/D↑ price↑)');
-    else if (accumulation) reasons.push('Accumulation (OBV↑ A/D↑)');
-    else if (weakAccumulation) reasons.push('Weak accumulation signals');
-    if (strongDistribution) reasons.push('Strong distribution (OBV↓ A/D↓ price↓)');
-    else if (distribution) reasons.push('Distribution (OBV↓ A/D↓)');
-    else if (weakDistribution) reasons.push('Weak distribution signals');
-    if (priceAboveMA20 && priceAboveMA50) reasons.push('Price above MA20 & MA50');
-    if (!priceAboveMA20) reasons.push('Price below MA20');
-    if (rsi >= 30 && rsi <= 40) reasons.push(`RSI ${rsi} near oversold`);
-    else if (rsi < 30) reasons.push(`RSI ${rsi} oversold`);
-    else if (rsi > 70) reasons.push(`RSI ${rsi} overbought`);
-    if (mfi < 30) reasons.push(`MFI ${mfi} oversold`);
-    else if (mfi > 70) reasons.push(`MFI ${mfi} overbought`);
-    if (volumeSurge) reasons.push(`Volume ${obvUp ? 'surge + bullish' : 'surge + bearish'}`);
-    if (reasons.length === 0) reasons.push('Mixed signals, no clear edge');
-    const reason = reasons.join(' · ');
-
     return {
         ma20, ma50, goldenCross, deathCross, nearGoldenCross,
         rsi, rsiOversold: rsi < 30, rsiOverbought: rsi > 70,
         volumeSurge,
-        accumulation: strongAccumulation || accumulation || weakAccumulation,
-        distribution: strongDistribution || distribution || weakDistribution,
+        accumulation,
+        distribution,
         adSignal: adTrend ? 'BULLISH' : 'BEARISH',
         obvTrend,
         mfi,
-        signal,
-        score,
-        keySupport,
-        keyResistance,
-        entryPrice,
-        stopLoss,
-        takeProfit,
-        reason,
-        accumulationPercent,
-        netFlow: Math.round(netFlow),
         divergence,
         investorIndication,
+        accumulationPercent,
+        netFlow: Math.round(netFlow),
+        keySupport,
+        keyResistance,
     };
 }
 
@@ -280,39 +282,67 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Max 100 tickers per request' }, { status: 400 });
     }
 
+    const filteredTickers = tickers.filter(t => {
+        const base = t.replace('.JK', '');
+        return !EXCLUDED_TICKERS.includes(base);
+    });
+
     const results: ScreenerResult[] = [];
     const errors: string[] = [];
 
-    const BATCH_SIZE = 5;
-    for (let batchStart = 0; batchStart < tickers.length; batchStart += BATCH_SIZE) {
-        const batch = tickers.slice(batchStart, batchStart + BATCH_SIZE);
+    for (let batchStart = 0; batchStart < filteredTickers.length; batchStart += BATCH_SIZE) {
+        const batch = filteredTickers.slice(batchStart, batchStart + BATCH_SIZE);
 
         const batchResults = await Promise.allSettled(
             batch.map(async (ticker) => {
                 try {
-                    const [quote, chartResult] = await Promise.all([
+                    const [quote, bars] = await Promise.all([
                         yahooFinance.quote(ticker).catch(() => null),
-                        yahooFinance.chart(ticker, { period1: new Date('2025-01-01'), period2: new Date(), interval: '1d' }).catch(() => null),
+                        fetchBars(ticker).catch(() => [] as Bar[]),
                     ]);
 
-                    const history = chartResult?.quotes || [];
-                    if (!quote || history.length < 50) {
-                        return { error: true, ticker };
+                    if (!quote) {
+                        return { error: true, ticker, reason: 'no quote' };
+                    }
+                    if (bars.length < BARS_MIN) {
+                        return { error: true, ticker, reason: `only ${bars.length} bars` };
                     }
 
                     const price = quote.regularMarketPrice || 0;
                     const name = quote.shortName || quote.longName || ticker;
                     const change = quote.regularMarketChange || 0;
                     const changePercent = quote.regularMarketChangePercent || 0;
+                    const lastClose = Math.round(price);
 
-                    const indicators = calculateIndicators(history);
+                    const indicators = calculateIndicators(bars);
 
-                    // Use real quote price for entry/SL/TP
-                    const realPrice = Math.round(price || 0);
+                    const { strategies, composite, consensus } = rankStrategiesFast(bars);
+                    const best = strategies[0] || null;
+
+                    const score = composite;
+                    const signal = consensus === 'STRONG_BUY' ? 'BUY' : consensus === 'BUY' ? 'BUY' : consensus === 'AVOID' ? 'SELL' : 'NEUTRAL';
+
                     const ind = indicators as any;
                     const keyS = ind.keySupport || Math.round(price * 0.95);
                     const keyR = ind.keyResistance || Math.round(price * 1.05);
-                    const isSell = ind.signal === 'SELL';
+                    const isSell = signal === 'SELL';
+
+                    const topStrategies = strategies.slice(0, 3).map(s => {
+                        const name = s.label.replace(/\(.*\)/, '').trim();
+                        return `${name}(${s.signal === 'BUY' ? '+' : s.signal === 'SELL' ? '-' : '0'}${s.score})`;
+                    }).join(', ');
+
+                    const strategyReason = best
+                        ? `${topStrategies}`
+                        : 'No clear edge';
+                    const technicalReasons = [
+                        ind.goldenCross ? 'Golden Cross' : '',
+                        ind.deathCross ? 'Death Cross' : '',
+                        ind.rsiOversold ? `RSI ${ind.rsi} oversold` : ind.rsiOverbought ? `RSI ${ind.rsi} overbought` : '',
+                        ind.volumeSurge ? 'Volume surge' : '',
+                        ind.accumulation ? 'Accumulation' : '',
+                    ].filter(Boolean).join(', ');
+                    const reasons = `${strategyReason}${technicalReasons ? ' | ' + technicalReasons : ''}`;
 
                     const baseTicker = ticker.replace('.JK', '');
                     return {
@@ -326,13 +356,26 @@ export async function GET(request: Request) {
                             changePercent,
                             sharia: isSharia(baseTicker),
                             ...indicators,
-                            entryPrice: realPrice,
+                            signal,
+                            score,
+                            entryPrice: lastClose,
                             stopLoss: isSell ? Math.round(keyR * 1.03) : Math.round(keyS * 0.95),
                             takeProfit: isSell ? Math.round(keyS * 0.95) : Math.round(keyR * 0.97),
+                            reason: reasons || 'Mixed signals',
+                            bestStrategy: best?.label || '-',
+                            bestStrategyScore: best ? best.score : 0,
+                            consensus,
+                            buySignals: strategies.filter(s => s.signal === 'BUY').length,
+                            sellSignals: strategies.filter(s => s.signal === 'SELL').length,
+                            winRate: best ? Math.round(best.stats.winRatePct) : 0,
+                            sharpe: best ? +best.stats.sharpeRatio.toFixed(2) : 0,
+                            maxDrawdown: best ? +best.stats.maxDrawdownPct.toFixed(1) : 0,
+                            totalReturn: best ? +best.stats.totalReturnPct.toFixed(1) : 0,
+                            tradeCount: best ? best.stats.tradeCount : 0,
                         } as ScreenerResult,
                     };
-                } catch {
-                    return { error: true, ticker };
+                } catch (e: any) {
+                    return { error: true, ticker, reason: e.message?.slice(0, 50) || 'exception' };
                 }
             })
         );
@@ -342,7 +385,7 @@ export async function GET(request: Request) {
             if (r.status === 'fulfilled') {
                 const val = r.value as any;
                 if (val.error) {
-                    errors.push(val.ticker);
+                    errors.push(val.ticker + (val.reason ? ` (${val.reason})` : ''));
                 } else {
                     results.push(val.data as ScreenerResult);
                 }
@@ -352,14 +395,21 @@ export async function GET(request: Request) {
         }
 
         if (batchStart + BATCH_SIZE < tickers.length) {
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 300));
         }
+    }
+
+    const errorReasons: Record<string, number> = {};
+    for (const e of errors) {
+        const reason = e.includes('(') ? e.match(/\(([^)]+)\)/)?.[1] || 'unknown' : 'unknown';
+        errorReasons[reason] = (errorReasons[reason] || 0) + 1;
     }
 
     return NextResponse.json({
         success: true,
         data: results,
         errors: errors.length > 0 ? errors : undefined,
+        errorSummary: errorReasons,
         total: results.length,
     });
 }

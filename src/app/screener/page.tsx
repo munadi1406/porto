@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { formatIDR, formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
+import { formatIDR, formatPercentage, cn } from "@/lib/utils";
 import {
-    TrendingUp, TrendingDown, Zap, Activity, BarChart3,
-    Search, ArrowUp, ArrowDown, Loader2, Play, AlertCircle, Info, Save, Clock, Building2
+    TrendingUp, TrendingDown, Zap, BarChart3, Activity,
+    Search, ArrowUp, ArrowDown, Loader2, Play, AlertCircle, Info, Save, Clock, Building2, Target, Bot, Calculator
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import stockData from "../../../stocks-idx.json";
 import { useStockScreener } from "@/hooks/useIdxExtended";
+import { PositionCalculator } from "@/components/PositionCalculator";
 
 interface ScreenerItem {
     ticker: string;
@@ -44,6 +44,16 @@ interface ScreenerItem {
     netFlow: number;
     divergence: string;
     investorIndication: string;
+    bestStrategy: string;
+    bestStrategyScore: number;
+    consensus: string;
+    buySignals: number;
+    sellSignals: number;
+    winRate: number;
+    sharpe: number;
+    maxDrawdown: number;
+    totalReturn: number;
+    tradeCount: number;
 }
 
 interface OfficialScreenerItem {
@@ -85,7 +95,7 @@ interface SavedScreen {
 
 type SortKey = 'score' | 'ticker' | 'changePercent' | 'rsi' | 'signal';
 type FilterKey = 'all' | 'golden' | 'accumulation' | 'oversold' | 'surge' | 'buy' | 'distribution' | 'sharia';
-type ScreenerTab = 'technical' | 'fundamental';
+type ScreenerTab = 'technical' | 'fundamental' | 'ai' | 'position';
 
 function SortHeader({ label, k, sortKey, sortAsc, onSort }: {
     label: string;
@@ -95,7 +105,7 @@ function SortHeader({ label, k, sortKey, sortAsc, onSort }: {
     onSort: (key: SortKey) => void;
 }) {
     return (
-        <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+        <th className="px-3 py-2 text-[10px] font-black uppercase tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
             onClick={() => onSort(k)}>
             <div className="flex items-center gap-1">
                 {label}
@@ -109,11 +119,10 @@ const BATCH_SIZE = 10;
 const BATCH_DELAY = 1200;
 
 export default function ScreenerPage() {
-    const router = useRouter();
     const [activeTab, setActiveTab] = useState<ScreenerTab>('technical');
     const [results, setResults] = useState<ScreenerItem[]>([]);
     const [scanning, setScanning] = useState(false);
-    const [progress, setProgress] = useState({ done: 0, total: 0, errors: 0 });
+    const [progress, setProgress] = useState({ done: 0, total: 0, errors: 0, errorSummary: {} as Record<string, number> });
     const [error, setError] = useState<string | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('score');
     const [sortAsc, setSortAsc] = useState(false);
@@ -124,23 +133,23 @@ export default function ScreenerPage() {
     const [saving, setSaving] = useState(false);
     const [saveLabel, setSaveLabel] = useState('');
     const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
     const abortRef = useRef(false);
 
-    // Official stock screener
     const { data: officialData, isLoading: officialLoading } = useStockScreener();
     const [officialSearch, setOfficialSearch] = useState('');
     const [officialSortKey, setOfficialSortKey] = useState<'marketCapital' | 'per' | 'pbv' | 'roe' | 'npm' | 'ytd'>('marketCapital');
     const [officialSortDir, setOfficialSortDir] = useState<'asc' | 'desc'>('desc');
 
     const filterDescriptions: Record<FilterKey, { title: string; desc: string }> = {
-        all: { title: 'All Stocks', desc: 'Menampilkan semua saham yang sudah di-scan tanpa filter.' },
-        golden: { title: 'Golden Cross', desc: 'MA20 baru saja memotong MA50 dari bawah ke atas — sinyal bullish jangka menengah. Juga termasuk Near Golden Cross (jarak MA20-MA50 < 1%).' },
-        accumulation: { title: 'Accumulation', desc: 'OBV naik atau Chaikin A/D positif + RSI < 60 (tidak overbought) + tidak ada lonjakan volume abnormal. Indikasi smart money sedang mengakumulasi.' },
-        surge: { title: 'Volume Surge', desc: 'Volume hari ini > 1.8× rata-rata volume 20 hari terakhir. Menarik jika OBV juga naik (konfirmasi bullish) atau turun (konfirmasi bearish).' },
-        oversold: { title: 'Oversold', desc: 'RSI < 30 — harga turun terlalu cepat dan berpotensi reversal naik. Cocok untuk strategi mean reversion dengan konfirmasi volume.' },
-        buy: { title: 'Buy Signal', desc: 'Composite Score ≥ +20 — menggabungkan Golden Cross, Accumulation, OBV, RSI, dan Volume Surge. Sinyal beli paling kuat dari screener.' },
-        distribution: { title: 'Distribution', desc: 'OBV turun atau A/D negatif + RSI > 40 + indikasi Death Cross. Smart money sedang mendistribusikan (melepas) saham — sinyal bearish.' },
-        sharia: { title: 'Sharia', desc: 'Hanya menampilkan saham-saham yang termasuk dalam Daftar Efek Syariah (DES) OJK. Saham syariah memenuhi kriteria rasio keuangan dan bukan pada usaha yang dilarang.' },
+        all: { title: 'Semua', desc: 'Menampilkan semua saham yang sudah di-scan.' },
+        golden: { title: 'Golden Cross', desc: 'MA20 memotong MA50 dari bawah ke atas — sinyal bullish jangka menengah.' },
+        accumulation: { title: 'Accumulation', desc: 'Smart money sedang mengakumulasi — OBV naik, RSI tidak overbought.' },
+        surge: { title: 'Volume Surge', desc: 'Volume > 1.8× rata-rata 20 hari — perhatikan konfirmasi OBV.' },
+        oversold: { title: 'Oversold', desc: 'RSI < 30 — potensi reversal naik untuk mean reversion.' },
+        buy: { title: 'Buy Signal', desc: 'Composite Score ≥ +20 — sinyal beli paling kuat.' },
+        distribution: { title: 'Distribution', desc: 'Smart money mendistribusikan — OBV turun, death cross.' },
+        sharia: { title: 'Sharia', desc: 'Saham dalam Daftar Efek Syariah (DES) OJK.' },
     };
 
     const allTickers: string[] = (stockData.stocks as string[]).filter(t => /^[A-Z]{2,4}\.JK$/.test(t));
@@ -150,7 +159,7 @@ export default function ScreenerPage() {
         setScanning(true);
         setError(null);
         setResults([]);
-        setProgress({ done: 0, total: allTickers.length, errors: 0 });
+        setProgress({ done: 0, total: allTickers.length, errors: 0, errorSummary: {} });
 
         const newResults: ScreenerItem[] = [];
 
@@ -161,7 +170,7 @@ export default function ScreenerPage() {
                 const res = await fetch(`/api/screener?tickers=${batch.join(',')}`);
                 const json = await res.json();
 
-                if (json.success && json.data) {
+                if (json.success && json.data && json.data.length > 0) {
                     newResults.push(...json.data);
                     setResults([...newResults]);
                 }
@@ -170,9 +179,15 @@ export default function ScreenerPage() {
                     done: Math.min(prev.done + batch.length, prev.total),
                     total: prev.total,
                     errors: prev.errors + (json.errors?.length || 0),
+                    errorSummary: json.errorSummary || {},
                 }));
-            } catch {
+
+                if (!json.success && json.error) {
+                    setError(json.error);
+                }
+            } catch (e: any) {
                 setProgress(prev => ({ ...prev, errors: prev.errors + batch.length }));
+                setError(e.message || 'Network error');
             }
 
             if (i + BATCH_SIZE < allTickers.length && !abortRef.current) {
@@ -183,7 +198,6 @@ export default function ScreenerPage() {
         setScanning(false);
     }, [allTickers]);
 
-    // Load saved screens
     useEffect(() => {
         fetch('/api/screener/history')
             .then(r => r.json())
@@ -292,7 +306,6 @@ export default function ScreenerPage() {
 
     const progressPct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
-    // Official screener filtering and sorting
     const filteredOfficial = useMemo(() => {
         if (!officialData) return [];
         let items = [...officialData] as OfficialScreenerItem[];
@@ -307,569 +320,595 @@ export default function ScreenerPage() {
         return items;
     }, [officialData, officialSearch, officialSortKey, officialSortDir]);
 
+    const tabs = [
+        { id: "technical" as const, label: "Technical", icon: Zap },
+        { id: "fundamental" as const, label: "Fundamental", icon: Building2 },
+        { id: "position" as const, label: "Position", icon: Calculator },
+    ];
+
+    const selectedStock = selectedTicker ? results.find(r => r.ticker === selectedTicker) : null;
+
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight">Stock Screener</h1>
-                    <p className="text-sm text-muted-foreground">
-                        {activeTab === 'technical'
-                            ? (results.length > 0 ? `${results.length} / ${allTickers.length} stocks scanned` : `${allTickers.length} stocks ready to screen`)
-                            : `${officialData?.length || 0} stocks with fundamental data`}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    {scanning && activeTab === 'technical' && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                            <span>{progressPct}%</span>
-                            {progress.errors > 0 && <span className="text-destructive">({progress.errors} err)</span>}
+        <div className="space-y-3">
+            {/* Header + Controls */}
+            <div className="card p-0 overflow-hidden">
+                <div className="p-4 border-b border-border bg-muted/20">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
+                                <BarChart3 className="w-5 h-5 text-primary" />
+                                Stock Screener
+                            </h1>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {results.length > 0 ? `${results.length} / ${allTickers.length} stocks scanned` : `${allTickers.length} stocks ready`}
+                            </p>
                         </div>
-                    )}
-                    {!scanning && activeTab === 'technical' ? (
                         <div className="flex items-center gap-2">
-                            {results.length > 0 && (
+                            {scanning && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                    <span>{progressPct}%</span>
+                                </div>
+                            )}
+                            {!scanning ? (
+                                <div className="flex items-center gap-2">
+                                    {results.length > 0 && (
+                                        <>
+                                            <button
+                                                onClick={() => { setSaveLabel(''); setShowSaveDialog(true); }}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground text-xs font-bold hover:bg-muted transition-colors"
+                                            >
+                                                <Save className="w-3.5 h-3.5" />
+                                                Save
+                                            </button>
+                                            <button
+                                                onClick={() => setShowHistory(true)}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground text-xs font-bold hover:bg-muted transition-colors"
+                                            >
+                                                <Clock className="w-3.5 h-3.5" />
+                                                History
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={handleScreen}
+                                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/80 transition-colors"
+                                    >
+                                        <Play className="w-3.5 h-3.5" />
+                                        Screen Stocks
+                                    </button>
+                                </div>
+                            ) : (
                                 <button
-                                    onClick={() => { setSaveLabel(''); setShowSaveDialog(true); }}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border text-muted-foreground rounded-xl text-sm font-bold hover:bg-muted transition-all"
+                                    onClick={handleStop}
+                                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-xs font-bold hover:bg-destructive/80 transition-colors"
                                 >
-                                    <Save className="w-4 h-4" />
-                                    Save
+                                    Stop
                                 </button>
                             )}
-                            <button
-                                onClick={() => setShowHistory(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border text-muted-foreground rounded-xl text-sm font-bold hover:bg-muted transition-all"
-                            >
-                                <Clock className="w-4 h-4" />
-                                History
-                            </button>
-                            <button
-                                onClick={handleScreen}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/80 transition-all shadow-lg"
-                            >
-                                <Play className="w-4 h-4" />
-                                Screen Stocks
-                            </button>
                         </div>
-                    ) : (
-                        <button
-                            onClick={handleStop}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-destructive text-destructive-foreground rounded-xl text-sm font-bold hover:bg-destructive/80 transition-all"
-                        >
-                            Stop
-                        </button>
-                    )}
+                    </div>
                 </div>
-            </div>
 
-            {/* Tab Navigation */}
-            <div className="flex gap-1 bg-card border border-border rounded-xl p-1 w-fit">
-                <button
-                    onClick={() => setActiveTab('technical')}
-                    className={cn(
-                        "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all",
-                        activeTab === 'technical' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    <Zap className="w-3.5 h-3.5" />
-                    Technical
-                </button>
-                <button
-                    onClick={() => setActiveTab('fundamental')}
-                    className={cn(
-                        "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all",
-                        activeTab === 'fundamental' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    <Building2 className="w-3.5 h-3.5" />
-                    Fundamental
-                </button>
+                {/* Progress bar */}
+                {scanning && (
+                    <div className="h-1 w-full bg-muted">
+                        <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                    </div>
+                )}
             </div>
-
-            {/* Progress bar */}
-            {scanning && activeTab === 'technical' && (
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
-                        style={{ width: `${progressPct}%` }}
-                    />
-                </div>
-            )}
 
             {/* Error */}
             {error && (
-                <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-xl text-xs text-destructive font-medium">
-                    <AlertCircle className="w-4 h-4" />
+                <div className="card flex items-center gap-2 p-3 border-destructive/40 bg-destructive/5 text-xs text-destructive">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
                     {error}
                 </div>
             )}
 
-            {/* Technical Screener Content */}
-            {activeTab === 'technical' && (
-            <>
-            {/* Top 5 Picks */}
-            {!scanning && results.length > 0 && (topPicks.buys.length > 0 || topPicks.sells.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {topPicks.buys.length > 0 && (
-                        <div className="card-flush">
-                            <div className="px-5 py-3 bg-success/5 border-b border-border flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-success" />
-                                <span className="text-xs font-black text-success uppercase tracking-wider">Top 5 Buy</span>
-                            </div>
-                            <div className="divide-y divide-border">
-                                {topPicks.buys.map((item, idx) => (
-                                    <div key={item.ticker} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-black text-muted-foreground w-4">#{idx+1}</span>
-                                                <Link href={`/analysis/${item.ticker}.JK`} className="font-bold text-sm text-foreground hover:text-primary font-mono">{item.ticker}</Link>
-                                                {item.sharia && <span className="text-[7px] font-black px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500 tracking-wider">S</span>}
-                                                <span className="text-[10px] text-muted-foreground max-w-[140px] truncate">{item.name}</span>
-                                            </div>
-                                            <span className="text-xs font-black text-success">+{item.score}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground ml-6">
-                                            <span>Entry: <span className="font-semibold text-foreground">{formatIDR(item.entryPrice)}</span></span>
-                                            <span>SL: <span className="font-semibold text-destructive">{formatIDR(item.stopLoss)}</span></span>
-                                            <span>TP: <span className="font-semibold text-success">{formatIDR(item.takeProfit)}</span></span>
-                                            <span className="text-[9px]">R:R <span className="font-semibold text-foreground">1:{(Math.abs(item.takeProfit - item.entryPrice) / Math.abs(item.stopLoss - item.entryPrice)).toFixed(1)}</span></span>
-                                            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", item.accumulationPercent >= 60 ? "bg-success/10 text-success" : item.accumulationPercent >= 40 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground")}>
-                                                {item.signal === 'SELL' ? 100 - item.accumulationPercent : item.accumulationPercent}% flow
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 ml-6 mt-1">
-                                            <span className={cn("text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider",
-                                                item.divergence === 'BULLISH_DIVERGENCE' ? "bg-success/10 text-success" :
-                                                item.divergence === 'BEARISH_DIVERGENCE' ? "bg-destructive/10 text-destructive" :
-                                                item.divergence === 'RETAIL_FOMO' ? "bg-warning/10 text-warning" :
-                                                item.divergence === 'PANIC_SELLING' ? "bg-destructive/10 text-destructive" :
-                                                item.divergence === 'STEADY_ACCUMULATION' ? "bg-success/10 text-success" :
-                                                item.divergence === 'EARLY_ACCUMULATION' ? "bg-primary/10 text-primary" :
-                                                item.divergence === 'EARLY_DISTRIBUTION' ? "bg-destructive/10 text-destructive" :
-                                                "bg-muted text-muted-foreground"
-                                            )}>
-                                                {item.divergence === 'BULLISH_DIVERGENCE' ? '🔍 Smart Money Acc' :
-                                                 item.divergence === 'BEARISH_DIVERGENCE' ? '🔍 Distribution' :
-                                                 item.divergence === 'RETAIL_FOMO' ? '⚠️ Retail FOMO' :
-                                                 item.divergence === 'PANIC_SELLING' ? '⚠️ Panic Sell' :
-                                                 item.divergence === 'STEADY_ACCUMULATION' ? '📈 Accumulation' :
-                                                 item.divergence === 'STEADY_DISTRIBUTION' ? '📉 Distribution' :
-                                                 item.divergence === 'EARLY_ACCUMULATION' ? '🔎 Early Acc' :
-                                                 item.divergence === 'EARLY_DISTRIBUTION' ? '🔎 Early Dist' :
-                                                 '➖ Neutral'}
-                                            </span>
-                                        </div>
-                                        <div className="ml-6 mt-0.5 text-[8px] text-muted-foreground leading-tight">{item.reason}</div>
-                                    </div>
-                                ))}
+            {/* Tabs */}
+            <div className="card p-0 overflow-hidden">
+                <div className="flex items-center border-b border-border bg-muted/10">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            disabled={!results.length && tab.id !== 'technical' && tab.id !== 'fundamental'}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-5 py-3 text-xs font-bold border-b-2 -mb-px transition-colors",
+                                activeTab === tab.id
+                                    ? "border-primary text-primary bg-background"
+                                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                                !results.length && tab.id !== 'technical' && tab.id !== 'fundamental' && "opacity-40 cursor-not-allowed hover:text-muted-foreground hover:bg-transparent"
+                            )}
+                        >
+                            <tab.icon className="w-3.5 h-3.5" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-4 min-h-[400px]">
+                    {/* Technical Tab */}
+                    {activeTab === 'technical' && (
+                        <TechnicalScreener
+                            results={results}
+                            filtered={filtered}
+                            topPicks={topPicks}
+                            scanning={scanning}
+                            progress={progress}
+                            sortKey={sortKey}
+                            sortAsc={sortAsc}
+                            toggleSort={toggleSort}
+                            filter={filter}
+                            setFilter={setFilter}
+                            search={search}
+                            setSearch={setSearch}
+                            count={count}
+                            filterDescriptions={filterDescriptions}
+                            formatScore={formatScore}
+                            onSelectTicker={(t) => { setSelectedTicker(t); setActiveTab('position'); }}
+                        />
+                    )}
+
+                    {/* Fundamental Tab */}
+                    {activeTab === 'fundamental' && (
+                        <FundamentalScreener
+                            data={filteredOfficial}
+                            isLoading={officialLoading}
+                            search={officialSearch}
+                            setSearch={setOfficialSearch}
+                            sortKey={officialSortKey}
+                            setSortKey={setOfficialSortKey}
+                            sortDir={officialSortDir}
+                            setSortDir={setOfficialSortDir}
+                        />
+                    )}
+
+                    {/* Position Tab */}
+                    {activeTab === 'position' && selectedStock && (
+                        <div className="space-y-4">
+                            <div className="card p-3 border-primary/30">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Target className="w-4 h-4 text-primary" />
+                                    <h3 className="text-sm font-bold">Position Calculator</h3>
+                                    <span className="ml-auto text-xs text-muted-foreground">
+                                        {selectedStock.ticker} · Rp {selectedStock.price.toLocaleString("id-ID")}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mb-3">
+                                    Kalkulasi lot & alokasi untuk {selectedStock.ticker} berdasarkan entry price dari screener.
+                                </p>
+                                <PositionCalculator
+                                    ticker={selectedStock.ticker}
+                                    lastClose={selectedStock.price}
+                                    technicalData={{
+                                        nextEntry: {
+                                            kind: "rsi_below",
+                                            price: selectedStock.entryPrice,
+                                            lastClose: selectedStock.price,
+                                            distancePct: ((selectedStock.entryPrice / selectedStock.price - 1) * 100),
+                                            ready: true,
+                                            indicatorNow: `RSI ${selectedStock.rsi.toFixed(1)}`
+                                        },
+                                        indicators: {
+                                            rsi14: selectedStock.rsi,
+                                            support: selectedStock.keySupport,
+                                            resistance: selectedStock.keyResistance,
+                                        },
+                                    }}
+                                    strategyLabel={`Screener Score: ${selectedStock.score}`}
+                                    showCalculator={true}
+                                />
                             </div>
                         </div>
                     )}
-                    {topPicks.sells.length > 0 && (
-                        <div className="card-flush">
-                            <div className="px-5 py-3 bg-destructive/5 border-b border-border flex items-center gap-2">
-                                <TrendingDown className="w-4 h-4 text-destructive" />
-                                <span className="text-xs font-black text-destructive uppercase tracking-wider">Top 5 Sell</span>
-                            </div>
-                            <div className="divide-y divide-border">
-                                {topPicks.sells.map((item, idx) => (
-                                    <div key={item.ticker} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-black text-muted-foreground w-4">#{idx+1}</span>
-                                                <Link href={`/analysis/${item.ticker}.JK`} className="font-bold text-sm text-foreground hover:text-primary font-mono">{item.ticker}</Link>
-                                                <span className="text-[10px] text-muted-foreground max-w-[140px] truncate">{item.name}</span>
-                                            </div>
-                                            <span className="text-xs font-black text-destructive">{item.score}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground ml-6">
-                                            <span>Entry: <span className="font-semibold text-foreground">{formatIDR(item.entryPrice)}</span></span>
-                                            <span>SL: <span className="font-semibold text-success">{formatIDR(item.stopLoss)}</span></span>
-                                            <span>TP: <span className="font-semibold text-destructive">{formatIDR(item.takeProfit)}</span></span>
-                                            <span className="text-[9px]">R:R <span className="font-semibold text-foreground">1:{(Math.abs(item.takeProfit - item.entryPrice) / Math.abs(item.stopLoss - item.entryPrice)).toFixed(1)}</span></span>
-                                            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", item.accumulationPercent >= 60 ? "bg-success/10 text-success" : item.accumulationPercent >= 40 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground")}>
-                                                {item.signal === 'SELL' ? 100 - item.accumulationPercent : item.accumulationPercent}% flow
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 ml-6 mt-1">
-                                            <span className={cn("text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider",
-                                                item.divergence === 'BULLISH_DIVERGENCE' ? "bg-success/10 text-success" :
-                                                item.divergence === 'BEARISH_DIVERGENCE' ? "bg-destructive/10 text-destructive" :
-                                                item.divergence === 'RETAIL_FOMO' ? "bg-warning/10 text-warning" :
-                                                item.divergence === 'PANIC_SELLING' ? "bg-destructive/10 text-destructive" :
-                                                item.divergence === 'STEADY_ACCUMULATION' ? "bg-success/10 text-success" :
-                                                item.divergence === 'EARLY_ACCUMULATION' ? "bg-primary/10 text-primary" :
-                                                item.divergence === 'EARLY_DISTRIBUTION' ? "bg-destructive/10 text-destructive" :
-                                                "bg-muted text-muted-foreground"
-                                            )}>
-                                                {item.divergence === 'BULLISH_DIVERGENCE' ? '🔍 Smart Money Acc' :
-                                                 item.divergence === 'BEARISH_DIVERGENCE' ? '🔍 Distribution' :
-                                                 item.divergence === 'RETAIL_FOMO' ? '⚠️ Retail FOMO' :
-                                                 item.divergence === 'PANIC_SELLING' ? '⚠️ Panic Sell' :
-                                                 item.divergence === 'STEADY_ACCUMULATION' ? '📈 Accumulation' :
-                                                 item.divergence === 'STEADY_DISTRIBUTION' ? '📉 Distribution' :
-                                                 item.divergence === 'EARLY_ACCUMULATION' ? '🔎 Early Acc' :
-                                                 item.divergence === 'EARLY_DISTRIBUTION' ? '🔎 Early Dist' :
-                                                 '➖ Neutral'}
-                                            </span>
-                                        </div>
-                                        <div className="ml-6 mt-0.5 text-[8px] text-muted-foreground leading-tight">{item.reason}</div>
-                                    </div>
-                                ))}
-                            </div>
+
+                    {/* Empty state for Position */}
+                    {activeTab === 'position' && !selectedStock && (
+                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <BarChart3 className="w-12 h-12 mb-4 text-muted-foreground/30" />
+                            <p className="text-sm font-medium">
+                                Pilih saham dari tab Technical untuk kalkulasi posisi
+                            </p>
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Save Dialog */}
+            {showSaveDialog && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowSaveDialog(false)}>
+                    <div className="bg-card p-6 rounded-xl w-full max-w-md border border-border shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="font-bold text-foreground mb-1">Save Screener Results</h3>
+                        <p className="text-xs text-muted-foreground mb-4">{results.length} stocks — {topPicks.buys.length} buy, {topPicks.sells.length} sell</p>
+                        <input
+                            type="text"
+                            value={saveLabel}
+                            onChange={e => setSaveLabel(e.target.value)}
+                            placeholder="e.g. IDX Scan 19 Jun 2026"
+                            className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            autoFocus
+                            onKeyDown={e => e.key === 'Enter' && handleSave()}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setShowSaveDialog(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+                            <button onClick={handleSave} disabled={saving || !saveLabel.trim()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:bg-primary/80 disabled:opacity-50 transition-all">
+                                {saving ? 'Saving...' : 'Save'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* History Panel */}
+            {showHistory && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowHistory(false)}>
+                    <div className="bg-card p-6 rounded-xl w-full max-w-lg border border-border shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-foreground">Saved Screens</h3>
+                            <button onClick={() => setShowHistory(false)} className="text-muted-foreground hover:text-foreground text-sm font-medium">Close</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-2">
+                            {savedScreens.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-8">No saved screens yet</p>
+                            ) : (
+                                savedScreens.map((s) => (
+                                    <div key={s.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border hover:bg-muted/60 transition-colors">
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">{s.label}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                {s.resultsCount} stocks · {s.buyCount} buy · {s.sellCount} sell · {new Date(s.createdAt).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleLoadSaved(s.id)}
+                                            className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors"
+                                        >
+                                            Load
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function TechnicalScreener({
+    results, filtered, topPicks, scanning, progress, sortKey, sortAsc, toggleSort, filter, setFilter, search, setSearch, count, filterDescriptions, formatScore, onSelectTicker,
+}: {
+    results: ScreenerItem[];
+    filtered: ScreenerItem[];
+    topPicks: { buys: ScreenerItem[]; sells: ScreenerItem[] };
+    scanning: boolean;
+    progress: { done: number; total: number; errors: number; errorSummary: Record<string, number> };
+    sortKey: SortKey;
+    sortAsc: boolean;
+    toggleSort: (key: SortKey) => void;
+    filter: FilterKey;
+    setFilter: (f: FilterKey) => void;
+    search: string;
+    setSearch: (s: string) => void;
+    count: (k: FilterKey) => void;
+    filterDescriptions: Record<FilterKey, { title: string; desc: string }>;
+    formatScore: (score: number) => { label: string; color: string; bg: string };
+    onSelectTicker: (ticker: string) => void;
+}) {
+    if (results.length === 0 && !scanning) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <BarChart3 className="w-16 h-16 mb-4 text-muted-foreground/30" />
+                <p className="text-sm font-medium mb-2">Belum ada hasil scan</p>
+                <p className="text-xs">Klik "Screen Stocks" untuk memulai scanning</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            {/* Scanning indicator */}
+            {scanning && (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span className="font-bold">Scanning... ({results.length} stocks found)</span>
+                    </div>
+                    {progress.errors > 0 && (
+                        <div className="text-[10px] text-warning">
+                            {progress.errors} stocks failed
+                            {Object.keys(progress.errorSummary).length > 0 && (
+                                <span className="ml-1">
+                                    ({Object.entries(progress.errorSummary).map(([k, v]) => `${k}: ${v}`).join(', ')})
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Top Picks Summary */}
+            {!scanning && topPicks.buys.length > 0 && (
+                <div className="card p-3 bg-success/5 border-success/30">
+                    <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-success" />
+                        <span className="text-xs font-black text-success">Top Buys</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {topPicks.buys.slice(0, 5).map((item, idx) => (
+                            <button
+                                key={item.ticker}
+                                onClick={() => onSelectTicker(item.ticker)}
+                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-success/10 text-success text-[10px] font-bold hover:bg-success/20 transition-colors"
+                            >
+                                #{idx + 1} {item.ticker} (+{item.score})
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
             {/* Search + Filter */}
             {results.length > 0 && (
                 <>
-                    <div className="relative w-full sm:w-72">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Cari ticker atau nama..."
-                            className="w-full pl-9 pr-4 py-2 bg-muted border border-input rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        />
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        {([
-                            ['all', 'All'],
-                            ['golden', `Golden Cross (${count('golden')})`],
-                            ['accumulation', `Accumulation (${count('accumulation')})`],
-                            ['surge', `Volume Surge (${count('surge')})`],
-                            ['oversold', `Oversold (${count('oversold')})`],
-                            ['buy', `Buy Signal (${count('buy')})`],
-                            ['distribution', `Distribution (${count('distribution')})`],
-                            ['sharia', `Sharia (${count('sharia')})`],
-                        ] as [FilterKey, string][]).map(([k, label]) => (
-                            <button
-                                key={k}
-                                onClick={() => setFilter(k)}
-                                className={cn(
-                                    "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg border transition-all",
-                                    filter === k
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-card text-muted-foreground border-border hover:border-primary/30"
-                                )}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Filter Description */}
-                    {filter !== 'all' && (
-                        <div className="flex items-start gap-2 p-3 bg-muted/30 border border-border rounded-xl">
-                            <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                            <div>
-                                <p className="text-xs font-bold text-foreground">{filterDescriptions[filter].title}</p>
-                                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{filterDescriptions[filter].desc}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Save Dialog */}
-                    {showSaveDialog && (
-                        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowSaveDialog(false)}>
-                            <div className="bg-card p-6 rounded-xl w-full max-w-md border border-border shadow-2xl" onClick={e => e.stopPropagation()}>
-                                <h3 className="font-bold text-foreground mb-1">Save Screener Results</h3>
-                                <p className="text-xs text-muted-foreground mb-4">{results.length} stocks — {topPicks.buys.length} buy, {topPicks.sells.length} sell</p>
-                                <input
-                                    type="text"
-                                    value={saveLabel}
-                                    onChange={e => setSaveLabel(e.target.value)}
-                                    placeholder="e.g. IDX Scan 19 Jun 2026"
-                                    className="w-full px-3 py-2 bg-muted border border-input rounded-lg text-sm text-foreground mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                    autoFocus
-                                    onKeyDown={e => e.key === 'Enter' && handleSave()}
-                                />
-                                <div className="flex justify-end gap-2">
-                                    <button onClick={() => setShowSaveDialog(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
-                                    <button onClick={handleSave} disabled={saving || !saveLabel.trim()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:bg-primary/80 disabled:opacity-50 transition-all">
-                                        {saving ? 'Saving...' : 'Save'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* History Panel */}
-                    {showHistory && (
-                        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowHistory(false)}>
-                            <div className="bg-card p-6 rounded-xl w-full max-w-lg border border-border shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-bold text-foreground">Saved Screens</h3>
-                                    <button onClick={() => setShowHistory(false)} className="text-muted-foreground hover:text-foreground text-sm font-medium">Close</button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-2">
-                                    {savedScreens.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground text-center py-8">No saved screens yet</p>
-                                    ) : (
-                                        savedScreens.map((s) => (
-                                            <div key={s.id} className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border hover:bg-muted/60 transition-colors">
-                                                <div>
-                                                    <p className="text-sm font-medium text-foreground">{s.label}</p>
-                                                    <p className="text-[10px] text-muted-foreground">
-                                                        {s.resultsCount} stocks &middot; {s.buyCount} buy &middot; {s.sellCount} sell &middot; {new Date(s.createdAt).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleLoadSaved(s.id)}
-                                                    className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors"
-                                                >
-                                                    Load
-                                                </button>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Table */}
-                    <div className="card-flush">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30 text-muted-foreground text-left">
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Ticker" k="ticker" />
-                                        <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wider">Name</th>
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Price" k="changePercent" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Change" k="changePercent" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Signal" k="signal" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Score" k="score" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="RSI" k="rsi" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="MFI" k="rsi" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Cross" k="score" />
-                                        <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Volume" k="score" />
-                                        <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wider">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {filtered.map((item) => {
-                                        const sc = formatScore(item.score);
-                                        const isUp = item.changePercent >= 0;
-                                        return (
-                                            <tr key={item.ticker} className="hover:bg-muted/40 transition-colors">
-                                                <td className="px-3 py-3">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="font-bold text-foreground font-mono text-xs">{item.ticker}</span>
-                                                        {item.sharia && (
-                                                            <span className="text-[8px] font-black px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase tracking-wider">S</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-3 py-3 text-xs text-muted-foreground max-w-[180px] truncate">{item.name}</td>
-                                                <td className="px-3 py-3 font-semibold text-xs">{formatIDR(item.price)}</td>
-                                                <td className="px-3 py-3">
-                                                    <span className={cn("text-xs font-semibold", isUp ? "text-success" : "text-destructive")}>
-                                                        {formatPercentage(item.changePercent)}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span className={cn("text-[10px] font-black px-2 py-0.5 rounded", sc.color, sc.bg)}>
-                                                        {sc.label}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span className={cn("text-xs font-black", sc.color)}>
-                                                        {item.score > 0 ? '+' : ''}{item.score}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span className={cn("text-xs font-semibold",
-                                                        item.rsiOversold ? "text-success" : item.rsiOverbought ? "text-destructive" : "text-foreground"
-                                                    )}>
-                                                        {item.rsi}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span className={cn("text-xs font-semibold",
-                                                        item.mfi < 30 ? "text-success" : item.mfi > 70 ? "text-destructive" : "text-foreground"
-                                                    )}>
-                                                        {item.mfi}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    {item.goldenCross ? (
-                                                        <span className="text-[10px] font-black text-success bg-success/10 px-2 py-0.5 rounded">GOLDEN</span>
-                                                    ) : item.deathCross ? (
-                                                        <span className="text-[10px] font-black text-destructive bg-destructive/10 px-2 py-0.5 rounded">DEATH</span>
-                                                    ) : item.nearGoldenCross ? (
-                                                        <span className="text-[10px] font-black text-warning bg-warning/10 px-2 py-0.5 rounded">NEAR GC</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-muted-foreground">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <div className="flex items-center gap-1">
-                                                        {item.volumeSurge && <Zap className="w-3 h-3 text-warning" />}
-                                                        <span className={cn("text-[10px] font-semibold",
-                                                            item.obvTrend === 'UP' ? "text-success" : item.obvTrend === 'DOWN' ? "text-destructive" : "text-muted-foreground"
-                                                        )}>
-                                                            {item.accumulation ? 'ACC' : item.distribution ? 'DIST' : '—'}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <Link
-                                                        href={`/analysis/${item.ticker}.JK`}
-                                                        className="text-[10px] font-black text-primary hover:text-primary/80 transition-colors uppercase tracking-wider"
-                                                    >
-                                                        Analyze
-                                                    </Link>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                        {filtered.length === 0 && !scanning && (
-                            <div className="p-12 text-center">
-                                <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                                <p className="text-sm font-medium text-muted-foreground">No matches found</p>
-                            </div>
-                        )}
-                    </div>
-                </>
-            )}
-
-            {results.length === 0 && !scanning && (
-                <div className="p-24 text-center">
-                    <BarChart3 className="w-16 h-16 text-muted-foreground/40 mx-auto mb-6" />
-                    <h2 className="text-xl font-bold text-foreground mb-2">Ready to Screen</h2>
-                    <p className="text-sm text-muted-foreground max-w-md mx-auto mb-8">
-                        Scan {allTickers.length} IDX stocks for golden cross, accumulation, volume surge, and more.
-                        Results appear progressively as each batch completes.
-                    </p>
-                    <button
-                        onClick={handleScreen}
-                        className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:bg-primary/80 transition-all shadow-xl hover:shadow-2xl"
-                    >
-                        <Play className="w-6 h-6" />
-                        Start Screening
-                    </button>
-                </div>
-            )}
-
-            {scanning && results.length === 0 && (
-                <div className="p-24 text-center">
-                    <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-6" />
-                    <h2 className="text-lg font-bold text-foreground mb-2">Scanning Market...</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Processing {allTickers.length} stocks in batches of {BATCH_SIZE} to avoid rate limits
-                    </p>
-                </div>
-            )}
-            </>
-            )}
-
-            {/* Fundamental Screener Content */}
-            {activeTab === 'fundamental' && (
-                <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <div className="relative flex-1 sm:max-w-xs">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                             <input
                                 type="text"
-                                value={officialSearch}
-                                onChange={(e) => setOfficialSearch(e.target.value)}
-                                placeholder="Cari saham (BBCA, TLKM, INDF...)"
-                                className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Cari ticker..."
+                                className="w-full pl-8 pr-3 py-1.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                         </div>
-                        <div className="flex gap-1 bg-card border border-border rounded-xl p-1">
-                            {([['marketCapital', 'Market Cap'], ['per', 'PER'], ['pbv', 'PBV'], ['roe', 'ROE'], ['npm', 'NPM'], ['ytd', 'YTD']] as const).map(([key, label]) => (
+                        <div className="flex flex-wrap gap-1.5">
+                            {([
+                                ['all', 'All'],
+                                ['buy', `Buy (${count('buy')})`],
+                                ['golden', `GC (${count('golden')})`],
+                                ['accumulation', `Acc (${count('accumulation')})`],
+                                ['oversold', `Oversold (${count('oversold')})`],
+                                ['surge', `Surge (${count('surge')})`],
+                                ['sharia', `Sharia (${count('sharia')})`],
+                            ] as [FilterKey, string][]).map(([k, label]) => (
                                 <button
-                                    key={key}
-                                    onClick={() => { setOfficialSortKey(key); setOfficialSortDir(officialSortKey === key ? (officialSortDir === 'asc' ? 'desc' : 'asc') : 'desc'); }}
+                                    key={k}
+                                    onClick={() => setFilter(k)}
                                     className={cn(
-                                        "px-3 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all",
-                                        officialSortKey === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                                        "px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-colors",
+                                        filter === k
+                                            ? "bg-primary text-primary-foreground border-primary"
+                                            : "bg-background text-muted-foreground border-border hover:border-primary/30"
                                     )}
                                 >
-                                    {label} {officialSortKey === key ? (officialSortDir === 'asc' ? '↑' : '↓') : ''}
+                                    {label}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {officialLoading ? (
-                        <div className="p-12 text-center">
-                            <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
-                            <p className="text-sm text-muted-foreground">Memuat data fundamental...</p>
-                        </div>
-                    ) : filteredOfficial.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <Building2 className="w-8 h-8 text-muted-foreground/50 mx-auto mb-3" />
-                            <p className="text-sm text-muted-foreground">{officialSearch ? `Tidak ditemukan "${officialSearch}"` : 'Tidak ada data'}</p>
-                        </div>
-                    ) : (
-                        <div className="card-flush">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
-                                    <thead>
-                                        <tr className="border-b border-border bg-muted/30">
-                                            <th className="text-left px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">Kode</th>
-                                            <th className="text-left px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Nama</th>
-                                            <th className="text-left px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Sektor</th>
-                                            <th className="text-right px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">Market Cap</th>
-                                            <th className="text-right px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">PER</th>
-                                            <th className="text-right px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">PBV</th>
-                                            <th className="text-right px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">ROE</th>
-                                            <th className="text-right px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">NPM</th>
-                                            <th className="text-right px-4 py-2.5 font-bold text-muted-foreground uppercase tracking-wider">YTD</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {filteredOfficial.slice(0, 100).map((s) => (
-                                            <tr
-                                                key={s.code}
-                                                onClick={() => router.push(`/analysis/${s.code}.JK`)}
-                                                className="hover:bg-muted/40 transition-colors cursor-pointer"
-                                            >
-                                                <td className="px-4 py-2.5 font-mono font-bold text-foreground">{s.code}</td>
-                                                <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[200px] hidden sm:table-cell">{s.name}</td>
-                                                <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{s.subIndustry}</td>
-                                                <td className="px-4 py-2.5 text-right font-mono text-foreground">{s.marketCapital ? formatCompactIDR(s.marketCapital) : '-'}</td>
-                                                <td className={cn("px-4 py-2.5 text-right font-mono font-bold", s.per > 0 && s.per < 15 ? "text-success" : s.per > 25 ? "text-destructive" : "text-foreground")}>
-                                                    {s.per > 0 ? s.per.toFixed(1) : '-'}
-                                                </td>
-                                                <td className={cn("px-4 py-2.5 text-right font-mono font-bold", s.pbv > 0 && s.pbv < 1 ? "text-success" : s.pbv > 3 ? "text-destructive" : "text-foreground")}>
-                                                    {s.pbv > 0 ? s.pbv.toFixed(2) : '-'}
-                                                </td>
-                                                <td className={cn("px-4 py-2.5 text-right font-mono font-bold", s.roe > 15 ? "text-success" : s.roe < 5 ? "text-destructive" : "text-foreground")}>
-                                                    {s.roe ? `${s.roe.toFixed(1)}%` : '-'}
-                                                </td>
-                                                <td className={cn("px-4 py-2.5 text-right font-mono font-bold", s.npm > 10 ? "text-success" : s.npm < 0 ? "text-destructive" : "text-foreground")}>
-                                                    {s.npm ? `${s.npm.toFixed(1)}%` : '-'}
-                                                </td>
-                                                <td className={cn("px-4 py-2.5 text-right font-mono font-bold", s.ytd > 0 ? "text-success" : "text-destructive")}>
-                                                    {s.ytd ? `${s.ytd.toFixed(1)}%` : '-'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {filteredOfficial.length > 100 && (
-                                <div className="px-4 py-3 text-center border-t border-border">
-                                    <p className="text-[10px] text-muted-foreground">Menampilkan 100 dari {filteredOfficial.length} saham</p>
-                                </div>
-                            )}
+                    {filter !== 'all' && (
+                        <div className="flex items-start gap-2 p-2.5 bg-muted/30 border border-border rounded-lg text-[11px]">
+                            <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                            <span className="text-muted-foreground">{filterDescriptions[filter].desc}</span>
                         </div>
                     )}
+                </>
+            )}
+
+            {/* Table */}
+            {filtered.length > 0 && (
+                <div className="card overflow-x-auto p-0">
+                    <table className="w-full text-xs tabular-nums">
+                        <thead>
+                            <tr className="border-b border-border bg-muted/30 text-muted-foreground text-left">
+                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Ticker" k="ticker" />
+                                <th className="px-3 py-2 text-[10px] font-black uppercase">Name</th>
+                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Price" k="changePercent" />
+                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Signal" k="signal" />
+                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Score" k="score" />
+                                <th className="px-3 py-2 text-[10px] font-black uppercase">Best Strategy</th>
+                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Win%" k="score" />
+                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Sharpe" k="score" />
+                                <th className="px-3 py-2 text-[10px] font-black uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {filtered.map((item) => {
+                                const sc = formatScore(item.score);
+                                return (
+                                    <tr key={item.ticker} className="hover:bg-muted/30 transition-colors">
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-1">
+                                                <span className="font-bold text-foreground font-mono">{item.ticker}</span>
+                                                {item.sharia && <span className="text-[7px] font-black px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500">S</span>}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-muted-foreground max-w-[120px] truncate">{item.name}</td>
+                                        <td className="px-3 py-2 font-semibold">{formatIDR(item.price)}</td>
+                                        <td className="px-3 py-2">
+                                            <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded", sc.color, sc.bg)}>
+                                                {sc.label}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <span className={cn("font-black", sc.color)}>{item.score > 0 ? '+' : ''}{item.score}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-[10px] text-muted-foreground max-w-[120px] truncate">
+                                            {item.bestStrategy !== '-' ? item.bestStrategy.replace(/\(.*\)/, '').trim() : '-'}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <span className={cn("font-semibold",
+                                                item.winRate >= 50 ? "text-success" : item.winRate >= 40 ? "text-warning" : "text-destructive"
+                                            )}>{item.winRate}%</span>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <span className={cn("font-semibold",
+                                                item.sharpe >= 1 ? "text-success" : item.sharpe >= 0.5 ? "text-warning" : "text-destructive"
+                                            )}>{item.sharpe?.toFixed(2) || '-'}</span>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <button
+                                                onClick={() => onSelectTicker(item.ticker)}
+                                                className="text-[10px] font-black text-primary hover:underline"
+                                            >
+                                                Position →
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {filtered.length === 0 && !scanning && results.length > 0 && (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                    <Activity className="w-6 h-6 mx-auto mb-2 text-muted-foreground/40" />
+                    <p>Tidak ada saham yang cocok dengan filter ini</p>
+                </div>
+            )}
+
+            {/* AI Recommendation - muncul setelah scanning selesai */}
+            {!scanning && topPicks.buys.length > 0 && (
+                <div className="card p-4 border-primary/30 bg-primary/5">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Bot className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-bold">AI Recommendation</h3>
+                        <span className="ml-auto text-[9px] text-muted-foreground">8 strategi backtest</span>
+                    </div>
+                    <div className="space-y-2">
+                        {topPicks.buys.slice(0, 5).map((item, idx) => (
+                            <div key={item.ticker} className="flex items-center gap-3 p-2 rounded-lg bg-background border border-border">
+                                <span className="text-xs font-black text-muted-foreground w-5">#{idx + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-bold font-mono">{item.ticker}</span>
+                                        <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded",
+                                            item.consensus === 'STRONG_BUY' ? "bg-success/20 text-success" :
+                                            item.score >= 30 ? "bg-success/10 text-success" : "bg-primary/10 text-primary"
+                                        )}>{item.consensus === 'STRONG_BUY' ? 'STRONG' : '+' + item.score}</span>
+                                        <span className="text-[9px] text-muted-foreground">
+                                            {item.buySignals}B/{item.sellSignals}S
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{item.reason}</p>
+                                </div>
+                                <button
+                                    onClick={() => onSelectTicker(item.ticker)}
+                                    className="shrink-0 text-[10px] font-bold text-primary hover:underline"
+                                >
+                                    Position →
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
     );
 }
+
+function FundamentalScreener({
+    data, isLoading, search, setSearch, sortKey, setSortKey, sortDir, setSortDir,
+}: {
+    data: OfficialScreenerItem[];
+    isLoading: boolean;
+    search: string;
+    setSearch: (s: string) => void;
+    sortKey: 'marketCapital' | 'per' | 'pbv' | 'roe' | 'npm' | 'ytd';
+    setSortKey: (k: 'marketCapital' | 'per' | 'pbv' | 'roe' | 'npm' | 'ytd') => void;
+    sortDir: 'asc' | 'desc';
+    setSortDir: (d: 'asc' | 'desc') => void;
+}) {
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
+                <span className="text-sm">Memuat data fundamental...</span>
+            </div>
+        );
+    }
+
+    if (data.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Building2 className="w-10 h-10 mb-3 text-muted-foreground/30" />
+                <p className="text-sm">{search ? `Tidak ditemukan "${search}"` : 'Tidak ada data'}</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Cari saham..."
+                        className="w-full pl-8 pr-3 py-1.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                </div>
+                <div className="flex gap-1 bg-background border border-border rounded-lg p-1">
+                    {([['marketCapital', 'Cap'], ['per', 'PER'], ['pbv', 'PBV'], ['roe', 'ROE'], ['npm', 'NPM'], ['ytd', 'YTD']] as const).map(([key, label]) => (
+                        <button
+                            key={key}
+                            onClick={() => { setSortKey(key); setSortDir(sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : 'desc'); }}
+                            className={cn(
+                                "px-2.5 py-1 text-[10px] font-bold uppercase rounded transition-colors",
+                                sortKey === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {label} {sortKey === key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="card overflow-x-auto p-0">
+                <table className="w-full text-xs tabular-nums">
+                    <thead>
+                        <tr className="border-b border-border bg-muted/30 text-muted-foreground text-left">
+                            <th className="px-3 py-2 text-[10px] font-black uppercase">Code</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase">Name</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase">Sector</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase text-right">PER</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase text-right">PBV</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase text-right">ROE</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase text-right">DER</th>
+                            <th className="px-3 py-2 text-[10px] font-black uppercase text-right">YTD</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                        {data.slice(0, 100).map((item) => (
+                            <tr key={item.code} className="hover:bg-muted/30 transition-colors">
+                                <td className="px-3 py-2 font-bold font-mono">
+                                    <Link href={`/analysis/${item.code}.JK`} className="hover:text-primary">{item.code}</Link>
+                                </td>
+                                <td className="px-3 py-2 text-muted-foreground max-w-[180px] truncate">{item.name}</td>
+                                <td className="px-3 py-2 text-muted-foreground">{item.sector}</td>
+                                <td className="px-3 py-2 text-right">{item.per?.toFixed(2) || '-'}</td>
+                                <td className="px-3 py-2 text-right">{item.pbv?.toFixed(2) || '-'}</td>
+                                <td className="px-3 py-2 text-right">{item.roe?.toFixed(1) || '-'}</td>
+                                <td className="px-3 py-2 text-right">{item.der?.toFixed(2) || '-'}</td>
+                                <td className={cn("px-3 py-2 text-right font-bold", (item.ytd || 0) >= 0 ? "text-success" : "text-destructive")}>
+                                    {item.ytd != null ? `${item.ytd >= 0 ? '+' : ''}${item.ytd.toFixed(1)}%` : '-'}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
