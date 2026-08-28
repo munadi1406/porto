@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { io, Socket } from "socket.io-client";
 import type { ClientMessage, ServerMessage, PriceData } from "@/lib/ws-types";
 
 interface UseWebSocketOptions {
@@ -19,123 +20,84 @@ interface UseWebSocketReturn {
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
-    const {
-        autoConnect = true,
-        reconnectInterval = 3000,
-        maxReconnectAttempts = 10,
-    } = options;
-
+    const { autoConnect = true } = options;
     const [connected, setConnected] = useState(false);
     const [prices, setPrices] = useState<Record<string, PriceData>>({});
     const [marketOpen, setMarketOpen] = useState(false);
 
-    const wsRef = useRef<WebSocket | null>(null);
-    const reconnectCount = useRef(0);
-    const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const socketRef = useRef<Socket | null>(null);
     const subscribedTickers = useRef<Set<string>>(new Set());
 
-    const getWsUrl = useCallback(() => {
+    const getSocketUrl = useCallback(() => {
         if (typeof window === "undefined") return "";
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        return `${protocol}//${window.location.host}/ws`;
+        return window.location.origin;
     }, []);
 
     const connect = useCallback(() => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-        const url = getWsUrl();
+        if (socketRef.current?.connected) return;
+        const url = getSocketUrl();
         if (!url) return;
-
         try {
-            const ws = new WebSocket(url);
-            wsRef.current = ws;
+            const socket: Socket = io(url, {
+                path: "/ws",
+                transports: ["websocket", "polling"],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 3000,
+                timeout: 10000,
+            });
+            socketRef.current = socket;
 
-            ws.onopen = () => {
-                console.log("[WS] Connected");
+            socket.on("connect", () => {
+                console.log("[WS] Socket.IO connected", socket.id);
                 setConnected(true);
-                reconnectCount.current = 0;
-
-                // Re-subscribe to previous tickers
                 if (subscribedTickers.current.size > 0) {
-                    const msg: ClientMessage = {
-                        type: "subscribe",
-                        tickers: Array.from(subscribedTickers.current),
-                    };
-                    ws.send(JSON.stringify(msg));
+                    socket.emit("subscribe", { type: "subscribe", tickers: Array.from(subscribedTickers.current) });
                 }
-            };
+            });
 
-            ws.onmessage = (event) => {
-                try {
-                    const msg: ServerMessage = JSON.parse(event.data);
-                    switch (msg.type) {
-                        case "price_update":
-                            setPrices((prev) => ({ ...prev, ...msg.data }));
-                            break;
-                        case "market_status":
-                            setMarketOpen(msg.isOpen);
-                            break;
-                        case "pong":
-                            break;
-                        case "welcome":
-                            setMarketOpen(msg.marketOpen);
-                            break;
-                    }
-                } catch {}
-            };
+            socket.on("price_update", (msg: ServerMessage) => {
+                if ((msg as any).type === "price_update") {
+                    setPrices((prev) => ({ ...prev, ...(msg as any).data }));
+                }
+            });
+            socket.on("market_status", (msg: any) => setMarketOpen(!!msg.isOpen));
+            socket.on("welcome", (msg: any) => setMarketOpen(!!msg.marketOpen));
+            socket.on("pong", () => {});
 
-            ws.onclose = () => {
-                console.log("[WS] Disconnected");
+            socket.on("disconnect", () => {
+                console.log("[WS] Socket.IO disconnected");
                 setConnected(false);
-                wsRef.current = null;
-
-                // Auto-reconnect
-                if (reconnectCount.current < maxReconnectAttempts) {
-                    reconnectTimer.current = setTimeout(() => {
-                        reconnectCount.current++;
-                        connect();
-                    }, reconnectInterval);
-                }
-            };
-
-            ws.onerror = () => {
-                // Will trigger onclose
-            };
+            });
+            socket.on("connect_error", () => setConnected(false));
         } catch {}
-    }, [getWsUrl, reconnectInterval, maxReconnectAttempts]);
+    }, [getSocketUrl]);
 
     const disconnect = useCallback(() => {
-        if (reconnectTimer.current) {
-            clearTimeout(reconnectTimer.current);
-            reconnectTimer.current = null;
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+            socketRef.current = null;
+            setConnected(false);
         }
-        reconnectCount.current = maxReconnectAttempts; // Prevent auto-reconnect
-        if (wsRef.current) {
-            wsRef.current.close();
-            wsRef.current = null;
-        }
-    }, [maxReconnectAttempts]);
+    }, []);
 
     const subscribe = useCallback((tickers: string[]) => {
         tickers.forEach((t) => subscribedTickers.current.add(t));
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-            const msg: ClientMessage = { type: "subscribe", tickers };
-            wsRef.current.send(JSON.stringify(msg));
+        if (socketRef.current?.connected) {
+            socketRef.current.emit("subscribe", { type: "subscribe", tickers });
         }
     }, []);
 
     const unsubscribe = useCallback((tickers: string[]) => {
         tickers.forEach((t) => subscribedTickers.current.delete(t));
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-            const msg: ClientMessage = { type: "unsubscribe", tickers };
-            wsRef.current.send(JSON.stringify(msg));
+        if (socketRef.current?.connected) {
+            socketRef.current.emit("unsubscribe", { type: "unsubscribe", tickers });
         }
     }, []);
 
     const reconnect = useCallback(() => {
         disconnect();
-        reconnectCount.current = 0;
-        connect();
+        setTimeout(() => connect(), 100);
     }, [connect, disconnect]);
 
     useEffect(() => {
