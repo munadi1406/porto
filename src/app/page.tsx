@@ -10,6 +10,7 @@ import MarketStatusBar from "@/components/MarketStatusBar";
 import LivePrice from "@/components/LivePrice";
 import SectorHeatmap from "@/components/SectorHeatmap";
 import BrokerSummaryPanel from "@/components/BrokerSummaryPanel";
+import NewsCarousel from "@/components/NewsCarousel";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -416,6 +417,9 @@ export default function MarketPage() {
 
             {activeTab === "overview" && (
                 <div className="space-y-6">
+                    {/* News Carousel — IHSG & emiten terkait (auto) */}
+                    <NewsCarousel symbols={["IHSG", "JKSE", "IDX", ...(tapeTickers.slice(0, 3).map(t => t.replace(".JK","")) )]} />
+
                     {/* Ticker Tape live */}
                     {tapeTickers.length > 0 && <TickerTape tickers={tapeTickers} prices={livePrices} />}
 
