@@ -98,62 +98,90 @@ Jawab HANYA JSON array.`;
         for (const ch of s){ if(esc){esc=false;continue;} if(ch==='\\'&&inStr){esc=true;continue;} if(ch==='"'){inStr=!inStr;continue;} if(inStr) continue; if(ch==='[') closers.push(']'); else if(ch==='{') closers.push('}'); else if(ch===']'&&closers[closers.length-1]===']') closers.pop(); else if(ch==='}'&&closers[closers.length-1]==='}') closers.pop(); }
         let out=s.replace(/[\r\n\t]+/g,' ').trimEnd(); if(inStr) out+='"'; out=out.replace(/,(\s*[}\]])/g,'$1'); while(closers.length) out+=closers.pop(); return out;
     };
-    try {
-        const r = await fetch(`${OPENCODE_BASE}/chat/completions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENCODE_KEY}` },
-            body: JSON.stringify({
-                model: MODEL,
-                messages: [
-                    { role: 'system', content: 'Kamu analis IHSG. Jawab HANYA JSON array valid.' },
-                    { role: 'user', content: prompt },
-                ],
-                temperature: 0.2,
-                max_tokens: 2800,
-            }),
-            signal: AbortSignal.timeout(20000),
-        });
-        if (!r.ok) throw new Error(`AI ${r.status}`);
-        const j: any = await r.json();
-        const raw = j.choices?.[0]?.message?.content || '';
-        let cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-        let arr: any = null;
+    const chunk = <T,>(arr: T[], n: number) => Array.from({length: Math.ceil(arr.length/n)}, (_,i)=> arr.slice(i*n, (i+1)*n));
+    const batches = chunk(items, 5); // 5 per call agar tidak terpotong (hemat token)
+    const results: any[] = [];
+    let aiOk = false;
+    for (const batch of batches) {
+        const batchPrompt = prompt.replace(`panjang ${items.length}`, `panjang ${batch.length}`).replace(items.map((it, i) => `${i + 1}. Title: ${it.title}\nSnippet: ${it.snippet.slice(0, 260)}`).join('\n\n'), batch.map((it, i) => `${i + 1}. Title: ${it.title}\nSnippet: ${it.snippet.slice(0, 260)}`).join('\n\n'));
         try {
-            const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
-            if (s>=0 && e>s) arr = JSON.parse(cleaned.slice(s, e+1));
-        } catch {}
-        if (!arr) {
-            const repaired = repairJson(cleaned);
-            if (repaired) { try { const s=repaired.indexOf('['), e=repaired.lastIndexOf(']'); if(s>=0&&e>s) arr=JSON.parse(repaired.slice(s,e+1)); } catch {} }
-        }
-        if (Array.isArray(arr) && arr.length) {
-            // Jika terpotong, pad dengan heuristic agar panjang tetap
-            while (arr.length < items.length) {
-                const idx = arr.length;
-                const h = heuristicImpact(items[idx].title, items[idx].snippet);
-                arr.push({ impact: h.impact, confidence: h.confidence, reason: h.reason, tickers:[], category:'IHSG', summary: items[idx].snippet.slice(0,140) });
-            }
-            return arr.slice(0, items.length).map((x: any, i:number) => {
-                let summary = String(x.summary || x.reason || '').slice(0, 280).trim();
-                const titleNorm = items[i].title.toLowerCase().trim();
-                // Cegah AI copy title verbatim — jika summary == title atau 90% mirip, buat parafrase fallback
-                if (summary.toLowerCase() === titleNorm || summary.toLowerCase().includes(titleNorm.slice(0, Math.min(40, titleNorm.length)))) {
-                    const h = heuristicImpact(items[i].title, items[i].snippet);
-                    summary = `${items[i].title.split(' - ')[0].slice(0, 80)} — ${h.reason}. ${items[i].snippet.slice(0, 80)}`.slice(0, 220);
-                }
-                return {
-                    impact: (['bullish', 'bearish', 'neutral'].includes(x.impact) ? x.impact : 'neutral') as Impact,
-                    confidence: Math.min(95, Math.max(0, Number(x.confidence) || 60)),
-                    reason: String(x.reason || '').slice(0, 120),
-                    tickers: Array.isArray(x.tickers) ? x.tickers.slice(0, 3).map((t: string) => String(t).toUpperCase().replace('.JK', '')) : [],
-                    category: (['IHSG','GEOPOLITIK','EMAS','ENERGI','MONETER','GLOBAL'].includes(x.category) ? x.category : 'IHSG'),
-                    summary,
-                };
+            const r = await fetch(`${OPENCODE_BASE}/chat/completions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENCODE_KEY}` },
+                body: JSON.stringify({
+                    model: MODEL,
+                    messages: [
+                        { role: 'system', content: 'Kamu analis IHSG. Jawab HANYA JSON array valid.' },
+                        { role: 'user', content: batchPrompt },
+                    ],
+                    temperature: 0.2,
+                    max_tokens: 1800,
+                }),
+                signal: AbortSignal.timeout(20000),
             });
+            if (!r.ok) throw new Error(`AI ${r.status}`);
+            const j: any = await r.json();
+            const raw = j.choices?.[0]?.message?.content || '';
+            let cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+            let arr: any = null;
+            try {
+                const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
+                if (s>=0 && e>s) arr = JSON.parse(cleaned.slice(s, e+1));
+            } catch {}
+            if (!arr) {
+                const repaired = repairJson(cleaned);
+                if (repaired) { try { const s=repaired.indexOf('['), e=repaired.lastIndexOf(']'); if(s>=0&&e>s) arr=JSON.parse(repaired.slice(s,e+1)); } catch {} }
+            }
+            if (Array.isArray(arr) && arr.length) {
+                aiOk = true;
+                // Pad jika terpotong
+                while (arr.length < batch.length) {
+                    const idx = arr.length;
+                    const h = heuristicImpact(batch[idx].title, batch[idx].snippet);
+                    arr.push({ impact: h.impact, confidence: h.confidence, reason: h.reason, tickers:[], category:'IHSG', summary: batch[idx].snippet.slice(0,140) });
+                }
+                for (let i=0; i<batch.length; i++) {
+                    const x = arr[i]; const origIdx = results.length;
+                    let summary = String(x.summary || x.reason || '').slice(0, 280).trim();
+                    const titleNorm = batch[i].title.toLowerCase().trim();
+                    if (!summary || summary.toLowerCase() === titleNorm || summary.toLowerCase().includes(titleNorm.slice(0, Math.min(45, titleNorm.length)))) {
+                        // Buat parafrase manual yang beda: ganti frasa umum
+                        const paraphrased = batch[i].title
+                            .replace('Perkirakan','memprediksi')
+                            .replace('Amati Peluang','soroti peluang selective')
+                            .replace(' IHSG ',' indeks ')
+                            .replace('Sideways','bergerak sideways/konsolidasi')
+                            .split(' - ')[0];
+                        summary = `${paraphrased.slice(0, 110)} — ${x.reason || 'Konsolidasi, peluang trading jangka pendek pada saham yang disebut.'}`.slice(0, 220);
+                    }
+                    results.push({
+                        impact: (['bullish', 'bearish', 'neutral'].includes(x.impact) ? x.impact : 'neutral') as Impact,
+                        confidence: Math.min(95, Math.max(0, Number(x.confidence) || 60)),
+                        reason: String(x.reason || '').slice(0, 120),
+                        tickers: Array.isArray(x.tickers) ? x.tickers.slice(0, 3).map((t: string) => String(t).toUpperCase().replace('.JK', '')) : [],
+                        category: (['IHSG','GEOPOLITIK','EMAS','ENERGI','MONETER','GLOBAL'].includes(x.category) ? x.category : 'IHSG'),
+                        summary,
+                    });
+                }
+            } else {
+                throw new Error('AI empty');
+            }
+        } catch (e) {
+            console.warn('[AI] mimo-v2.5 batch chunk failed, heuristic', e);
+            for (const it of batch) {
+                const h = heuristicImpact(it.title, it.snippet);
+                let cleanSnippet = it.snippet.replace(/<[^>]+>/g,' ').trim();
+                if (!cleanSnippet || cleanSnippet.startsWith('http')) cleanSnippet = it.title;
+                const paraphrased = it.title.replace('Perkirakan','memprediksi').replace('Amati Peluang','soroti peluang').split(' - ')[0];
+                const summary = `${paraphrased.slice(0, 100)} — ${h.reason}`.slice(0, 200);
+                results.push({ impact: h.impact, confidence: h.confidence, reason: h.reason, tickers:[], category:'IHSG', summary });
+            }
         }
-    } catch (e) {
-        console.warn('[AI] mimo-v2.5 batch failed, fallback heuristic', e);
+        // Jeda hemat rate limit antar chunk
+        if (batches.indexOf(batch) < batches.length-1) await new Promise(r=> setTimeout(r, 600));
     }
+    if (results.length) return results;
+    // Final fallback (should not reach)
     // Fallback heuristic — buat summary dari title agar tidak tampil <a href...>
     return items.map(it => {
         const h = heuristicImpact(it.title, it.snippet);
@@ -172,7 +200,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbolsParam = searchParams.get('symbols') || 'IHSG';
     const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 5);
-    const cacheKey = `ihsg:v4:${symbols.join(',')}`;
+    const cacheKey = `ihsg:v5:${symbols.join(',')}`;
 
         const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < TTL) {
