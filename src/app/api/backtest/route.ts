@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
     const ticker = sp.get('ticker')?.replace('.JK', '')?.toUpperCase();
     const strategy = (sp.get('strategy') || 'golden_cross') as StrategyId;
-    const years = Math.min(Math.max(parseInt(sp.get('years') || '2'), 1), 10);
+    const rawYears = parseFloat(sp.get('years') || '2');
+    const years = Math.min(Math.max(Number.isFinite(rawYears) ? rawYears : 2, 0.25), 10);
 
     if (!ticker) return Response.json({ success: false, error: 'ticker required' }, { status: 400 });
     if (!VALID.includes(strategy)) return Response.json({ success: false, error: 'strategi tidak dikenal' }, { status: 400 });

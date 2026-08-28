@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { LocaleProvider } from "@/config/locale";
+import Axelia from "@/components/Axelia";
 import "./globals.css";
 
 const inter = Inter({
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </div>
                   </SidebarInset>
                 </SidebarProvider>
+                <Axelia />
               </TooltipProvider>
             </WsProvider>
           </QueryProvider>

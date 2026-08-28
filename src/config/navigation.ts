@@ -6,7 +6,7 @@
 import {
     CandlestickChart, SlidersHorizontal, FlaskConical, Columns2, Rocket,
     LayoutDashboard, Layers, TrendingUp, History,
-    Building2, Wallet, Scale, FileText,
+    Building2, Wallet, Scale, FileText, Bot,
 } from "lucide-react";
 
 export type Lang = "en" | "id";
@@ -28,8 +28,9 @@ export const NAV_ITEMS: NavItem[] = [
     // Analisis Saham — semua butuh input ticker, hasilkan sinyal/insight (toolbox)
     { id: "screener", url: "/screener", icon: SlidersHorizontal, group: "analysis", status: "active", title: { en: "Screener", id: "Screener" }, description: { en: "Technical & fundamental scan (959 stocks)", id: "Scan teknikal & fundamental (959 saham)" } },
     { id: "backtest", url: "/backtest", icon: FlaskConical, group: "analysis", status: "active", title: { en: "Backtest", id: "Backtest" }, description: { en: "8 strategies, AI entry, position calculator", id: "8 strategi, AI entry, kalkulator posisi" } },
-    { id: "compare", url: "/compare", icon: Columns2, group: "analysis", status: "active", title: { en: "Compare", id: "Bandingkan" }, description: { en: "Compare up to 3 stocks", id: "Bandingkan hingga 3 saham" } },
+    { id: "compare", url: "/compare", icon: Columns2, group: "analysis", status: "active", title: { en: "Compare", id: "Bandingkan" }, description: { en: "Compare up to 3 stocks + portfolios", id: "Bandingkan hingga 3 saham & portofolio" } },
     { id: "fundamentals", url: "/fundamentals", icon: Building2, group: "analysis", status: "active", title: { en: "Fundamentals", id: "Fundamental" }, description: { en: "Health score, fair value, smart money", id: "Skor kesehatan, fair value, smart money" } },
+    { id: "ai-performance", url: "/ai-performance", icon: Bot, group: "analysis", status: "active", title: { en: "AI Track Record", id: "Kinerja AI" }, description: { en: "AI recommendation log & win rate", id: "Log rekomendasi AI & win rate" } },
     // Data Referensi — browse/list informasi (bukan analisis aktif)
     { id: "corporate-actions", url: "/corporate-actions", icon: Rocket, group: "reference", status: "active", title: { en: "Corporate Actions", id: "Aksi Korporasi" }, description: { en: "IPO, Split, Rights, Delisting, Suspend", id: "IPO, Split, Rights, Delisting, Suspend" } },
     { id: "dividends", url: "/stocks/dividends", icon: Wallet, group: "reference", status: "active", title: { en: "Dividends", id: "Dividen" }, description: { en: "Yield calendar", id: "Kalender yield" } },

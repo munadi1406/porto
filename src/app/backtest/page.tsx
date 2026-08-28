@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FlaskConical, Loader2, Search, Target, Trophy, BarChart3, Bot, Calculator, LayoutGrid, TrendingUp, AlertCircle, HelpCircle } from "lucide-react";
+import { FlaskConical, Loader2, Search, Target, Trophy, BarChart3, Bot, Calculator, LayoutGrid, TrendingUp, AlertCircle, HelpCircle, Split } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
 import { STRATEGIES, type StrategyId } from "@/lib/quant";
@@ -78,14 +78,61 @@ export default function BacktestPage() {
     const [rankLoading, setRankLoading] = useState(false);
     const [rankError, setRankError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"hasil" | "ai" | "posisi" | "ranking">("hasil");
+    // C11 Walk-Forward state
+    const [walkForward, setWalkForward] = useState(false);
+    const [wfIs, setWfIs] = useState<BtResponse | null>(null);
+    const [wfOos, setWfOos] = useState<BtResponse | null>(null);
+    const [wfLoading, setWfLoading] = useState(false);
+    const [wfError, setWfError] = useState<string | null>(null);
+    const [wfSubTab, setWfSubTab] = useState<"compare" | "is" | "oos">("compare");
 
     const run = async (e?: React.FormEvent) => {
         e?.preventDefault();
         const t = ticker.trim().toUpperCase().replace(".JK", "");
         if (!t) return;
+        setActiveTab("hasil");
+        if (walkForward) {
+            // Walk-Forward: split years into 70% IS and 30% OOS, 2 calls reusing same engine
+            const isYears = parseFloat((years * 0.7).toFixed(1));
+            const oosYears = parseFloat((years * 0.3).toFixed(1));
+            // Guard minimal 0.3y (~75 trading days) agar tidak <60 bars
+            const isY = Math.max(0.3, Math.min(10, isYears));
+            const oosY = Math.max(0.3, Math.min(10, oosYears));
+            setWfLoading(true);
+            setWfError(null);
+            setWfIs(null);
+            setWfOos(null);
+            setResult(null);
+            setError(null);
+            setWfSubTab("compare");
+            try {
+                const [resIs, resOos] = await Promise.all([
+                    fetch(`/api/backtest?ticker=${t}&strategy=${strategy}&years=${isY}`),
+                    fetch(`/api/backtest?ticker=${t}&strategy=${strategy}&years=${oosY}`),
+                ]);
+                const jsonIs = await resIs.json();
+                const jsonOos = await resOos.json();
+                if (!jsonIs.success) throw new Error(jsonIs.error || "Gagal menjalankan backtest in-sample");
+                if (!jsonOos.success) throw new Error(jsonOos.error || "Gagal menjalankan backtest out-of-sample");
+                setWfIs(jsonIs.data);
+                setWfOos(jsonOos.data);
+                if (!rank || rank.ticker !== t || rank.years !== years) {
+                    fetchRanking(t, years);
+                }
+            } catch (err: any) {
+                setWfError(err.message);
+            } finally {
+                setWfLoading(false);
+            }
+            return;
+        }
+        // Normal single backtest
         setLoading(true);
         setError(null);
         setResult(null);
+        setWfIs(null);
+        setWfOos(null);
+        setWfError(null);
         setActiveTab("hasil");
         try {
             const res = await fetch(`/api/backtest?ticker=${t}&strategy=${strategy}&years=${years}`);
@@ -149,16 +196,20 @@ export default function BacktestPage() {
                                 Uji strategi teknikal ke data historis IDX
                             </p>
                         </div>
-                        {result && (
+                        {(result || wfIs) && (
                             <div className="text-right">
-                                <p className="text-base font-black text-primary">{result.ticker}</p>
-                                <p className="text-[10px] text-muted-foreground">{result.strategyLabel}</p>
+                                <p className="text-base font-black text-primary">{(result ?? wfIs)!.ticker}</p>
+                                <p className="text-[10px] text-muted-foreground">{(result ?? wfIs)!.strategyLabel}</p>
+                                {walkForward && wfIs && wfOos && (
+                                    <p className="text-[9px] text-muted-foreground">WF {wfIs.barsUsed}d IS · {wfOos.barsUsed}d OOS</p>
+                                )}
                             </div>
                         )}
                     </div>
                 </div>
 
-                <form onSubmit={run} className="p-3 flex flex-col sm:flex-row gap-3 sm:items-end">
+                <form onSubmit={run} className="p-3 flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
                     <div className="flex-1">
                         <label className="text-[9px] font-bold uppercase text-muted-foreground">Kode Saham</label>
                         <div className="relative mt-1">
@@ -196,20 +247,44 @@ export default function BacktestPage() {
                     </div>
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || wfLoading}
                         className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-5 py-2 min-h-[44px] text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
                     >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+                        {(loading || wfLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
                         Jalankan
                     </button>
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-xs font-medium cursor-pointer select-none w-fit">
+                        <input
+                            type="checkbox"
+                            checked={walkForward}
+                            onChange={e => setWalkForward(e.target.checked)}
+                            className="w-4 h-4 rounded border-border accent-primary"
+                        />
+                        <Split className="w-3.5 h-3.5 text-muted-foreground" />
+                        Mode Walk-Forward
+                        <span className="text-[10px] text-muted-foreground font-normal">70% in-sample / 30% out-of-sample</span>
+                        <InfoTip text="Walk-Forward: periode dibagi 70% in-sample (training) dan 30% out-of-sample (testing). Dua panggilan GET /api/backtest dengan years 70% dan 30% dijalankan paralel memakai engine yang sama, lalu dibandingkan di Statistik." />
+                    </label>
+                    {walkForward && (
+                        <p className="text-[10px] text-muted-foreground -mt-1">
+                            Akan menjalankan 2× backtest: {(years*0.7).toFixed(1)} th IS & {(years*0.3).toFixed(1)} th OOS (reuse engine, tanpa endpoint baru).
+                        </p>
+                    )}
                 </form>
             </div>
 
             {/* Error */}
-            {error && !loading && (
+            {error && !loading && !wfLoading && (
                 <div className="card flex items-center gap-2 p-3 border-destructive/40 bg-destructive/5 text-xs text-destructive">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     {error}
+                </div>
+            )}
+            {wfError && !wfLoading && (
+                <div className="card flex items-center gap-2 p-3 border-destructive/40 bg-destructive/5 text-xs text-destructive">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    Walk-Forward: {wfError}
                 </div>
             )}
 
@@ -220,6 +295,12 @@ export default function BacktestPage() {
                     <span>Menghitung backtest…</span>
                 </div>
             )}
+            {wfLoading && (
+                <div className="card h-32 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    <span>Menghitung walk-forward (2× backtest)…</span>
+                </div>
+            )}
 
             {/* Tabs — PageTabs wired */}
             <div className="card p-0 overflow-hidden">
@@ -227,7 +308,7 @@ export default function BacktestPage() {
 
                 {/* Tab Content */}
                 <div className="p-4 min-h-[400px]">
-                    {!result && activeTab !== "ranking" && (
+                    {!result && !wfIs && !wfOos && activeTab !== "ranking" && !wfLoading && (
                         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                             <FlaskConical className="w-12 h-12 mb-4 text-muted-foreground/30" />
                             <p className="text-sm font-medium">Belum ada hasil backtest</p>
@@ -235,15 +316,35 @@ export default function BacktestPage() {
                         </div>
                     )}
 
-                    {activeTab === "hasil" && result && <BacktestResultView result={result} />}
+                    {activeTab === "hasil" && !walkForward && result && <BacktestResultView result={result} />}
+                    {activeTab === "hasil" && walkForward && (wfIs || wfOos || wfLoading) && (
+                        <WalkForwardTab
+                            isData={wfIs}
+                            oosData={wfOos}
+                            loading={wfLoading}
+                            subTab={wfSubTab}
+                            onSubTab={setWfSubTab}
+                            years={years}
+                        />
+                    )}
+                    {activeTab === "hasil" && walkForward && !wfLoading && !wfIs && !wfOos && !wfError && (
+                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <Split className="w-10 h-10 mb-3 text-muted-foreground/30" />
+                            <p className="text-sm font-medium">Mode Walk-Forward aktif</p>
+                            <p className="text-xs mt-1">Klik "Jalankan" untuk hitung 70% IS / 30% OOS</p>
+                        </div>
+                    )}
 
-                    {activeTab === "ai" && result && (
+                    {activeTab === "ai" && (result || wfIs) && (
+                        (() => {
+                            const r = result ?? wfIs!;
+                            return (
                         <div className="space-y-4">
                             <BacktestAiSummary
-                                backtestResult={result}
+                                backtestResult={r}
                                 positionCalc={null}
-                                ticker={result.ticker}
-                                strategyLabel={result.strategyLabel}
+                                ticker={r.ticker}
+                                strategyLabel={r.strategyLabel}
                             />
                             <div className="card p-4 border-primary/30">
                                 <div className="flex items-center gap-2 mb-3">
@@ -252,36 +353,43 @@ export default function BacktestPage() {
                                     <span className="ml-auto text-[9px] text-muted-foreground">Berbasis ranking semua strategi</span>
                                 </div>
                                 <PositionCalculator
-                                    ticker={result.ticker}
-                                    lastClose={result.nextEntry?.lastClose}
+                                    ticker={r.ticker}
+                                    lastClose={r.nextEntry?.lastClose}
                                     technicalData={{
-                                        nextEntry: result.nextEntry,
-                                        indicators: result.nextEntry?.indicatorNow
-                                            ? { indicatorNow: result.nextEntry.indicatorNow }
+                                        nextEntry: r.nextEntry,
+                                        indicators: r.nextEntry?.indicatorNow
+                                            ? { indicatorNow: r.nextEntry.indicatorNow }
                                             : {},
                                     }}
-                                    strategyLabel={result.strategyLabel}
+                                    strategyLabel={r.strategyLabel}
                                     showCalculator={false}
                                     ranking={rank}
                                 />
                             </div>
                         </div>
+                            );
+                        })()
                     )}
 
-                    {activeTab === "posisi" && result && (
+                    {activeTab === "posisi" && (result || wfIs) && (
+                        (() => {
+                            const r = result ?? wfIs!;
+                            return (
                         <PositionCalculator
-                            ticker={result.ticker}
-                            lastClose={result.nextEntry?.lastClose}
+                            ticker={r.ticker}
+                            lastClose={r.nextEntry?.lastClose}
                             technicalData={{
-                                nextEntry: result.nextEntry,
-                                indicators: result.nextEntry?.indicatorNow
-                                    ? { indicatorNow: result.nextEntry.indicatorNow }
+                                nextEntry: r.nextEntry,
+                                indicators: r.nextEntry?.indicatorNow
+                                    ? { indicatorNow: r.nextEntry.indicatorNow }
                                     : {},
                             }}
-                            strategyLabel={result.strategyLabel}
+                            strategyLabel={r.strategyLabel}
                             showCalculator={true}
                             ranking={rank}
                         />
+                            );
+                        })()
                     )}
 
                     {activeTab === "ranking" && (
@@ -689,6 +797,177 @@ function TradesTable({ trades }: { trades: BtTrade[] }) {
                     </tbody>
                 </table>
             </div>
+        </div>
+    );
+}
+
+// ── C11 Walk-Forward: side-by-side IS/OOS inside Statistik tab ──
+function WalkForwardTab({
+    isData, oosData, loading, subTab, onSubTab, years,
+}: {
+    isData: BtResponse | null; oosData: BtResponse | null; loading: boolean;
+    subTab: "compare" | "is" | "oos"; onSubTab: (v: "compare" | "is" | "oos") => void;
+    years: number;
+}) {
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span>Menghitung walk-forward…</span>
+            </div>
+        );
+    }
+    if (!isData || !oosData) return null;
+    const isYears = parseFloat((years * 0.7).toFixed(1));
+    const oosYears = parseFloat((years * 0.3).toFixed(1));
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-2 text-xs">
+                <Split className="w-4 h-4 text-primary" />
+                <span className="font-bold">Walk-Forward</span>
+                <span className="text-muted-foreground">· {isData.strategyLabel} · {isData.ticker}</span>
+                <span className="ml-auto text-[10px] text-muted-foreground hidden sm:inline">
+                    2× GET /api/backtest — reuse engine (IS {isYears}th / OOS {oosYears}th)
+                </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+                {(
+                    [
+                        ["compare", "Perbandingan"],
+                        ["is", `IS 70% (${isYears}th)`],
+                        ["oos", `OOS 30% (${oosYears}th)`],
+                    ] as const
+                ).map(([id, label]) => (
+                    <button
+                        key={id}
+                        onClick={() => onSubTab(id as typeof subTab)}
+                        className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors",
+                            subTab === id ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 border-border hover:bg-muted"
+                        )}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            {subTab === "compare" && <WalkForwardCompare isData={isData} oosData={oosData} />}
+
+            {subTab === "is" && (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="px-2 py-0.5 rounded bg-success/10 text-success font-bold">In-Sample 70%</span>
+                        <span>{isData.from} → {isData.to} · {isData.barsUsed} hari</span>
+                    </div>
+                    <BacktestResultView result={isData} />
+                </div>
+            )}
+            {subTab === "oos" && (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="px-2 py-0.5 rounded bg-warning/10 text-warning font-bold">Out-of-Sample 30%</span>
+                        <span>{oosData.from} → {oosData.to} · {oosData.barsUsed} hari</span>
+                    </div>
+                    <BacktestResultView result={oosData} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+function WalkForwardCompare({ isData, oosData }: { isData: BtResponse; oosData: BtResponse }) {
+    const rows: { label: string; fmt: (s: BtResponse["stats"]) => string; delta?: boolean }[] = [
+        { label: "Return", fmt: s => `${s.totalReturnPct >= 0 ? "+" : ""}${s.totalReturnPct.toFixed(1)}%` },
+        { label: "vs B&H", fmt: s => {
+            const v = s.totalReturnPct - s.buyHoldReturnPct;
+            return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+        } },
+        { label: "CAGR", fmt: s => `${s.annualizedReturnPct >= 0 ? "+" : ""}${s.annualizedReturnPct.toFixed(1)}%` },
+        { label: "Win Rate", fmt: s => `${s.winRatePct.toFixed(0)}%` },
+        { label: "Trades", fmt: s => String(s.tradeCount) },
+        { label: "Avg Hold", fmt: s => `${Math.round(s.avgDaysHeld)} hari` },
+        { label: "Max DD", fmt: s => `${s.maxDrawdownPct.toFixed(1)}%` },
+        { label: "Sharpe", fmt: s => s.sharpeRatio.toFixed(2) },
+        { label: "Profit Factor", fmt: s => s.profitFactor == null ? "∞" : s.profitFactor.toFixed(2) },
+        { label: "Exposure", fmt: s => `${s.exposurePct.toFixed(0)}%` },
+    ];
+    const deteriorated = (label: string, isV: number, oosV: number): boolean => {
+        if (label === "Max DD") return oosV < isV && isV < 0; // more negative is worse
+        if (["Return","vs B&H","CAGR","Win Rate","Sharpe","Profit Factor"].includes(label)) return oosV < isV;
+        return false;
+    };
+    const numeric = (s: BtResponse["stats"], label: string): number => {
+        switch(label){
+            case "Return": return s.totalReturnPct;
+            case "vs B&H": return s.totalReturnPct - s.buyHoldReturnPct;
+            case "CAGR": return s.annualizedReturnPct;
+            case "Win Rate": return s.winRatePct;
+            case "Trades": return s.tradeCount;
+            case "Avg Hold": return s.avgDaysHeld;
+            case "Max DD": return s.maxDrawdownPct;
+            case "Sharpe": return s.sharpeRatio;
+            case "Profit Factor": return s.profitFactor ?? 999;
+            case "Exposure": return s.exposurePct;
+            default: return 0;
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="card p-2.5 border-success/30 bg-success/5">
+                    <p className="text-[9px] font-black uppercase text-success">In-Sample 70% (training)</p>
+                    <p className="text-xs font-bold mt-1">{isData.from} → {isData.to}</p>
+                    <p className="text-[10px] text-muted-foreground">{isData.barsUsed} hari · {isData.stats.tradeCount} trades</p>
+                </div>
+                <div className="card p-2.5 border-warning/30 bg-warning/5">
+                    <p className="text-[9px] font-black uppercase text-warning">Out-of-Sample 30% (testing)</p>
+                    <p className="text-xs font-bold mt-1">{oosData.from} → {oosData.to}</p>
+                    <p className="text-[10px] text-muted-foreground">{oosData.barsUsed} hari · {oosData.stats.tradeCount} trades</p>
+                </div>
+            </div>
+
+            <div className="card p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs tabular-nums">
+                        <thead>
+                            <tr className="text-left text-muted-foreground border-b border-border bg-muted/30">
+                                <th className="py-2 px-3">Metrik</th>
+                                <th className="py-2 px-3 text-right">IS 70%</th>
+                                <th className="py-2 px-3 text-right">OOS 30%</th>
+                                <th className="py-2 px-3 text-right">Δ (OOS−IS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map(r => {
+                                const isN = numeric(isData.stats, r.label);
+                                const oosN = numeric(oosData.stats, r.label);
+                                const delta = r.label === "Profit Factor" && (isData.stats.profitFactor == null || oosData.stats.profitFactor == null)
+                                    ? "—"
+                                    : `${oosN - isN >= 0 ? "+" : ""}${(oosN - isN).toFixed(r.label === "Trades" || r.label === "Avg Hold" ? 0 : r.label === "Sharpe" || r.label === "Profit Factor" ? 2 : 1)}${r.label.includes("%") || ["Return","vs B&H","CAGR","Win Rate","Max DD","Exposure"].includes(r.label) ? "%" : r.label === "Sharpe" || r.label === "Profit Factor" ? "" : ""}`;
+                                const bad = deteriorated(r.label, isN, oosN);
+                                return (
+                                    <tr key={r.label} className="border-b border-border/40 last:border-b-0">
+                                        <td className="py-1.5 px-3 font-medium">{r.label}</td>
+                                        <td className="py-1.5 px-3 text-right font-bold">{r.fmt(isData.stats)}</td>
+                                        <td className="py-1.5 px-3 text-right font-bold">{r.fmt(oosData.stats)}</td>
+                                        <td className={cn("py-1.5 px-3 text-right font-bold", bad ? "text-destructive" : "text-success")}>{delta}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-3">
+                <EquityCurveCard chartData={isData.equityCurve.map(p => ({ ...p, label: p.date.slice(2).replace("-", "/") }))} title="Ekuitas IS 70%" />
+                <EquityCurveCard chartData={oosData.equityCurve.map(p => ({ ...p, label: p.date.slice(2).replace("-", "/") }))} title="Ekuitas OOS 30%" />
+            </div>
+
+            <p className="text-[9px] text-muted-foreground/60 px-1">
+                Walk-forward: IS dipakai untuk observasi / tuning, OOS untuk validasi out-of-sample. Kinerja OOS yang jauh memburuk vs IS mengindikasikan overfitting. Reuse engine: 2× GET /api/backtest tanpa endpoint baru.
+            </p>
         </div>
     );
 }

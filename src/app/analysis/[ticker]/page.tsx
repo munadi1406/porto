@@ -20,6 +20,7 @@ import FundamentalSummary from "@/components/FundamentalSummary";
 import NewsPanel from "@/components/NewsPanel";
 import FinancialReports from "@/components/FinancialReports";
 import ShareholderChart from "@/components/ShareholderChart";
+import { InsiderOwnershipTracker, useOwnershipChange } from "@/components/InsiderOwnershipTracker";
 import ChartPatterns from "@/components/ChartPatterns";
 import OrderBookPanel from "@/components/OrderBookPanel";
 import RiskMetricsCard from "@/components/RiskMetricsCard";
@@ -63,6 +64,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
     const companyCode = ticker.replace('.JK', '');
     const { data: companyDetail } = useCompanyDetail(companyCode);
     const { data: idxFinancial } = useFinancialStatement(companyCode);
+    const { hasSignificant: ownershipHasChange } = useOwnershipChange(ticker, (smartMoney as any)?.insidersPercentHeld, (smartMoney as any)?.institutionsPercentHeld);
 
     useEffect(() => {
         if (!ticker) return;
@@ -273,8 +275,15 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                     )}
                 </div>
 
-                {/* Tabs — PageTabs */}
-                <PageTabs tabs={TABS.map(t => ({ id: t.key, label: t.label }))} active={activeTab} onChange={(id) => setActiveTab(id as Tab)} />
+                {/* Tabs — PageTabs + C10 badge on Ownership when >1% change */}
+                <PageTabs
+                  tabs={TABS.map(t => ({
+                    id: t.key,
+                    label: t.key === "ownership" && ownershipHasChange ? "Ownership •" : t.label,
+                  }))}
+                  active={activeTab}
+                  onChange={(id) => setActiveTab(id as Tab)}
+                />
 
                 {/* Overview tab */}
                 {activeTab === "overview" && (
@@ -659,6 +668,12 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                             institutionsPercent={(smartMoney as any)?.institutionsPercentHeld}
                             institutionsCount={(smartMoney as any)?.institutionsCount}
                             sharia={smartMoney?.sharia}
+                        />
+                        {/* C10 Insider & Ownership Change Tracker — timeline per quarter, badge when >1% */}
+                        <InsiderOwnershipTracker
+                            ticker={ticker}
+                            insidersPercent={(smartMoney as any)?.insidersPercentHeld}
+                            institutionsPercent={(smartMoney as any)?.institutionsPercentHeld}
                         />
                     </div>
                 )}

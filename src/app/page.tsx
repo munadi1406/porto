@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Clock, Search, BarChart3, PieChart, Zap, DollarSign, Layers } from "lucide-react";
+import { TrendingUp, TrendingDown, Clock, Search, BarChart3, Zap, DollarSign, Layers } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -12,6 +12,7 @@ import LivePrice from "@/components/LivePrice";
 import SectorHeatmap from "@/components/SectorHeatmap";
 import BrokerSummaryPanel from "@/components/BrokerSummaryPanel";
 import NewsCarousel from "@/components/NewsCarousel";
+import { SectorRotationDashboard, SectorRotationTeaser } from "@/components/SectorRotationDashboard";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -188,40 +189,13 @@ function TableCard({ title, icon: Icon, items, type, onViewAll, livePrices }: { 
     );
 }
 
+/**
+ * Enhanced SectorPerformanceCard — hosts Sector Rotation quadrant
+ * (chart + table toggle, table is fallback). Preserves original
+ * signature (sectors, onViewAll) for non-destructive replace.
+ */
 function SectorPerformanceCard({ sectors, onViewAll }: { sectors: SectorSummary[]; onViewAll: () => void }) {
-    const sorted = [...sectors].sort((a, b) => b.totalValue - a.totalValue).slice(0, 8);
-    return (
-        <div className="card-flush">
-            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-                <PieChart className="w-3.5 h-3.5 text-muted-foreground" />
-                <h3 className="card-title">Sector Performance</h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                    <thead>
-                        <tr className="border-b border-border bg-muted/30">
-                            <th className="text-left px-4 py-2 font-bold text-muted-foreground">Sector</th>
-                            <th className="text-right px-4 py-2 font-bold text-muted-foreground">Change</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                        {sorted.map(s => (
-                            <tr key={s.sector} className="hover:bg-muted/40">
-                                <td className="px-4 py-2 font-medium text-foreground">{s.sector}</td>
-                                <td className={cn("px-4 py-2 text-right font-bold", s.avgChangePercent >= 0 ? "text-success" : "text-destructive")}>{formatPercentage(s.avgChangePercent)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            <button
-                onClick={onViewAll}
-                className="w-full px-4 py-2 border-t border-border text-center text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            >
-                View all ({sectors.length})
-            </button>
-        </div>
-    );
+    return <SectorRotationDashboard sectors={sectors} onViewAll={onViewAll} />;
 }
 
 export default function MarketPage() {
@@ -463,7 +437,12 @@ export default function MarketPage() {
                     {/* Sector Heatmap ala Finviz */}
                     <SectorHeatmap sectors={sectors} />
 
-                    {/* Sector Performance */}
+                    {/* C9 teaser — compact leaders preview linking to full quadrant */}
+                    {!sectorLoading && sectors.length > 0 && (
+                        <SectorRotationTeaser sectors={sectors} onViewAll={() => setActiveTab("sectors")} />
+                    )}
+
+                    {/* Sector Performance — full rotation dashboard (chart + fallback table) */}
                     <SectorPerformanceCard sectors={sectors} onViewAll={() => setActiveTab("sectors")} />
                 </div>
             )}

@@ -18,15 +18,17 @@ import { formatIDR, formatPercentage, cn } from "@/lib/utils";
 import { DashboardSkeleton, ChartSkeleton } from "@/components/Skeleton";
 import { PageTabs } from "@/components/PageTabs";
 import { ExportPDFButton } from "@/components/ExportPDFButton";
+import { ScheduledReportButton } from "@/components/ScheduledReportButton";
+import { PortfolioCompareTab } from "@/components/PortfolioCompare";
 import { exportToPDF } from "@/lib/exportPDF";
 import {
     Briefcase, DollarSign, TrendingUp, TrendingDown, Activity, Calendar,
     Wallet, Plus, Layers, Target, BarChart3, PieChart,
-    Clock, ChevronRight, Shield
+    Clock, ChevronRight, Shield, Columns2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-type TabKey = "overview" | "holdings" | "analytics" | "target";
+type TabKey = "overview" | "holdings" | "analytics" | "target" | "compare";
 
 const AllocationChart = dynamic(() => import("@/components/AllocationChart").then(m => m.AllocationChart), { ssr: false, loading: () => <ChartSkeleton /> });
 const GainLossChart = dynamic(() => import("@/components/GainLossChart").then(m => m.GainLossChart), { ssr: false, loading: () => <ChartSkeleton /> });
@@ -189,10 +191,11 @@ export default function PortfolioDashboardPage() {
         { key: "holdings", label: "Holdings", icon: Layers },
         { key: "analytics", label: "Performance", icon: PieChart },
         { key: "target", label: "Target", icon: Target },
+        { key: "compare", label: "Bandingkan", icon: Columns2 },
     ];
 
     return (
-        <div className="space-y-6">
+        <div ref={dashboardRef} className="space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -219,6 +222,7 @@ export default function PortfolioDashboardPage() {
                         Tambah Saham
                     </button>
                     <ExportPDFButton onClick={handleExportPDF} size="md" />
+                    <ScheduledReportButton dashboardRef={dashboardRef as any} onExport={handleExportPDF} />
                 </div>
             </div>
 
@@ -597,6 +601,17 @@ export default function PortfolioDashboardPage() {
                     <TargetPortfolio portfolio={portfolio} prices={prices} cash={cash} />
                     {/* 11.B4 Rebalancing Advisor – diff target vs actual */}
                     <RebalancingAdvisor portfolio={portfolio} prices={prices} />
+                </div>
+            )}
+
+            {/* === COMPARE TAB — E16 Bandingkan Antar Portofolio */}
+            {activeTab === "compare" && (
+                <div className="space-y-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-foreground mb-1">Bandingkan Antar Portofolio</h2>
+                        <p className="text-xs text-muted-foreground">Bandingkan 2 portofolio (usePortfolios + useCashAndHistory per portfolioId) — non-destruktif, toggle di /compare juga.</p>
+                    </div>
+                    <PortfolioCompareTab />
                 </div>
             )}
 

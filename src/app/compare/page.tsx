@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Columns2, Loader2, Plus, X } from "lucide-react";
+import { Columns2, Loader2, Plus, X, Briefcase, ArrowLeftRight } from "lucide-react";
 import { cn, formatCompactIDR } from "@/lib/utils";
 import type { FundamentalData } from "@/hooks/useFundamentals";
+import { PortfolioCompareTab } from "@/components/PortfolioCompare";
 
 interface RiskData {
     beta: number;
@@ -132,6 +133,7 @@ const ROWS: Row[] = [
 ];
 
 export default function ComparePage() {
+    const [mode, setMode] = useState<"saham" | "portofolio">("saham");
     const [input, setInput] = useState("");
     const [stocks, setStocks] = useState<StockBundle[]>([]);
     const [loading, setLoading] = useState(false);
@@ -170,11 +172,43 @@ export default function ComparePage() {
             <div>
                 <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                     <Columns2 className="w-6 h-6 text-primary" />
-                    Bandingkan Saham
+                    Bandingkan
                 </h1>
-                <p className="text-xs text-muted-foreground mt-1">Bandingkan hingga {MAX_STOCKS} saham — valuasi, profitabilitas &amp; risiko</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                    {mode === "saham" ? `Bandingkan hingga ${MAX_STOCKS} saham — valuasi, profitabilitas & risiko` : "Bandingkan antar portofolio (usePortfolios + useCashAndHistory per portfolioId)"}
+                </p>
+            </div>
+            {/* E16 toggle Saham vs Portofolio */}
+            <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+                <button
+                    onClick={() => setMode("saham")}
+                    className={cn("px-4 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5", mode === "saham" ? "bg-card shadow border border-border text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                    <Columns2 className="w-3.5 h-3.5" /> Saham vs Saham
+                </button>
+                <button
+                    onClick={() => setMode("portofolio")}
+                    className={cn("px-4 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5", mode === "portofolio" ? "bg-card shadow border border-border text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                    <Briefcase className="w-3.5 h-3.5" /> Saham vs Portofolio
+                    <span className="hidden sm:inline-flex items-center gap-1 ml-1 text-[9px] font-black px-1 py-0.5 rounded bg-primary/10 text-primary">E16</span>
+                </button>
             </div>
 
+            {mode === "portofolio" && (
+                <div className="card">
+                    <div className="flex items-center gap-2 mb-3">
+                        <ArrowLeftRight className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-bold">Bandingkan Antar Portofolio</h3>
+                        <span className="text-[9px] text-muted-foreground">reuse usePortfolios + fetch per portfolioId</span>
+                    </div>
+                    <PortfolioCompareTab />
+                </div>
+            )}
+            {mode === "saham" && null}
+
+            {mode === "saham" && (
+            <>
             <div className="card">
                 <form onSubmit={e => { e.preventDefault(); addStock(); }} className="flex gap-2 items-center">
                     <input
@@ -246,6 +280,8 @@ export default function ComparePage() {
                         ★ = terbaik di baris tersebut (PER/PBV/DER/volatilitas lebih rendah lebih baik). Risiko dihitung vs IHSG 1 tahun harian.
                     </p>
                 </div>
+            )}
+            </>
             )}
         </div>
     );
