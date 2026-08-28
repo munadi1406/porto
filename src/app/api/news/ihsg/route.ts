@@ -270,27 +270,34 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: true, data: [], meta: { serper: !!SERPER_KEY, firecrawl: !!FIRECRAWL_KEY } });
         }
 
-        // 3. Firecrawl scrape HANYA top 2-3 berita yang snippet terlalu pendek — hemat kredit
+        // 3. Firecrawl scrape isi artikel penuh untuk ringkasan AI yang akurat — hemat: max 5 per 30 menit, cache, hanya yang snippet pendek atau top 5
+        // Serper sudah kasih snippet, Firecrawl baca body artikel agar AI summary bukan dari judul saja
         const needScrape = rawNews
             .map((r, i) => ({ r, i }))
-            .filter(({ r }) => (r.snippet || '').length < 80)
-            .slice(0, 3);
+            .filter(({ r }) => (r.snippet || '').length < 120 || r.link.includes('news.google.com'))
+            .slice(0, 5);
 
         if (FIRECRAWL_KEY && needScrape.length) {
             for (const { r } of needScrape) {
                 const scraped = await firecrawlScrape(r.link).catch(() => '');
-                if (scraped) r.snippet = scraped.slice(0, 300);
-                // Jeda kecil hemat rate limit
-                await new Promise(res => setTimeout(res, 400));
+                if (scraped) {
+                    // Simpan full content untuk AI, snippet dipanjangkan
+                    r.snippet = scraped.slice(0, 800);
+                }
+                await new Promise(res => setTimeout(res, 500));
             }
+        } else if (!FIRECRAWL_KEY && needScrape.length) {
+            // Tanpa firecrawl, snippet tetap pendek — AI tetap bisa parafrase dari title
+            console.log('[News] Firecrawl skip: no key, using snippet only');
         }
 
         // 4. AI batch impact + summary per artikel — 1 call mimo-v2.5 untuk semua (hemat)
-        // Bersihkan snippet HTML agar AI tidak melihat <a href...> mentah
+        // Jika Firecrawl berhasil, r.snippet sudah isi artikel penuh (800 char) → AI ringkas dari isi, bukan judul
         const aiInputs = rawNews.map(r => {
             let s = (r.snippet || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
             if (!s || s.startsWith('http') || s.includes('news.google.com/rss/articles')) s = r.title;
-            return { title: r.title, snippet: s.slice(0, 280) };
+            // Jika ada Firecrawl scrape, s sudah 800 char isi artikel — potong 400 untuk AI agar fokus
+            return { title: r.title, snippet: s.slice(0, 400) };
         });
         const impacts = await aiBatchImpactAndSummary(aiInputs);
 

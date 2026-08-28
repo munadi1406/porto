@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Newspaper, ExternalLink, Clock, ChevronLeft, ChevronRight, Pause, Play, TrendingUp, Building2, Globe, Bookmark } from "lucide-react";
+import { Newspaper, ExternalLink, Clock, ChevronLeft, ChevronRight, Pause, Play, TrendingUp, TrendingDown, Minus, Building2, Globe, Bookmark, Sparkles, Zap } from "lucide-react";
 import type { NewsItem } from "@/lib/news";
 
 type NewsCarouselProps = {
@@ -10,7 +10,7 @@ type NewsCarouselProps = {
     autoPlayMs?: number;
 };
 
-const DEFAULT_SYMBOLS = ["IHSG", "BBCA", "BBRI", "TLKM"];
+const DEFAULT_SYMBOLS = ["IHSG", "BBCA", "EMAS", "GEOPOLITIK", "FED"];
 
 function timeAgo(ts: number): string {
     const diff = Math.floor((Date.now() - ts) / 1000);
@@ -24,8 +24,10 @@ function stripHTML(s: string): string {
     return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+type EnrichedNews = NewsItem & { impact?: 'bullish'|'bearish'|'neutral'; confidence?: number; reason?: string; tickers?: string[]; category?: string };
+
 export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berita Pasar & IHSG", autoPlayMs = 4500 }: NewsCarouselProps) {
-    const [allNews, setAllNews] = useState<NewsItem[]>([]);
+    const [allNews, setAllNews] = useState<EnrichedNews[]>([]);
     const [loading, setLoading] = useState(true);
     const [idx, setIdx] = useState(0);
     const [paused, setPaused] = useState(false);
@@ -34,18 +36,25 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
+            // Hemat kredit: 1 call ter-enrichment (Serper+Firecrawl+AI batch) via /api/news/ihsg
+            const res = await fetch(`/api/news/ihsg?symbols=${encodeURIComponent(symbols.join(','))}`).then(r => r.json()).catch(() => null);
+            if (res?.success && Array.isArray(res.data) && res.data.length) {
+                const sorted = [...res.data].sort((a,b) => (b.publishTime||0) - (a.publishTime||0));
+                setAllNews(sorted.slice(0, 12));
+                setIdx(0);
+                setLoading(false);
+                return;
+            }
+            // Fallback RSS lama jika enriched belum ada / tanpa key
             const results = await Promise.all(
                 symbols.map(s => fetch(`/api/news?symbol=${encodeURIComponent(s)}`).then(r => r.json()).catch(() => ({ success: false })))
             );
-            const merged: NewsItem[] = [];
+            const merged: EnrichedNews[] = [];
             const seen = new Set<string>();
-            for (const res of results) {
-                if (res.success && Array.isArray(res.news)) {
-                    for (const n of res.news as NewsItem[]) {
-                        if (!seen.has(n.link)) {
-                            seen.add(n.link);
-                            merged.push(n);
-                        }
+            for (const r2 of results) {
+                if (r2.success && Array.isArray(r2.news)) {
+                    for (const n of r2.news as NewsItem[]) {
+                        if (!seen.has(n.link)) { seen.add(n.link); merged.push({ ...n, impact: 'neutral' }); }
                     }
                 }
             }
@@ -91,14 +100,20 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
             <div className="rounded-xl border border-dashed bg-card p-6 text-center">
                 <Newspaper className="w-6 h-6 mx-auto text-muted-foreground/50 mb-2" />
                 <p className="text-sm font-medium">Belum ada berita IHSG / emiten terkait</p>
-                <p className="text-xs text-muted-foreground mt-1">Coba segarkan atau cek koneksi sumber berita</p>
+                <p className="text-xs text-muted-foreground mt-1">Tambahkan SERPER_API_KEY & FIRECRAWL_API_KEY di .env untuk hasil lebih kaya</p>
                 <button onClick={fetchAll} className="mt-3 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold">Muat ulang</button>
             </div>
         );
     }
 
-    const cur = allNews[idx];
+    const cur = allNews[idx] as EnrichedNews;
     const total = allNews.length;
+    const impact = cur.impact || 'neutral' as const;
+    const impactCfg = {
+        bullish: { label: 'Bullish IHSG', icon: TrendingUp, cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', dot: 'bg-emerald-500' },
+        bearish: { label: 'Bearish IHSG', icon: TrendingDown, cls: 'bg-red-500/10 text-red-600 border-red-500/20', dot: 'bg-red-500' },
+        neutral: { label: 'Netral', icon: Minus, cls: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground' },
+    }[impact];
 
     return (
         <div
@@ -115,7 +130,13 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
                         <p className="text-[10px] text-muted-foreground">{cur.source || 'Berita'} · {cur.publishTime ? timeAgo(cur.publishTime) : 'baru saja'}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                    <span className={cn("hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-black border", impactCfg.cls)} title={cur.reason || ''}>
+                        <span className={cn("size-1.5 rounded-full", impactCfg.dot)} />
+                        <impactCfg.icon className="w-3 h-3" />
+                        {impactCfg.label}
+                        {cur.confidence ? <span className="opacity-70">· {cur.confidence}%</span> : null}
+                    </span>
                     <button aria-label={paused ? "Play" : "Pause"} onClick={() => setPaused(v => !v)} className="size-7 grid place-items-center rounded-md border bg-background hover:bg-muted">
                         {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
                     </button>
@@ -144,11 +165,27 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
                                     <span className="px-1.5 py-0.5 rounded bg-muted font-black">{(cur.source || 'NEWS').slice(0, 14)}</span>
                                     {cur.publishTime > 0 && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(cur.publishTime)}</span>}
                                 </span>
-                                <span className="hidden sm:inline-flex items-center gap-1"><TrendingUp className="w-3 h-3 text-success" /> Terkait IHSG & emiten LQ45</span>
+                                <span className="hidden sm:inline-flex items-center gap-1"><Zap className="w-3 h-3 text-primary" /> {cur.category || 'IHSG'} · {cur.tickers && cur.tickers.length ? cur.tickers.join(', ') : 'Umum'}</span>
                             </div>
-                            {cur.summary && (
-                                <p className="text-xs text-muted-foreground leading-relaxed mt-2 line-clamp-2">{stripHTML(cur.summary)}</p>
-                            )}
+                            {/* AI Summary per artikel (mimo-v2.5) */}
+                            <div className="mt-2 rounded-lg border bg-muted/20 p-2.5">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Sparkles className="w-3 h-3 text-primary" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-primary">Ringkasan AI (mimo-v2.5)</span>
+                                    {cur.category && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-muted border">{cur.category}</span>}
+                                </div>
+                                <p className="text-xs leading-relaxed text-foreground/90">{stripHTML(cur.summary || cur.reason || '')}</p>
+                                {cur.reason && cur.summary && cur.reason !== cur.summary && (
+                                    <p className="text-[11px] text-muted-foreground mt-1">Dampak: {cur.reason} · {cur.confidence}%</p>
+                                )}
+                                {cur.tickers && cur.tickers.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {cur.tickers.map((t: string) => (
+                                            <span key={t} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{t}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <div className="flex items-center gap-2 mt-3">
                                 <a href={cur.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline">
                                     Baca selengkapnya <ExternalLink className="w-3 h-3" />
