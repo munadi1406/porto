@@ -109,15 +109,15 @@ Jawab HANYA JSON array.`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENCODE_KEY}` },
                 body: JSON.stringify({
-                model: MODEL,
+                    model: MODEL,
                 messages: [
                     { role: 'system', content: 'Kamu analis IHSG. Jawab HANYA JSON array valid.' },
                     { role: 'user', content: batchPrompt },
                 ],
                 temperature: 0.2,
-                max_tokens: 2600,
+                max_tokens: 2800,
             }),
-                signal: AbortSignal.timeout(25000),
+                signal: AbortSignal.timeout(60000),
             });
             if (!r.ok) throw new Error(`AI ${r.status}`);
             const j: any = await r.json();
@@ -208,7 +208,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbolsParam = searchParams.get('symbols') || 'IHSG';
     const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 5);
-    const cacheKey = `ihsg:v6:${symbols.join(',')}`;
+    const cacheKey = `ihsg:v7:${symbols.join(',')}`;
 
         const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < TTL) {
