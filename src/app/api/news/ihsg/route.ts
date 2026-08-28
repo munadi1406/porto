@@ -208,7 +208,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbolsParam = searchParams.get('symbols') || 'IHSG';
     const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 5);
-    const cacheKey = `ihsg:v7:${symbols.join(',')}`;
+    const cacheKey = `ihsg:v8:${symbols.join(',')}`;
 
         const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < TTL) {
@@ -259,10 +259,14 @@ export async function GET(request: Request) {
             } catch {}
         }
 
-        // Dedup & slice — hemat Firecrawl & AI
+        // Dedup & filter generic + slice — hemat Firecrawl & AI
         const seenLink = new Set<string>();
         rawNews = rawNews.filter(r => {
             if (!r.title || !r.link || seenLink.has(r.link)) return false;
+            const low = r.title.toLowerCase();
+            // Filter generic non-news: Yahoo Finance chart pages, kosong
+            if (low.includes('charts, data & news') && low.length < 80) return false;
+            if (low === 'idx composite (^jkse) charts, data & news') return false;
             seenLink.add(r.link); return true;
         }).slice(0, 10);
 
