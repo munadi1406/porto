@@ -160,8 +160,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {(() => {
           const groups = [
             { key: "market" as const, items: getActiveNav().filter(n => n.group === "market") },
+            { key: "analysis" as const, items: getActiveNav().filter(n => n.group === "analysis") },
+            { key: "reference" as const, items: getActiveNav().filter(n => n.group === "reference") },
             { key: "portfolio" as const, items: getActiveNav().filter(n => n.group === "portfolio") },
-            { key: "research" as const, items: getActiveNav().filter(n => n.group === "research") },
           ]
           return groups.map((g, gi) => (
             <div key={g.key}>
