@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { LocaleProvider } from "@/config/locale";
 import "./globals.css";
 
 const inter = Inter({
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="id" className={inter.variable} suppressHydrationWarning>
       <body>
         <ThemeInit />
+        <LocaleProvider>
         <QueryProvider>
           <TooltipProvider>
             <TopProgressBar />
@@ -51,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SidebarProvider>
           </TooltipProvider>
         </QueryProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

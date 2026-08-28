@@ -5,6 +5,7 @@ import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
 import { cn, formatIDR } from "@/lib/utils";
+import { useLocale } from "@/config/locale";
 import {
     TrendingUp, TrendingDown, Activity, Target,
     BarChart3, ArrowUpRight, ArrowDownRight, Info
@@ -22,6 +23,7 @@ export default function AnalyticsPage() {
     const { cash, history } = useCashAndHistory();
     const tickers = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const { prices } = useMarketData(tickers);
+    const { lang } = useLocale();
 
     const [ihsgData, setIhsgData] = useState<{ date: string; close: number }[]>([]);
     const [riskMetrics, setRiskMetrics] = useState({ beta: 0, correlation: 0, volatility: 0 });
@@ -126,74 +128,55 @@ export default function AnalyticsPage() {
     const performanceData = useMemo(() => {
         if (!ihsgData.length) return [];
         const toPct = (cur: number, base: number) => base > 0 ? ((cur / base) - 1) * 100 : 0;
-        let basePort: number, baseIhsg: number;
-        let raw: { date: string; label: string; portfolio: number|null; ihsg: number|null }[];
-
-        if (!history.length) {
-            baseIhsg = ihsgData[0]?.close || 1;
-            raw = ihsgData.map(d => ({
-                date: d.date,
-                label: d.date.slice(5).replace('-', '/'),
-                portfolio: 0,
-                ihsg: toPct(d.close, baseIhsg),
-            }));
-        } else if (history.length < 2) {
-            basePort = history[0].totalValue || 1;
-            baseIhsg = ihsgData[0]?.close || 1;
-            raw = history.map((h: any) => {
-                const date = new Date(h.timestamp).toISOString().slice(0, 10);
-                const ihsg = ihsgData.find(i => i.date === date);
-                return {
-                    date,
-                    label: date.slice(5).replace('-', '/'),
-                    portfolio: toPct(h.totalValue, basePort),
-                    ihsg: ihsg ? toPct(ihsg.close, baseIhsg) : null,
-                };
-            }).filter((d: any) => d.ihsg !== null);
-        } else {
-            basePort = history[0].totalValue || 1;
-            baseIhsg = ihsgData[0]?.close || 1;
-            const ihsgMap = new Map(ihsgData.map(d => [d.date, d.close]));
-            raw = history.map((h: any) => {
-                const date = new Date(h.timestamp).toISOString().slice(0, 10);
-                const ihsgClose = ihsgMap.get(date);
-                if (ihsgClose == null) return null;
-                return {
-                    date,
-                    label: date.slice(5).replace('-', '/'),
-                    portfolio: toPct(h.totalValue, basePort),
-                    ihsg: toPct(ihsgClose, baseIhsg),
-                };
-            }).filter(Boolean) as any;
-            if (raw.length < 2) {
-                raw = ihsgData.map(d => ({
-                    date: d.date,
-                    label: d.date.slice(5).replace('-', '/'),
-                    portfolio: 0,
-                    ihsg: toPct(d.close, baseIhsg),
-                }));
+        const fmtLabel = (dateStr: string) => {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        };
+        // Build continuous daily series by forward-filling portfolio value onto IHSG dates
+        // This avoids sparse "step" artifact (history only on transaction days)
+        const sortedHistory = [...history].sort((a: any, b: any) => a.timestamp - b.timestamp);
+        const currentTotal = metrics.totalEquity || analysis.reduce((s, a) => s + a.marketValue, 0) + cash || 1;
+        const getPortfolioAt = (dateStr: string) => {
+            const ts = new Date(dateStr).getTime() + 16 * 3600_000; // include snapshots of same day
+            let val: number | null = null;
+            for (const h of sortedHistory) {
+                if (h.timestamp <= ts) val = h.totalValue;
+                else break;
             }
-        }
-        // Filter by period
-        if (period === 'All') return raw as any;
-        const now = raw[raw.length-1]?.date ? new Date(raw[raw.length-1].date).getTime() : Date.now();
-        let cutoff = 0;
-        if (period === '1W') cutoff = now - 7*86400000;
-        else if (period === '1M') cutoff = now - 30*86400000;
-        else if (period === '3M') cutoff = now - 90*86400000;
-        else if (period === 'YTD') cutoff = new Date(new Date().getFullYear(),0,1).getTime();
-        else if (period === '1Y') cutoff = now - 365*86400000;
-        const filtered = raw.filter(d => new Date(d.date).getTime() >= cutoff);
-        // re-normalize filtered to start at 0%
-        if (filtered.length < 2) return raw as any;
-        const p0 = filtered[0].portfolio ?? 0;
-        const i0 = filtered[0].ihsg ?? 0;
-        return filtered.map(d => ({
-            ...d,
-            portfolio: d.portfolio != null ? d.portfolio - p0 : 0,
-            ihsg: d.ihsg != null ? d.ihsg - i0 : 0,
+            return val ?? (sortedHistory[0]?.totalValue ?? currentTotal);
+        };
+
+        const fullSeries = ihsgData.map(d => ({
+            date: d.date,
+            label: fmtLabel(d.date),
+            ihsgClose: d.close,
+            portVal: getPortfolioAt(d.date),
         }));
-    }, [ihsgData, history, period]);
+
+        // Filter by period first, then normalize to 0% at period start
+        let sliced = fullSeries;
+        if (period !== 'All') {
+            const lastDate = fullSeries[fullSeries.length - 1]?.date;
+            const now = lastDate ? new Date(lastDate).getTime() : Date.now();
+            let cutoff = 0;
+            if (period === '1W') cutoff = now - 7 * 86400000;
+            else if (period === '1M') cutoff = now - 30 * 86400000;
+            else if (period === '3M') cutoff = now - 90 * 86400000;
+            else if (period === 'YTD') cutoff = new Date(new Date().getFullYear(), 0, 1).getTime();
+            else if (period === '1Y') cutoff = now - 365 * 86400000;
+            sliced = fullSeries.filter(d => new Date(d.date).getTime() >= cutoff);
+            if (sliced.length < 2) sliced = fullSeries;
+        }
+
+        const basePort = sliced[0]?.portVal || 1;
+        const baseIhsg = sliced[0]?.ihsgClose || 1;
+        return sliced.map(d => ({
+            date: d.date,
+            label: d.label,
+            portfolio: toPct(d.portVal, basePort),
+            ihsg: toPct(d.ihsgClose, baseIhsg),
+        }));
+    }, [ihsgData, history, period, metrics.totalEquity, analysis, cash]);
 
     const drawdownData = useMemo(() => {
         if (!history.length) return [];
@@ -231,9 +214,9 @@ export default function AnalyticsPage() {
                     <div>
                         <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
                             <BarChart3 className="w-6 h-6 text-primary" />
-                            Portfolio Analytics
+                            {lang === "id" ? "Performa Portofolio" : "Portfolio Analytics"}
                         </h1>
-                        <p className="text-sm text-muted-foreground mt-1">Advanced portfolio analysis & risk metrics</p>
+                        <p className="text-sm text-muted-foreground mt-1">{lang === "id" ? "Analisis lanjutan & metrik risiko" : "Advanced portfolio analysis & risk metrics"}</p>
                     </div>
                     <div className="text-right">
                         <p className="text-3xl font-black tracking-tight">Rp {(metrics.totalEquity / 1000000).toFixed(2)}M</p>

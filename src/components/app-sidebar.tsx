@@ -26,14 +26,7 @@ import {
 
 import {
   LayoutDashboard,
-  TrendingUp,
   History,
-  Search,
-  Rocket,
-  Building2,
-  Wallet,
-  Scale,
-  FileText,
   CircleDot,
   Plus,
   Moon,
@@ -41,44 +34,12 @@ import {
   Command,
   ChevronRight,
   Layers,
-  CandlestickChart,
-  SlidersHorizontal,
-  FlaskConical,
-  Columns2,
   Star,
   X,
 } from "lucide-react"
-
-const MENU_GROUPS = [
-  {
-    label: "Pasar",
-    items: [
-      { title: "Ringkasan Pasar", url: "/", icon: CandlestickChart },
-      { title: "Screener", url: "/screener", icon: SlidersHorizontal },
-      { title: "Backtest", url: "/backtest", icon: FlaskConical },
-      { title: "Bandingkan", url: "/compare", icon: Columns2 },
-      { title: "Aksi Korporasi", url: "/corporate-actions", icon: Rocket },
-    ],
-  },
-  {
-    label: "Portofolio",
-    items: [
-      { title: "Dashboard", url: "/portfolio-dashboard", icon: LayoutDashboard },
-      { title: "Agregat", url: "/aggregate", icon: Layers },
-      { title: "Performa", url: "/analytics", icon: TrendingUp },
-      { title: "Transaksi", url: "/history", icon: History },
-    ],
-  },
-  {
-    label: "Riset & Data",
-    items: [
-      { title: "Fundamental", url: "/fundamentals", icon: Building2 },
-      { title: "Dividen", url: "/stocks/dividends", icon: Wallet },
-      { title: "Saham Syariah", url: "/stocks/sharia", icon: Scale },
-      { title: "Prospektus", url: "/stocks/prospectus", icon: FileText },
-    ],
-  },
-]
+import { NAV_ITEMS, GROUP_LABEL, getActiveNav } from "@/config/navigation"
+import { useLocale } from "@/config/locale"
+import { PageTabs } from "@/components/PageTabs"
 
 const SESSION_LABEL: Record<MarketSession, string> = {
   pre_open: "Pre-Opening",
@@ -93,7 +54,7 @@ function isActive(pathname: string, url: string): boolean {
 }
 
 // Widget IHSG live via WebSocket — klik untuk ke Ringkasan Pasar
-function LiveIhsgChip() {
+function LiveIhsgChip({ collapsed }: { collapsed?: boolean }) {
   const { connected, prices, subscribe, unsubscribe } = useWebSocket({ autoConnect: true })
   const [mounted, setMounted] = useState(false)
 
@@ -106,6 +67,17 @@ function LiveIhsgChip() {
 
   const q = prices["^JKSE"]
   const up = (q?.changePercent ?? 0) >= 0
+
+  if (collapsed) {
+    return (
+      <Link href="/" className="flex flex-col items-center gap-1 py-2">
+        <span className={cn("size-2 rounded-full", connected ? "bg-success animate-pulse" : "bg-muted-foreground/40")} />
+        <span className={cn("text-[9px] font-black", mounted && q ? (up ? "text-success" : "text-destructive") : "text-muted-foreground")}>
+          {q ? `${up ? "▲" : "▼"}${Math.abs(q.changePercent).toFixed(1)}%` : "—"}
+        </span>
+      </Link>
+    )
+  }
 
   return (
     <Link
@@ -139,6 +111,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
   const watchlist = useWatchlist()
+  const { lang, setLang } = useLocale()
   const [session, setSession] = useState<MarketSession>("closed")
 
   useEffect(() => {
@@ -176,60 +149,77 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent className="gap-0 px-2 py-3">
-        {/* IHSG live */}
+        {/* IHSG live — expanded */}
         <div className="group-data-[collapsible=icon]:hidden">
           <LiveIhsgChip />
         </div>
+        <div className="hidden group-data-[collapsible=icon]:block">
+          <LiveIhsgChip collapsed />
+        </div>
 
-        {MENU_GROUPS.map((group, gi) => (
-          <div key={group.label}>
-            {gi > 0 && <SidebarSeparator className="mx-2 my-1 opacity-50" />}
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/45 px-3 mb-1">
-                {group.label}
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-0.5">
-                  {group.items.map((item) => {
-                    const active = isActive(pathname, item.url)
-                    const Icon = item.icon
-                    return (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                          isActive={active}
-                          render={<Link href={item.url} />}
-                          tooltip={item.title}
-                          className={cn(
-                            "group/menu-item relative h-9 transition-all duration-150",
-                            active
-                              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary"
-                              : "hover:bg-sidebar-accent hover:text-sidebar-foreground hover:translate-x-0.5"
-                          )}
-                        >
-                          {active && (
-                            <span className="absolute -left-2 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary" />
-                          )}
-                          <Icon className={cn("size-4 shrink-0 transition-colors", active ? "text-primary-foreground" : "text-sidebar-foreground/65 group-hover/menu-item:text-foreground")} />
-                          <span className={cn("text-[13px]", active ? "font-bold" : "font-medium")}>{item.title}</span>
-                          {active && <ChevronRight className="ml-auto size-3.5 opacity-70" />}
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </div>
-        ))}
+        {(() => {
+          const groups = [
+            { key: "market" as const, items: getActiveNav().filter(n => n.group === "market") },
+            { key: "portfolio" as const, items: getActiveNav().filter(n => n.group === "portfolio") },
+            { key: "research" as const, items: getActiveNav().filter(n => n.group === "research") },
+          ]
+          return groups.map((g, gi) => (
+            <div key={g.key}>
+              {gi > 0 && <SidebarSeparator className="mx-2 my-1 opacity-50" />}
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/45 px-3 mb-1">
+                  {GROUP_LABEL[g.key][lang]}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="gap-0.5">
+                    {g.items.map((item) => {
+                      const active = isActive(pathname, item.url)
+                      const Icon = item.icon
+                      const title = item.title[lang]
+                      return (
+                        <SidebarMenuItem key={item.id}>
+                          <SidebarMenuButton
+                            isActive={active}
+                            render={<Link href={item.url} />}
+                            tooltip={title}
+                            className={cn(
+                              "group/menu-item relative h-9 transition-all duration-150",
+                              active
+                                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary"
+                                : "hover:bg-sidebar-accent hover:text-sidebar-foreground hover:translate-x-0.5"
+                            )}
+                          >
+                            {active && (
+                              <span className="absolute -left-2 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary" />
+                            )}
+                            <Icon className={cn("size-4 shrink-0 transition-colors", active ? "text-primary-foreground" : "text-sidebar-foreground/65 group-hover/menu-item:text-foreground")} />
+                            <span className={cn("text-[13px]", active ? "font-bold" : "font-medium")}>{title}</span>
+                            {active && <ChevronRight className="ml-auto size-3.5 opacity-70" />}
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      )
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </div>
+          ))
+        })()}
 
         {/* ── Watchlist ── */}
-        {watchlist.items.length > 0 && (
+        {true && (
           <>
             <SidebarSeparator className="mx-2 my-1 opacity-50" />
             <SidebarGroup>
               <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/45 px-3 mb-1">
                 <Star className="size-3 mr-1 fill-amber-500 text-amber-500" /> Watchlist
               </SidebarGroupLabel>
+              {watchlist.items.length === 0 && (
+                <div className="px-3 py-2 text-[11px] text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  <p>⭐ {lang === "id" ? "Belum ada watchlist" : "No watchlist yet"}</p>
+                  <p className="text-[10px] opacity-70">{lang === "id" ? "Tambah dari halaman analisis" : "Add from analysis page"}</p>
+                </div>
+              )}
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0.5">
                   {watchlist.items.map((code) => {
@@ -263,13 +253,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
 
         {/* ── Portofolio saya ── */}
-        {portfolios.length > 0 && (
+        {true && (
           <>
             <SidebarSeparator className="mx-2 my-1 opacity-50" />
             <SidebarGroup>
               <SidebarGroupLabel className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/45 px-3 mb-1">
-                Portofolio Saya
+                {lang === "id" ? "Portofolio Saya" : "My Portfolios"}
               </SidebarGroupLabel>
+              {portfolios.length === 0 && (
+                <div className="px-3 py-2 text-[11px] text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  <p>{lang === "id" ? "Belum ada portofolio" : "No portfolio yet"}</p>
+                  <Link href="/portfolio-dashboard" className="text-primary text-[10px] font-bold hover:underline">+ {lang === "id" ? "Buat pertama" : "Create first"}</Link>
+                </div>
+              )}
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0.5">
                   {portfolios.map((p) => (
@@ -297,9 +293,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter className="border-t border-sidebar-border/50 p-2">
         <SidebarMenu className="gap-0.5">
           <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setLang(lang === "id" ? "en" : "id")} tooltip={lang === "id" ? "Switch to English" : "Ganti ke Indonesia"} className="h-9 hover:translate-x-0.5 transition-transform">
+              <span className="size-4 shrink-0 text-xs font-black flex items-center justify-center border rounded">{lang === "id" ? "ID" : "EN"}</span>
+              <span className="text-[13px]">{lang === "id" ? "English" : "Indonesia"}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton onClick={toggle} tooltip={theme === "dark" ? "Light Mode" : "Dark Mode"} className="h-9 hover:translate-x-0.5 transition-transform">
               {theme === "dark" ? <Sun className="size-4 shrink-0" /> : <Moon className="size-4 shrink-0" />}
-              <span className="text-[13px]">{theme === "dark" ? "Mode Terang" : "Mode Gelap"}</span>
+              <span className="text-[13px]">{theme === "dark" ? (lang === "id" ? "Mode Terang" : "Light Mode") : (lang === "id" ? "Mode Gelap" : "Dark Mode")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           {!isOpen && (
