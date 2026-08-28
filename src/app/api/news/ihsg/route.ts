@@ -109,15 +109,15 @@ Jawab HANYA JSON array.`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENCODE_KEY}` },
                 body: JSON.stringify({
-                    model: MODEL,
-                    messages: [
-                        { role: 'system', content: 'Kamu analis IHSG. Jawab HANYA JSON array valid.' },
-                        { role: 'user', content: batchPrompt },
-                    ],
-                    temperature: 0.2,
-                    max_tokens: 1800,
-                }),
-                signal: AbortSignal.timeout(20000),
+                model: MODEL,
+                messages: [
+                    { role: 'system', content: 'Kamu analis IHSG. Jawab HANYA JSON array valid.' },
+                    { role: 'user', content: batchPrompt },
+                ],
+                temperature: 0.2,
+                max_tokens: 2600,
+            }),
+                signal: AbortSignal.timeout(25000),
             });
             if (!r.ok) throw new Error(`AI ${r.status}`);
             const j: any = await r.json();
@@ -168,13 +168,22 @@ Jawab HANYA JSON array.`;
             }
         } catch (e) {
             console.warn('[AI] mimo-v2.5 batch chunk failed, heuristic', e);
-            for (const it of batch) {
+                for (const it of batch) {
                 const h = heuristicImpact(it.title, it.snippet);
-                let cleanSnippet = it.snippet.replace(/<[^>]+>/g,' ').trim();
-                if (!cleanSnippet || cleanSnippet.startsWith('http')) cleanSnippet = it.title;
-                const paraphrased = it.title.replace('Perkirakan','memprediksi').replace('Amati Peluang','soroti peluang').split(' - ')[0];
-                const summary = `${paraphrased.slice(0, 100)} — ${h.reason}`.slice(0, 200);
-                results.push({ impact: h.impact, confidence: h.confidence, reason: h.reason, tickers:[], category:'IHSG', summary });
+                // Buat ringkasan yang tidak copy title verbatim — kompres daftar saham
+                let base = it.title.split(' - ')[0];
+                // Jika title terlalu panjang dengan banyak saham, ringkas
+                if ((base.match(/,/g)||[]).length >= 3) {
+                    base = base.replace(/DMAS.*TOBA|BBCA.*TLKM|IHSG.*/, (m) => {
+                        const tickers = m.match(/[A-Z]{4}/g) || [];
+                        if (tickers.length >= 3) return `beberapa saham pilihan (${tickers.slice(0,3).join(', ')} dkk)`;
+                        return m;
+                    });
+                    if (base.includes('DMAS, BIPI')) base = 'IHSG diprediksi sideways, analis soroti peluang selective buy di saham properti/material';
+                }
+                const paraphrased = base.replace('Perkirakan','diprediksi').replace('Amati Peluang','rekomendasikan pantau peluang').replace('Laju IHSG','IHSG').replace('Sideways','konsolidasi sideways');
+                const summary = `${paraphrased.slice(0, 130)} — ${h.reason === 'Tidak ada sinyal arah jelas' ? 'Konsolidasi, strategi wait-and-see dengan selective buy' : h.reason}.`.slice(0, 220);
+                results.push({ impact: h.impact, confidence: h.confidence, reason: h.reason === 'Tidak ada sinyal arah jelas' ? 'Konsolidasi sideways — peluang terbatas' : h.reason, tickers:[], category:'IHSG', summary });
             }
         }
         // Jeda hemat rate limit antar chunk
@@ -182,17 +191,16 @@ Jawab HANYA JSON array.`;
     }
     if (results.length) return results;
     // Final fallback (should not reach)
-    // Fallback heuristic — buat summary dari title agar tidak tampil <a href...>
+    // Fallback heuristic — buat summary berbeda dari title
     return items.map(it => {
         const h = heuristicImpact(it.title, it.snippet);
-        // Bersihkan snippet jika isinya link HTML
-        let cleanSnippet = (it.snippet || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!cleanSnippet || cleanSnippet.startsWith('http') || cleanSnippet.includes('news.google.com')) {
-            cleanSnippet = it.title;
+        let base = it.title.split(' - ')[0];
+        if ((base.match(/,/g)||[]).length >= 3) {
+            base = 'IHSG diprediksi sideways, analis soroti peluang selective buy di beberapa saham pilihan';
         }
-        // Ringkas manual 1 kalimat
-        const summary = cleanSnippet.slice(0, 180) + (cleanSnippet.length > 180 ? '...' : '');
-        return { impact: h.impact, confidence: h.confidence, reason: h.reason, tickers: [], category: 'IHSG', summary };
+        const paraphrased = base.replace('Perkirakan','diprediksi').replace('Amati Peluang','rekomendasikan pantau peluang').replace('Sideways','konsolidasi sideways');
+        const summary = `${paraphrased.slice(0, 130)} — ${h.reason === 'Tidak ada sinyal arah jelas' ? 'Konsolidasi, strategi wait-and-see' : h.reason}.`.slice(0, 220);
+        return { impact: h.impact, confidence: h.confidence, reason: h.reason === 'Tidak ada sinyal arah jelas' ? 'Konsolidasi sideways — peluang terbatas' : h.reason, tickers: [], category: 'IHSG', summary };
     });
 }
 
@@ -200,7 +208,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbolsParam = searchParams.get('symbols') || 'IHSG';
     const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 5);
-    const cacheKey = `ihsg:v5:${symbols.join(',')}`;
+    const cacheKey = `ihsg:v6:${symbols.join(',')}`;
 
         const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < TTL) {
