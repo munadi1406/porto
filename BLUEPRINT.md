@@ -2,7 +2,7 @@
 
 > **IDX Investment Terminal** — Next.js 16.1.1 (App Router) + Custom WebSocket Server (`server.ts`) + MySQL (Sequelize) + Yahoo Finance + IDX Bridge + OpenCode AI
 >
-> Generated: 2026-08-28 | Workspace: `D:\qna\porto` | Branch: `main`
+> Generated: 2026-08-28 (updated after Sprint 1-5) | Workspace: `D:\qna\porto` | Branch: `main` | Commit `e49159c`-`ff983af`
 >
 > **Language:** English (primary) — each API endpoint includes **EN / ID** description.
 
@@ -27,60 +27,65 @@
 | Dimension | Value |
 |-----------|-------|
 | **Framework** | Next.js 16.1.1 App Router, Turbopack, `src/app/layout.tsx` RootLayout |
-| **Runtime WS** | Custom `server.ts` → `npx tsx server.ts` (`dev`/`start`), `next dev` fallback `dev:next` |
+| **Runtime WS** | `server.js` cPanel-ready (`node server.js`, `HOST 0.0.0.0`) + `server.ts` dev (`npx tsx server.ts`), Socket.IO `path /ws` (was `ws`), fallback polling 5s |
 | **State** | Zustand (`usePortfolios`, `useWatchlist`), TanStack Query (`useCashAndHistory`), localStorage cache |
 | **DB** | MySQL via `sequelize` + `mysql2`, auto-migrate `src/lib/migrate.ts` |
 | **Charts** | `lightweight-charts` + `recharts` + `html2canvas` |
-| **Page Routes** | 16 `page.tsx` (11 active + 5 redirect dead) + 1 dynamic `[ticker]` |
-| **API Routes** | 61 active `route.ts` + 16 empty scaffold dirs (404) |
-| **Sidebar Items** | 13 active (3 groups) + 1 dead (`Agregat`) + 2 dynamic sections (Watchlist, Portofolio Saya) |
+| **Page Routes** | 16 `page.tsx` (11 active + 5 redirect dead) + 1 dynamic `[ticker]` + 20 `error.tsx`/`loading.tsx` (Sprint 2) |
+| **API Routes** | 64 active `route.ts` (61 + 3 new: `news/ihsg`, `backtest/ai-*` ) + 12 scaffold now 501 (was 16 empty) |
+| **Sidebar Items** | 13 active (4 groups: Pasar / Analisis Saham / Data Referensi / Portofolio) + 0 dead visible (`Agregat` hidden via `status:dead`) + 2 dynamic (Watchlist, Portofolio Saya) + Locale EN/ID toggle |
 
 ---
 
 ## 2. Sidebar Menu Map
 
-Source: `src/components/app-sidebar.tsx:52` — `MENU_GROUPS` hard-coded.
+Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/components/app-sidebar.tsx:52` hard-coded) + `src/config/locale.tsx` (`LocaleProvider`).
 
-![Screenshot: Sidebar — Pasar / Portofolio / Riset & Data](docs/screenshots/sidebar.png)
-*Placeholder — capture sidebar collapsed + expanded, IHSG LiveIhsgChip.*
+![Screenshot: Sidebar — Pasar / Analisis Saham / Data Referensi / Portofolio](docs/screenshots/sidebar.png)
+*Placeholder — capture sidebar expanded + collapsed (mini IHSG `▲1.2%`), Watchlist/Portofolio empty CTA, EN/ID toggle.*
 
-### 2.1 Group: Pasar
+### 2.1 Group: Pasar (read-only snapshot)
 
 | # | Title | URL | Icon | File | Status | EN Description | ID Deskripsi |
 |---|-------|-----|------|------|--------|----------------|--------------|
-| 1 | Ringkasan Pasar | `/` | `CandlestickChart` | `src/app/page.tsx` | **ACTIVE** | Market overview: hero, index strip, IHSG chart, breadth, top movers, sector heatmap, broker summary proxy | Ringkasan pasar, hero, strip indeks, chart IHSG, breadth, movers, heatmap sektor, ringkasan broker |
-| 2 | Screener | `/screener` | `SlidersHorizontal` | `src/app/screener/page.tsx` | **ACTIVE** | Stock screener (Technical scan 959 stocks + Fundamental official + Position calculator + AI picks) | Screener saham (scan teknikal 959 saham + fundamental resmi + kalkulator posisi + AI picks) |
-| 3 | Backtest | `/backtest` | `FlaskConical` | `src/app/backtest/page.tsx` | **ACTIVE** | 8 strategies backtest, equity curve vs B&H, next-entry level, ranking, AI summary & AI entry, position calculator (avg down/up) | Backtest 8 strategi, kurva ekuitas vs B&H, level entry berikutnya, ranking, ringkasan AI & entry AI, kalkulator posisi |
-| 4 | Bandingkan | `/compare` | `Columns2` | `src/app/compare/page.tsx` | **ACTIVE** | Compare up to 3 tickers: 14 fundamental + risk metrics, best highlight ★ | Bandingkan hingga 3 saham: 14 metrik fundamental + risiko |
-| 5 | Aksi Korporasi | `/corporate-actions` | `Rocket` | `src/app/corporate-actions/page.tsx` | **ACTIVE** | IPO/Split/HMETD/Delisting/Suspend tabs via IDX | Tab IPO/Split/HMETD/Delisting/Suspend via IDX |
+| 1 | Ringkasan Pasar | `/` | `CandlestickChart` | `src/app/page.tsx` | **ACTIVE** | Market overview: hero, index strip, IHSG chart, breadth, top movers, sector heatmap, broker summary, **NewsCarousel IHSG** (Serper/Firecrawl/mimo-v2.5) | Ringkasan pasar + carousel berita IHSG |
 
-### 2.2 Group: Portofolio
+### 2.2 Group: Analisis Saham (toolbox — input ticker → insight)
 
 | # | Title | URL | Icon | File | Status | EN | ID |
 |---|-------|-----|------|------|--------|----|----|
-| 6 | Dashboard | `/portfolio-dashboard` | `LayoutDashboard` | `src/app/portfolio-dashboard/page.tsx` | **ACTIVE** (primary) | Holdings overview, P/L, allocation, equity growth, target | Overview holdings, P/L, alokasi, pertumbuhan ekuitas, target |
-| 7 | Agregat | `/aggregate` | `Layers` | `src/app/aggregate/page.tsx` | **DEAD** — `redirect('/')` | Should aggregate all portfolios via `/api/portfolios/aggregate` but no UI | Seharusnya agregasi semua portofolio via API tapi tidak ada UI |
-| 8 | Performa | `/analytics` | `TrendingUp` | `src/app/analytics/page.tsx` | **ACTIVE** (mislabeled) | Label “Performa” but URL `/analytics` → header “Portfolio Analytics”, dark cumulative return vs IHSG | Label “Performa” tapi URL `/analytics` → header “Portfolio Analytics”, chart gelap kumulatif vs IHSG |
-| 9 | Transaksi | `/history` | `History` | `src/app/history/page.tsx` | **ACTIVE** | Thin wrapper → `<TransactionHistory>` with count badge | Wrapper tipis → TransactionHistory |
+| 2 | Screener | `/screener` | `SlidersHorizontal` | `src/app/screener/page.tsx` | **ACTIVE** | Stock screener 959 stocks (8-strategy backtest engine, not MA-only), Fundamental official, Position calc, AI recommendation | Screener 959 saham (engine 8 strategi), fundamental resmi |
+| 3 | Backtest | `/backtest` | `FlaskConical` | `src/app/backtest/page.tsx` | **ACTIVE** | 8 strategies, ranking (consensus), AI summary/entry (mimo-v2.5), position avg down/up | 8 strategi, ranking konsensus, AI entry, kalkulator |
+| 4 | Bandingkan | `/compare` | `Columns2` | `src/app/compare/page.tsx` | **ACTIVE** | Compare 3 tickers, 14 metrics, best ★ | Bandingkan 3 saham |
+| 5 | Fundamental | `/fundamentals` | `Building2` | `src/app/fundamentals/page.tsx` | **ACTIVE** | Terminal health score, foreign flow, smart money, Graham, with sticky mini-nav & source badges | Terminal skor kesehatan, smart money |
 
-### 2.3 Group: Riset & Data
+### 2.3 Group: Data Referensi (browse/list)
 
 | # | Title | URL | Icon | File | Status | EN | ID |
 |---|-------|-----|------|------|--------|----|----|
-| 10 | Fundamental | `/fundamentals` | `Building2` | `src/app/fundamentals/page.tsx` | **ACTIVE** | Terminal: health score, foreign flow, smart money, Graham fair value, roe/margin, analyst consensus | Terminal: skor kesehatan, flow asing, smart money, fair value Graham |
-| 11 | Dividen | `/stocks/dividends` | `Wallet` | `src/app/stocks/dividends/page.tsx` | **ACTIVE** | Dividend calendar sorted by yield, yield badge, mobile cards | Kalender dividen urut yield |
-| 12 | Saham Syariah | `/stocks/sharia` | `Scale` | `src/app/stocks/sharia/page.tsx` | **ACTIVE** | SHARIA list total/sharia/nonSharia filter + grid | Daftar syariah filter + grid |
-| 13 | Prospektus | `/stocks/prospectus` | `FileText` | `src/app/stocks/prospectus/page.tsx` | **ACTIVE** | Multi-IPO PDF AI analyzer (drag&drop / URL / paste → SSE, DeepSeek) | Analyzer prospektus IPO multi-emiten (SSE, DeepSeek) |
+| 6 | Aksi Korporasi | `/corporate-actions` | `Rocket` | `src/app/corporate-actions/page.tsx` | **ACTIVE** | IPO/Split/Rights/Delisting/Suspend | IPO/Split/Rights/Delisting/Suspend |
+| 7 | Dividen | `/stocks/dividends` | `Wallet` | `src/app/stocks/dividends/page.tsx` | **ACTIVE** | Dividend calendar, yield badge | Kalender dividen |
+| 8 | Saham Syariah | `/stocks/sharia` | `Scale` | `src/app/stocks/sharia/page.tsx` | **ACTIVE** | SHARIA list filter | Daftar syariah |
+| 9 | Prospektus | `/stocks/prospectus` | `FileText` | `src/app/stocks/prospectus/page.tsx` | **ACTIVE** | Multi-IPO PDF SSE DeepSeek | Analyzer prospektus |
 
-### 2.4 Dynamic Sections (not in MENU_GROUPS)
+### 2.4 Group: Portofolio (my data)
+
+| # | Title | URL | Icon | File | Status | EN | ID |
+|---|-------|-----|------|------|--------|----|----|
+| 10 | Ringkasan Portofolio | `/portfolio-dashboard` | `LayoutDashboard` | `src/app/portfolio-dashboard/page.tsx` | **ACTIVE** | Holdings overview, P/L, allocation, equity growth, target, **StressTest, RebalancingAdvisor**, tax 0.1% | Overview holdings, stress test, rebalancing |
+| 11 | Agregat | `/aggregate` | `Layers` | `src/app/aggregate/page.tsx` | **HIDDEN** `status:dead` filtered via `getActiveNav()` — redirect kept for compat | Hidden | Disembunyikan |
+| 12 | Performa | `/analytics` | `TrendingUp` | `src/app/analytics/page.tsx` | **ACTIVE** | `Performa Portofolio / Portfolio Analytics` bilingual, dark cumulative return vs IHSG, `var(--chart-1/2)` tokens | Performa bilingual, chart token |
+| 13 | Transaksi | `/history` | `History` | `src/app/history/page.tsx` | **ACTIVE** | Transactions + Tax 0.1% card + Journal note | Transaksi + pajak |
+
+### 2.5 Dynamic Sections
 
 | Section | Visibility | URL Pattern | Icon | Source |
 |---------|------------|-------------|------|--------|
-| Watchlist | if `watchlist.items.length > 0` | `/analysis/${code}.JK` | `Star` amber fill | `useWatchlist()` localStorage |
-| Portofolio Saya | if `portfolios.length > 0` | `/portfolio-dashboard` (with `selectedPortfolioId`) | `CircleDot` per-color | `usePortfolios()` |
-| IHSG Live Chip | always (hidden when collapsed) | `/` | dot `bg-success` pulse | `LiveIhsgChip()` WS `^JKSE` |
-| Market Status | header | — | `Command` logo + `SESSION_LABEL` | `getMarketStatus()` WIB poll 30s |
-| Theme Toggle | footer | — | `Sun`/`Moon` | `useTheme()` |
+| Watchlist | **always** (empty CTA if 0) | `/analysis/${code}.JK` | `Star` amber | `useWatchlist()` with `tag/group` support (`WatchlistEntry`) |
+| Portofolio Saya | **always** (empty CTA if 0) | `/portfolio-dashboard` | `CircleDot` | `usePortfolios()` |
+| IHSG Live Chip | always — **collapsed mini** `▲▼%` | `/` | dot | `LiveIhsgChip({collapsed})` via `useSharedWs()` |
+| Locale Toggle | footer | — | `ID/EN` | `useLocale()` localStorage `porto-lang` |
+| Theme Toggle | footer | — | `Sun/Moon` | `useTheme()` |
 
 ---
 
@@ -111,11 +116,11 @@ Source: `src/components/app-sidebar.tsx:52` — `MENU_GROUPS` hard-coded.
 ![Screenshot: Screener — Fundamental Tab](docs/screenshots/screener-fundamental.png)
 ![Screenshot: Screener — AI Recommendation + Position](docs/screenshots/screener-position.png)
 
-- **File:** `src/app/screener/page.tsx` 900+ lines, tabs `technical | fundamental | position`.
-- **Technical:** Batch scan `BATCH_SIZE=10` `BATCH_DELAY=1200ms` → `GET /api/screener?tickers=...` for 959 stocks, progress bar, `errorSummary` (`only X bars: N, no quote: M`), Top Picks 5 buys, filters `All/Buy/GC/Acc/Oversold/Surge/Sharia`, sort `score/ticker/change/rsi/signal`, table cols: Ticker/Name/Price/Signal (+score)/Best Strategy/Win%/Sharpe/Action→Position. Save `POST /api/screener/save`, History `GET /api/screener/history` & `history/[id]`.
-- **Engine:** `calculateIndicators` (MA20/50, goldenCross/deathCross/nearGC <1%, RSI14, volumeSurge >1.8×, OBV trend, MFI, Chaikin A/D, netFlow, divergence) + `rankStrategiesFast` over 3 strategies `sma_cross/ema_cross/rsi_reversion` (consensus 2+ BUY = BUY, 4+ = STRONG_BUY). Score composite from backtest engine. `EXCLUDED_TICKERS = ['FCA']`.
-- **Fundamental:** `useStockScreener()` → `GET /api/idx/stock-screener` official (per/pbv/roe/der/ytd/marketCapital), sort/search.
-- **Position/AI:** `PositionCalculator` (entry/nextEntry, support/resistance, avg down/up, lot calc) + AI Recommendation cards (backtest-based `WR/Sharpe/Return`).
+- **File:** `src/app/screener/page.tsx` 900+ lines, tabs `technical | fundamental | position` via `PageTabs` (Sprint 2), mobile `hidden sm:block` table + `sm:hidden` cards.
+- **Technical:** Batch scan `BATCH_SIZE=10` `BATCH_DELAY=1200ms` → `GET /api/screener?tickers=...` for 959 stocks, progress bar with ETA `342/959 (~45s)` + human error `12 dilewati karena data tidak cukup`, Top Picks 5 buys, filters `All/Buy/GC/Acc/Oversold/Surge/Sharia`, sort `score/ticker/change/rsi/signal`, table cols: Ticker/Name/Price/Signal (+score)/Best Strategy/Win%/Sharpe/Action→Position. Save `POST /api/screener/save`, History `GET /api/screener/history` & `history/[id]`.
+- **Engine:** `calculateIndicators` (MA20/50, goldenCross/deathCross/nearGC <1%, RSI14, volumeSurge >1.8×, OBV trend, MFI, Chaikin A/D, netFlow, divergence) + `rankStrategiesFast` over **8 strategies** `golden_cross/sma_cross/ema_cross/macd/bollinger_breakout/reversion/donchian/rsi` (consensus 2+ BUY=BUY, 4+ = STRONG_BUY, 3+ SELL=AVOID), score 35%WR+20%PF+25%Sharpe+20%Return, `EXCLUDED_TICKERS = ['FCA']`.
+- **Fundamental:** `useStockScreener()` → `GET /api/idx/stock-screener` official, sort/search.
+- **Position/AI:** `PositionCalculator` + AI Recommendation (top 5, `mimo-v2.5` batch) integrated at bottom of Technical tab after 100%.
 
 ### 3.3 `/backtest` — Backtest Strategi
 
@@ -138,11 +143,11 @@ Source: `src/components/app-sidebar.tsx:52` — `MENU_GROUPS` hard-coded.
 ![Screenshot: Analytics — Drawdown + Allocation](docs/screenshots/analytics-drawdown-allocation.png)
 ![Screenshot: Analytics — Holdings Table](docs/screenshots/analytics-table.png)
 
-- **File:** `src/app/analytics/page.tsx` ~450 lines, `history` via `useCashAndHistory` (`PortfolioSnapshot` `totalValue` not `equity`), `tickers` via `usePortfolios`.
-- **KPI 6:** Total Value, Beta, Correlation, Volatility (annualVolatility), Sharpe (252√), MaxDD.
-- **Sources:** `GET /api/risk?ticker=&period=1y` (beta/correlation/volatility vs IHSG via `dailyReturns`/`betaAndCorrelation`), `GET /api/idx/index-chart?period=1y&interval=1d` (API returns `{Date,Close}` capitalized → mapped to `date/close`), `history` snapshots.
-- **Charts:** Dark Cumulative Return (LineChart portfolio #10b981 vs IHSG #a855f7, base 100, Y `+ -%`, X `label` MM/DD, period filter 1W/1M/3M/YTD/1Y/All with re-normalize), Drawdown AreaChart (destructive gradient), Allocation Pie/Bar, AI Recommendations grid, Holdings Detail table (weight color).
-- **Gotchas fixed:** duplicate `.JK` guard, `j.data` shape, `history.length<2` fallback to flat 100, null `i.date`.
+- **File:** `src/app/analytics/page.tsx` ~460 lines, `history` via `useCashAndHistory` (`PortfolioSnapshot` `totalValue`), `tickers` via `usePortfolios`, `useLocale` bilingual `Performa Portofolio / Portfolio Analytics`.
+- **KPI 6:** Total Value, Beta, Correlation, Volatility, Sharpe, MaxDD via `StatCard` (unified, `tone`).
+- **Sources:** `GET /api/risk?ticker=&period=1y` (beta/correlation/volatility), `GET /api/idx/index-chart?period=1y&interval=1d` (`{Date,Close}` → `date/close`), `history` snapshots with forward-fill onto IHSG dates (no step artifact).
+- **Charts:** Dark Cumulative Return **normalized 0%** (Line `var(--chart-1)` portfolio vs `var(--chart-2)` IHSG, `Base 100` hidden, Y `+ -%` right, X `label` `30 Dec`, reference `y=0`), period 1W/1M/3M/YTD/1Y/All re-normalized per period, empty state `≥2 snapshot`; Drawdown AreaChart; Allocation Pie/Bar (`var(--chart-*)` tokens, not hex).
+- **Extras:** `StressTestCard` (beta slider -5/-10/-20% via `/api/risk`), `Bilingual`, `staleTime` tuned.
 
 ### 3.5 `/portfolio-dashboard` — Dashboard Utama
 
@@ -295,11 +300,12 @@ Source: `src/components/app-sidebar.tsx:52` — `MENU_GROUPS` hard-coded.
 | 43 | `GET /api/idx/index-summary` | `index-summary` | `getIndexSummary` | — | — |
 | 44 | `GET /api/idx/daily-indices` | `daily-indices` | `getDailyIndices` | — | — |
 
-### 5.6 Screener Engine
+### 5.6 Screener Engine + News
 
 | # | Method & Path | File | EN | ID | Req | Resp | Consumer |
 |---|---------------|------|----|----|-----|------|----------|
-| 45 | `GET /api/screener?tickers=` | `api/screener/route.ts` | Heavy: Yahoo quote+chart, `calculateIndicators` (MA20/50, RSI, MFI, OBV, A/D, divergence) + `runBacktest` 3 strategies fast, score, entry/SL/TP, bestStrategy, FCA exclude | Berat: Yahoo + indikator + backtest 3 strategi | `?tickers=BBCA.JK,BBRI.JK` (max 100, batch 5×3 tickers, 210 bars min) | `{success:true,data:[ScreenerItem],errors,errorSummary,total}` | Screener Technical |
+| 45 | `GET /api/screener?tickers=` | `api/screener/route.ts` | Heavy: Yahoo quote+chart (5y fetch, 60 bars min, ticker `.JK` guard), `calculateIndicators` + `runBacktest` **8 strategies** (composite 35%WR+20%PF+25%Sharpe+20%Return, consensus 2+ BUY/4+ STRONG_BUY), FCA exclude | Berat: Yahoo + 8 strategi | `?tickers=BBCA.JK` (max 100, batch 5, BARS_MIN 60) | `{success:true,data:[ScreenerItem {score, consensus, buySignals/sellSignals, bestStrategy, winRate, sharpe}], errors, errorSummary, total}` | Screener Technical |
+| 45b | `GET /api/news/ihsg?symbols=` | `api/news/ihsg/route.ts` | Enriched IHSG news via Serper (1-2 search) + Firecrawl (max 5 scrape, 30m cache) + AI `mimo-v2.5` batch 5 per call (impact/category/tickers/summary parafrase, not verbatim), fallback RSS | Berita IHSG ter-enrich | `?symbols=IHSG,BBCA,EMAS` (max 10, 6 cache key) | `{success:true,data:[{title,link,source,publishTime,summary,rawSnippet,impact,confidence,reason,tickers,category}], meta:{serper,firecrawl,ai}}` | `NewsCarousel` in `/` | TTL 30m, v9 cache, scrub `<a href` |
 | 46 | `GET /api/screener/history` | `api/screener/history/route.ts` | List saved screens `ScreenerResult` DB | Daftar screener tersimpan | — | `{success:true,data:[SavedScreen]}` | History panel |
 | 47 | `GET /api/screener/history/[id]` | `api/screener/history/[id]/route.ts` | Single saved by id | Satu tersimpan | `?id=...` | `{success:true,data:{results}}` | Load |
 | 48 | `POST /api/screener/save` | `api/screener/save/route.ts` | Create saved, body `{name,label,results}` | Simpan | Body JSON | `{success:true,data:SavedScreen}` | Save dialog |
@@ -349,32 +355,31 @@ Source: `src/components/app-sidebar.tsx:52` — `MENU_GROUPS` hard-coded.
 
 ---
 
-## 6. WebSocket Architecture
+## 6. WebSocket Architecture (migrated `ws` → `socket.io` in `51254c7`)
 
 ![Diagram: WS Flow](docs/screenshots/ws-diagram.png)
 
 | Layer | File | Detail |
 |-------|------|--------|
-| **Custom Server** | `server.ts:1` 27 lines | `createServer + next({dev,hostname,port})` + `initWebSocket(server)`. Scripts `dev` & `start` = `npx tsx server.ts` (3000, localhost). Not `next dev`. |
-| **WS Server** | `src/server/ws-server.ts:14` 110 lines | `WebSocketServer({noServer:true})` + manual `server.on("upgrade")` filter `pathname==="/ws"` so `/_next/webpack-hmr` not hijacked. `connection` → `manager.addClient(client_${counter})` + welcome `marketOpen:false`. Handlers `message→handleMessage`, `close→removeClient`, `error`, `pong→updateHeartbeat`. Ping 30s. `publisher.start()`. |
-| **Subscription Manager** | `src/server/subscription-manager.ts:1` 145 lines | `Map clientId→{ws,tickers:Set,lastHeartbeat}` + `Map ticker→Set<clientId>`. `subscribe/unsubscribe`, `getAllSubscribedTickers()`, `broadcast(tickers,msg)` per-ticker, `broadcastAll`, `cleanup()` stale >60s every 30s. |
-| **Price Publisher** | `src/server/price-publisher.ts` ~80 lines | `setInterval 3000ms` check `getMarketStatus().session` + `market_status` if changed, `getAllSubscribedTickers()` → `fetchPrices(tickers)` (`src/lib/price-fetcher.ts` yahoo quote, TTL 3s) → `broadcast` `PriceUpdateMessage {type:"price_update",data:Record<string,PriceData>}`. |
-| **Types** | `src/lib/ws-types.ts:1` 70 lines | `ClientMessage`: `Subscribe{"type":"subscribe",tickers[]}`, `Unsubscribe`, `Ping`; `ServerMessage`: `PriceUpdateMessage`, `MarketStatusMessage{isOpen,session}`, `Pong`, `Welcome{sessionId,marketOpen}`, `Error` |
-| **Market Hours** | `src/lib/market-hours.ts` | `getMarketStatus() → {isOpen, session: pre_open|trading|post_close|closed}` WIB, used server & `SESSION_LABEL` in sidebar. |
-| **Hook `useWebSocket`** | `src/hooks/useWebSocket.ts:21` 147 lines | Build `ws://host/ws` or `wss://` via `getWsUrl()`, `onopen` re-subscribe Set, `onmessage` switch `price_update→setPrices`, `market_status`, `welcome/pong`, `onclose` auto-reconnect `reconnectCount<10` + `setTimeout(3000)`, `subscribe(tickers)` add Set + `ws.send` if OPEN. |
-| **Hook `useMarketData`** | `src/hooks/useMarketData.ts:1` 130 lines | Wrapper over `useWebSocket`. Two effects: `connected&&wsPrices→setPrices` + `subscribe(tickers)` on change. Fallback HTTP: if WS not connected in 2s → `setUseWs(false)` + `fetchPricesHttp()` → `POST /api/price-batch` polling `5000ms`. Return `{prices,loading,lastUpdated,refresh,connected,useWs}` |
-| **Consumers** | `/` (40 tickers), `LiveIhsgChip` (`^JKSE` own WS), `portfolio-dashboard`, `analytics`, `analysis/[ticker]`, `TickerTape`, `LivePrice`, `AlertChecker` | `/` builds ~40 liveTickers single WS; sidebar chip owns separate WS (`autoConnect:true`). Dual socket per tab (isolated, wasteful). |
+| **Custom Server** | `server.ts` + `server.js:1` 60 lines (cPanel-ready `HOST 0.0.0.0`, `PORT||port`, `tsx/cjs` fallback, `initWebSocket` graceful) | `createServer + next({dev,hostname,port})` + `initWebSocket(server)`. Scripts `dev` & `start` = `npx tsx server.ts` (3000), `server.js` for `node server.js` on cPanel Passenger. |
+| **WS Server** | `src/server/ws-server.ts:1` ~110 lines | **`Socket.IO` `new Server(server,{path:"/ws", cors:"*", transports:["websocket","polling"], pingInterval 25s})`** + `io.on("connection")` → `manager.addClient` + `welcome`, handlers `subscribe`/`unsubscribe`/`ping`/`message` → `handleMessage`, `disconnect` → `removeClient`. `publisher.start()`. |
+| **Subscription Manager** | `src/server/subscription-manager.ts:1` ~140 lines | `Map clientId→{socket, tickers:Set}` + `ticker→Set<clientId>`, `socket.join(ticker)` room per ticker, `broadcast(tickers,event,data)` via `io.to(ticker).emit`, `broadcastAll` via `io.emit`, cleanup 60s. |
+| **Price Publisher** | `src/server/price-publisher.ts:1` ~40 lines | Dynamic throttle: `getDesiredIntervalMs()`: `closed` → 30s else 3s, `schedule()` reset on status change; `publish()` → `fetchPrices` → `manager.broadcast(tickers,"price_update",message)`, `broadcastAll("market_status")`. |
+| **WsProvider** | `src/components/WsProvider.tsx:1` 67 lines | `createContext` single `useWebSocket` at `src/app/layout.tsx:32` → `WsProvider` wraps app, `useSharedWs()` opt-in hook (fallback to own socket if no provider). Unifies dual WS (page 40 + chip `^JKSE`) into 1 socket/tab. |
+| **Types** | `src/lib/ws-types.ts:1` 70 lines | Same `Subscribe/Unsubscribe/Ping` + `PriceUpdate/MarketStatus/Pong/Welcome/Error`. Socket.IO events: `subscribe`, `unsubscribe`, `price_update`, `market_status`, `pong`, `welcome`. |
+| **Market Hours** | `src/lib/market-hours.ts` | `getMarketStatus()` WIB session. |
+| **Hook `useWebSocket`** | `src/hooks/useWebSocket.ts:1` ~120 lines | Now `socket.io-client` `io(origin,{path:"/ws", transports:["websocket","polling"], reconnection 10×3s})`, `on("connect")` re-subscribe, `on("price_update")` → `setPrices`, `on("market_status"/"welcome"/"pong")`, `on("disconnect")`. `subscribe` → `socket.emit("subscribe",{tickers})`. |
+| **Hook `useMarketData`** | `src/hooks/useMarketData.ts:1` ~130 lines | Wrapper over `useSharedWs()` (was `useWebSocket`), same fallback HTTP `POST /api/price-batch` 5s after 2s if not connected. |
+| **Consumers** | `/`, `LiveIhsgChip` (now `useSharedWs`), `portfolio-dashboard`, `analytics`, `analysis/[ticker]`, `TickerTape`, `LivePrice`, `AlertChecker` | Single shared socket per tab via `WsProvider` (was dual). |
 
-**Flow:**
+**Flow (Socket.IO):**
 
 ```
-Browser useMarketData(["BBCA.JK","^JKSE"])
-  → useWebSocket subscribe → ws.send {"type":"subscribe","tickers":[...]}
-  → ws-server handleMessage → SubscriptionManager.subscribe(clientId, tickers)
-  → PricePublisher 3s → getAllSubscribedTickers() → price-fetcher yahoo quote → broadcast()
-  → client onmessage price_update → setPrices → LivePrice re-render (useCountUp)
-Fallback: ws not connected 2s → POST /api/price-batch polling 5s
-Heartbeat: server ping 30s → pong → updateHeartbeat; cleanup stale 60s
+Browser useMarketData(["BBCA.JK","^JKSE"]) → useSharedWs() → socket.emit("subscribe",{tickers})
+  → ws-server io.on("subscribe") → manager.subscribe + socket.join(room)
+  → PricePublisher 3s/30s → io.to(ticker).emit("price_update",{data})
+  → client on("price_update") → setPrices → LivePrice
+Fallback: !connected 2s → POST /api/price-batch 5s
 ```
 
 ---
@@ -391,20 +396,21 @@ Heartbeat: server ping 30s → pong → updateHeartbeat; cleanup stale 60s
 
 ---
 
-## 8. Tech Debt & Recommendations
+## 8. Tech Debt & Recommendations (updated after Sprint 1-5)
 
-| Priority | Debt | Impact | Recommendation |
+| Priority | Debt | Status | Recommendation |
 |----------|------|--------|----------------|
-| P0 | Dead sidebar `Agregat` → `redirect('/')` | User deception | Remove menu or build UI using existing `GET /api/portfolios/aggregate` |
-| P0 | Orphan `/analysis/[ticker]` no direct menu, discoverability low | New user lost | Add `Riset → Analisis Saham` search landing at `/stocks` listing |
-| P1 | 16 empty API scaffolds (404) | Blueprint confusion | Delete dirs or implement stubs with 501 |
-| P1 | Dual WS per tab (page + sidebar chip) | 2× connections waste | Unify to single `WsProvider` context |
-| P1 | WS server `hostname="localhost"` + no `0.0.0.0` | Deploy fails on Vercel serverless (needs long-running Node) | Use VPS/Fly/Railway with `HOST=0.0.0.0`, `npm start` (`tsx server.ts`), Nginx Upgrade headers; or fallback fully to polling |
-| P2 | Publisher 3s even market closed (should 10s) | Yahoo quota waste | Pause/throttle when `session===closed` |
-| P2 | `MENU_GROUPS` hard-coded | New route requires edit `app-sidebar.tsx` + `page.tsx` | Auto-discover via `src/app` filesystem or CMS |
-| P2 | Naming mismatch `/analytics` vs sidebar `Performa` → header `Portfolio Analytics` | Confusing | Rename route to `/performa` or sidebar to `Analytics` |
-| P3 | Dashboard layout passthrough `return children` | Useless file | Remove `src/app/dashboard/layout.tsx` |
-| P3 | No WS auth, no rate-limit per client | Abuse | Add `clientId` signed + ticker allowlist, heartbeat cleanup already 60s |
+| P0 | Dead sidebar `Agregat` | **FIXED** `agregat` hidden via `status:dead` in `navigation.ts` | Keep hidden, route stays for compat |
+| P0 | Orphan `/analysis/[ticker]` | **FIXED** via `CommandPalette` global search (959 stocks) + `Breadcrumb` `Pasar › Analisis › BBCA` | — |
+| P1 | 16 empty API scaffolds | **FIXED** → 12 stubs `501 Not Implemented` + 4 parents kept | — |
+| P1 | Dual WS per tab | **FIXED** `WsProvider` in `layout.tsx` + `useSharedWs()` (`LiveIhsgChip` + `useMarketData` share 1 socket) | — |
+| P1 | WS `localhost` | **FIXED** `server.js` `HOST 0.0.0.0` + `PORT||port` + `server.ts` cPanel-ready, fallback polling if WS init fails | — |
+| P2 | Publisher 3s even closed | **FIXED** dynamic `3s→30s` when `session===closed` (`price-publisher.ts`) | — |
+| P2 | `MENU_GROUPS` hard-coded | **FIXED** → `src/config/navigation.ts` + `src/config/locale.tsx` EN/ID | — |
+| P2 | Naming mismatch `/analytics` | **FIXED** bilingual `Performa Portofolio / Portfolio Analytics` via `useLocale` | — |
+| P2 | Chart hardcode `#10b981` | **FIXED** → `var(--chart-1/2)` tokens | — |
+| P3 | Dashboard layout passthrough | **TODO** still `return children` | Remove |
+| P3 | No WS auth | TODO | Sign clientId + allowlist |
 
 ---
 
@@ -413,44 +419,56 @@ Heartbeat: server ping 30s → pong → updateHeartbeat; cleanup stale 60s
 ### 9.1 Page Manifest
 
 ```
-src/app/layout.tsx                RootLayout (SidebarProvider, SiteHeader, QueryProvider, ThemeInit)
-src/app/page.tsx                  / — Ringkasan Pasar
-src/app/screener/page.tsx         /screener
-src/app/backtest/page.tsx         /backtest
+src/app/layout.tsx                RootLayout (SidebarProvider, SiteHeader, QueryProvider, ThemeInit, LocaleProvider, WsProvider)
+src/app/page.tsx                  / — Ringkasan Pasar (+ NewsCarousel)
+src/app/screener/page.tsx         /screener (+ error/loading, mobile cards)
+src/app/backtest/page.tsx         /backtest (+ error/loading, reordered Banding first)
 src/app/compare/page.tsx          /compare
-src/app/corporate-actions/page.tsx /corporate-actions
-src/app/portfolio-dashboard/page.tsx /portfolio-dashboard
-src/app/analytics/page.tsx        /analytics (Performa)
-src/app/history/page.tsx          /history (Transaksi)
-src/app/fundamentals/page.tsx     /fundamentals
-src/app/stocks/dividends/page.tsx /stocks/dividends
-src/app/stocks/sharia/page.tsx    /stocks/sharia
-src/app/stocks/prospectus/page.tsx /stocks/prospectus
-src/app/analysis/[ticker]/page.tsx /analysis/[ticker] (+ opengraph-image.tsx)
-src/app/aggregate/page.tsx        /aggregate  REDIRECT
-src/app/dashboard/page.tsx        /dashboard  REDIRECT (+ layout.tsx passthrough)
+src/app/corporate-actions/page.tsx /corporate-actions (+ error/loading)
+src/app/portfolio-dashboard/page.tsx /portfolio-dashboard (+ StressTestCard, RebalancingAdvisor, tax card)
+src/app/analytics/page.tsx        /analytics (Performa) bilingual, var(--chart-*) (+ error/loading)
+src/app/history/page.tsx          /history (+ Tax 0.1% card + Journal note)
+src/app/fundamentals/page.tsx     /fundamentals (+ sticky mini-nav, source badges)
+src/app/stocks/dividends/page.tsx /stocks/dividends (+ error/loading)
+src/app/stocks/sharia/page.tsx    /stocks/sharia (+ error/loading)
+src/app/stocks/prospectus/page.tsx /stocks/prospectus (+ error/loading)
+src/app/analysis/[ticker]/page.tsx /analysis/[ticker] (+ Breadcrumb, 8-tab PageTabs, opengraph-image)
+src/app/aggregate/page.tsx        /aggregate  REDIRECT (hidden)
+src/app/dashboard/page.tsx        /dashboard  REDIRECT (+ layout.tsx passthrough — TODO remove)
 src/app/portfolio/page.tsx        /portfolio  REDIRECT
 src/app/stocks/page.tsx           /stocks     REDIRECT
 src/app/stock-analysis/page.tsx   /stock-analysis REDIRECT
 src/app/error.tsx                 Global error boundary
 src/app/analysis/error.tsx        Analysis error boundary
 src/app/portfolio-dashboard/error.tsx Dashboard error
++ 10 new error.tsx/loading.tsx (screener, backtest, compare, corporate-actions, analytics, history, fundamentals, stocks/*)
 ```
 
 ### 9.2 Key Components & Libs
 
 ```
-src/components/app-sidebar.tsx    Sidebar + IHSG live chip + Watchlist + Portofolio Saya
-src/lib/quant.ts                  EMA/SMA/RSI/rollingStd/macd/dailyReturns/beta/maxDrawdown/monthlyMatrix/nextEntryLevel/grahamNumber/runBacktest (8 strategies)
-src/lib/backtestService.ts        fetchBars (yahoo chart .JK), scoreStrategy, rankStrategies
-src/lib/positionCalc.ts           Position + lot calc, avg down/up
-src/lib/patternDetection.ts       Double Top/Head&Shoulders/Triple/drawings
-src/lib/analysis-utils.ts         analyzeCandlesticks
-src/hooks/useMarketData.ts        WS wrapper + HTTP fallback
-src/hooks/useWebSocket.ts         WS client
-src/server/ws-server.ts           WS server + heartbeat 30s
-src/server/price-publisher.ts     3s publisher
-src/server/subscription-manager.ts Sub man
+src/config/navigation.ts          Central bilingual nav (active/dead, 4 groups)
+src/config/locale.tsx             LocaleProvider EN/ID (localStorage porto-lang)
+src/components/app-sidebar.tsx    Sidebar + IHSG mini chip + Watchlist/Portofolio empty CTA + lang toggle
+src/components/PageTabs.tsx       Reusable sticky tabs (Sprint 2) — wired to 4 pages
+src/components/StatCard.tsx       Unified stat tile
+src/components/Breadcrumb.tsx     Breadcrumb Pasar › Analisis › BBCA
+src/components/NewsCarousel.tsx   Auto carousel 4.5s, Serper+Firecrawl+mimo-v2.5, impact bullish/bearish
+src/components/WsProvider.tsx     Single Socket.IO provider (unifies dual WS)
+src/components/StressTestCard.tsx Beta slider -5/-10/-20% (portfolio stress)
+src/components/RebalancingAdvisor.tsx Diff target vs actual → lot advice
+src/components/AiLoadingState.tsx (planned) SSE step 1/3 for AI
+src/lib/quant.ts                  8 strategies + indicators
+src/lib/backtestService.ts        fetchBars, scoreStrategy, rankStrategies
+src/lib/positionCalc.ts           Position + lot calc
+src/lib/patternDetection.ts       Chart patterns
+src/hooks/useMarketData.ts        Via useSharedWs + HTTP fallback
+src/hooks/useWebSocket.ts         Socket.IO client (socket.io-client)
+src/hooks/useWatchlist.ts         With tag/group support
+src/server/ws-server.ts           Socket.IO server (path /ws, ping 25s)
+src/server/price-publisher.ts     Dynamic 3s/30s throttle
+src/server/subscription-manager.ts Room per ticker (Socket.IO)
+src/server.js                     cPanel-ready 0.0.0.0 + PORT + WS graceful fallback
 ```
 
 ### 9.3 WS & API Summary Counts
