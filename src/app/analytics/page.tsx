@@ -16,7 +16,7 @@ import {
     ReferenceLine, Line, LineChart
 } from "recharts";
 
-const COLORS = ['#c8300a', '#4ade80', '#0ea5e9', '#a855f7', '#f59e0b', '#ef4444', '#10b981', '#6366f1'];
+const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)'];
 
 export default function AnalyticsPage() {
     const { portfolio, isLoaded } = usePortfolio();
@@ -291,8 +291,8 @@ export default function AnalyticsPage() {
                                     labelFormatter={(label) => `Tanggal ${label}`}
                                 />
                                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="4 4" />
-                                <Line type="monotone" dataKey="portfolio" stroke="#10b981" strokeWidth={1.8} dot={false} name="portfolio" />
-                                <Line type="monotone" dataKey="ihsg" stroke="#a855f7" strokeWidth={1.8} dot={false} name="ihsg" />
+                                <Line type="monotone" dataKey="portfolio" stroke="var(--chart-1)" strokeWidth={1.8} dot={false} name="portfolio" />
+                                <Line type="monotone" dataKey="ihsg" stroke="var(--chart-2)" strokeWidth={1.8} dot={false} name="ihsg" />
                             </LineChart>
                         </ResponsiveContainer>
                         )}
