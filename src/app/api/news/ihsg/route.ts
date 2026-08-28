@@ -207,29 +207,30 @@ Jawab HANYA JSON array.`;
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbolsParam = searchParams.get('symbols') || 'IHSG';
-    const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 5);
-    const cacheKey = `ihsg:v8:${symbols.join(',')}`;
+    const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 10);
+    const clearCache = searchParams.get('clear') === '1' || searchParams.get('nocache') === '1';
+    const cacheKey = `ihsg:v9:${symbols.slice(0,6).join(',')}`;
+
+    if (clearCache) cache.clear();
 
         const hit = cache.get(cacheKey);
-    if (hit && Date.now() - hit.ts < TTL) {
-        // invaldasi cache lama yang berisi <a href...>
-        const hasBad = hit.data?.data?.some((d: any) => String(d.summary || '').includes('<a href'));
+    if (!clearCache && hit && Date.now() - hit.ts < TTL) {
+        // invaldasi cache lama yang berisi <a href...> atau summary == title
+        const hasBad = hit.data?.data?.some((d: any) => String(d.summary || '').includes('<a href') || String(d.summary || '').toLowerCase() === String(d.title || '').toLowerCase());
         if (!hasBad) return NextResponse.json({ ...hit.data, cached: true });
     }
 
     try {
         let rawNews: { title: string; link: string; snippet: string; source?: string; publishTime?: number }[] = [];
 
-        // 1. Serper — hemat 1 call, query luas: IHSG + geopolitik + emas + moneter
+        // 1. Serper — hemat 2 calls max, query luas: IHSG + semua ticker trending + geopolitik/emas/moneter
         if (SERPER_KEY) {
             try {
-                const extra = symbols.filter(s => s !== 'IHSG').slice(0, 2).join(' ');
-                // Query luas mencakup faktor penggerak IHSG
+                const tickersForQuery = symbols.filter(s => !['IHSG','JKSE','IDX','EMAS','GEOPOLITIK','FED'].includes(s)).slice(0, 6).join(' ');
                 const queries = [
-                    `IHSG IDX Bursa Efek Indonesia ${extra} saham`,
+                    `IHSG IDX Bursa Efek Indonesia ${tickersForQuery} saham`,
                     `geopolitik harga emas Fed suku bunga rupiah minyak global pasar saham`,
                 ];
-                // Hemat: 1 query utama + 1 query makro hanya jika masih kurang — batch 2 max, cache 30 menit
                 const first = await serperSearch(queries[0]);
                 rawNews = first.map(r => ({ title: r.title, link: r.link, snippet: r.snippet, source: r.source, publishTime: Date.now() }));
                 if (rawNews.length < 6) {
@@ -240,12 +241,13 @@ export async function GET(request: Request) {
             } catch {}
         }
 
-        // 2. Fallback RSS lokal (gratis) + topik makro via Google News RSS
+        // 2. Fallback RSS lokal (gratis) — untuk semua ticker yang ada berita
         if (rawNews.length < 8) {
             try {
-                const rssSymbols = [...symbols.slice(0, 2), 'GEOPOLITIK', 'EMAS', 'FED'];
+                // Ambil berita untuk setiap ticker yang punya news (max 6 ticker, hemat)
+                const rssSymbols = [...new Set([...symbols.slice(0, 5), 'GEOPOLITIK', 'EMAS'] )];
                 const fallback = await Promise.all(
-                    rssSymbols.slice(0, 4).map(s => getStockNews(s).catch(() => []))
+                    rssSymbols.slice(0, 6).map(s => getStockNews(s).catch(() => []))
                 );
                 const flat = fallback.flat().map(n => ({
                     title: n.title,

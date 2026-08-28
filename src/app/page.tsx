@@ -417,8 +417,8 @@ export default function MarketPage() {
 
             {activeTab === "overview" && (
                 <div className="space-y-6">
-                    {/* News Carousel — IHSG & emiten terkait (auto) */}
-                    <NewsCarousel symbols={["IHSG", "JKSE", "IDX", ...(tapeTickers.slice(0, 3).map(t => t.replace(".JK","")) )]} />
+                    {/* News Carousel — IHSG, geopolitik/emas + semua ticker trending (auto) */}
+                    <NewsCarousel symbols={["IHSG", "EMAS", "GEOPOLITIK", "FED", ...tapeTickers.slice(0, 4).map(t => t.replace(".JK","")), ...mostActive.byValue.slice(0, 4).map((s:any) => (s.ticker || s.code || "").replace(".JK","")), ...gainers.slice(0, 2).map((g:any) => g.KODE_SAHAM)]} />
 
                     {/* Ticker Tape live */}
                     {tapeTickers.length > 0 && <TickerTape tickers={tapeTickers} prices={livePrices} />}
