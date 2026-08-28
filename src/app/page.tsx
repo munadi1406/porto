@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Clock, Search, BarChart3, PieChart, Zap, DollarSign, Layers } from "lucide-react";
+import { StatCard } from "@/components/StatCard";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import TickerTape from "@/components/TickerTape";
@@ -370,28 +371,24 @@ export default function MarketPage() {
                             const realNet: number | null = officialFF?.netValue ?? null;
                             const partVal: number | null = officialFF?.participationValue ?? null;
 
-                            const tiles: { label: string; value: string | number; cls: string; sub?: string }[] = [
-                                { label: "Naik", value: breadth.advancing, cls: "text-success" },
-                                { label: "Turun", value: breadth.declining, cls: "text-destructive" },
-                                { label: "Tetap", value: breadth.unchanged, cls: "text-muted-foreground" },
+                            const tiles: { label: string; value: string; tone: "success"|"danger"|"neutral"; icon: any; delta?: string }[] = [
+                                { label: "Naik", value: String(breadth.advancing), tone: "success", icon: TrendingUp },
+                                { label: "Turun", value: String(breadth.declining), tone: "danger", icon: TrendingDown },
+                                { label: "Tetap", value: String(breadth.unchanged), tone: "neutral", icon: Layers },
                             ];
                             if (realNet != null) {
-                                tiles.push({ label: "Net Foreign", value: `${realNet >= 0 ? "+" : ""}${formatCompactIDR(realNet)}`, cls: realNet >= 0 ? "text-success" : "text-destructive", sub: "Resmi IDX" });
+                                tiles.push({ label: "Net Foreign", value: `${realNet >= 0 ? "+" : ""}${formatCompactIDR(realNet)}`, tone: realNet >= 0 ? "success" : "danger", icon: DollarSign, delta: "Resmi IDX" });
                             } else if (partVal != null) {
-                                tiles.push({ label: "Foreign Value", value: formatCompactIDR(partVal), cls: "text-primary", sub: "IDX bulanan" });
+                                tiles.push({ label: "Foreign Value", value: formatCompactIDR(partVal), tone: "neutral", icon: DollarSign, delta: "IDX bulanan" });
                             } else if (proxyNet != null) {
-                                tiles.push({ label: "Net Foreign", value: `${proxyNet >= 0 ? "+" : ""}${formatCompactIDR(proxyNet)}`, cls: proxyNet >= 0 ? "text-success" : "text-destructive", sub: "≈ proxy" });
+                                tiles.push({ label: "Net Foreign", value: `${proxyNet >= 0 ? "+" : ""}${formatCompactIDR(proxyNet)}`, tone: proxyNet >= 0 ? "success" : "danger", icon: DollarSign, delta: "≈ proxy" });
                             } else {
-                                tiles.push({ label: "Net Foreign", value: "—", cls: "text-muted-foreground" });
+                                tiles.push({ label: "Net Foreign", value: "—", tone: "neutral", icon: DollarSign });
                             }
-                            tiles.push({ label: "Saham", value: totalStocks, cls: "text-foreground" });
+                            tiles.push({ label: "Saham", value: String(totalStocks), tone: "neutral", icon: BarChart3 });
 
                             return tiles.map(s => (
-                                <div key={s.label} className="rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-center backdrop-blur-sm">
-                                    <p className={cn("text-lg font-black tabular-nums leading-none", s.cls)}>{s.value}</p>
-                                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">{s.label}</p>
-                                    {s.sub && <p className="text-[8px] text-muted-foreground/70 leading-none">{s.sub}</p>}
-                                </div>
+                                <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={s.icon} delta={s.delta} />
                             ));
                         })()}
                     </div>
@@ -491,7 +488,8 @@ export default function MarketPage() {
                             className="w-full px-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                     </div>
-                    <div className="card-flush">
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block card-flush">
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                                 <thead>
@@ -532,6 +530,35 @@ export default function MarketPage() {
                             </p>
                         </div>
                     </div>
+                    {/* Mobile Cards */}
+                    <div className="grid grid-cols-1 sm:hidden gap-3">
+                        {(() => {
+                            const q = search.toLowerCase();
+                            const filtered = q ? allStocks.filter((s: any) => s.code?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q)) : allStocks;
+                            return filtered.slice(0, 100).map((s: any) => (
+                                <div key={s.code} onClick={() => router.push(`/analysis/${s.code}.JK`)} className="bg-card border border-border rounded-xl p-4 space-y-2 cursor-pointer hover:bg-muted/30 transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-mono font-bold text-sm text-foreground">{s.code}</span>
+                                        <span className={cn("text-xs font-bold", (s.changePercent || 0) >= 0 ? "text-success" : "text-destructive")}>{formatPercentage(s.changePercent)}</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate">{s.name}</p>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Price</span>
+                                        <span className="font-mono font-bold text-foreground">{s.price?.toLocaleString("id-ID")}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Volume</span>
+                                        <span className="font-mono text-muted-foreground">{formatCompactIDR(s.volume || 0).replace("Rp", "")}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Value</span>
+                                        <span className="font-mono text-muted-foreground">{formatCompactIDR(s.value || 0)}</span>
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                    <p className="sm:hidden text-[10px] text-muted-foreground text-center">Menampilkan {search ? "hasil pencarian" : "100 dari"} {allStocks.length} saham IDX</p>
                 </div>
             )}
 

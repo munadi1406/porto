@@ -1,14 +1,23 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Transaction } from "@/lib/types";
 import { formatIDR, cn } from "@/lib/utils";
-import { ShoppingCart, TrendingUp, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ShoppingCart, TrendingUp, Clock, ArrowUpRight, ArrowDownRight, StickyNote } from "lucide-react";
 
 interface TransactionHistoryProps {
     transactions: Transaction[];
 }
 
 export function TransactionHistory({ transactions }: TransactionHistoryProps) {
+    const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("porto_journal_notes");
+            if (raw) setLocalNotes(JSON.parse(raw));
+        } catch {}
+    }, [transactions]);
+
     if (transactions.length === 0) {
         return (
             <div className="bg-card p-6 rounded-xl shadow-sm border border-border">
@@ -103,10 +112,10 @@ export function TransactionHistory({ transactions }: TransactionHistoryProps) {
                                     <div className="text-base font-bold text-foreground">
                                         Total: {formatIDR(tx.totalAmount)}
                                     </div>
-                                    {tx.notes && (
+                                    {(tx.notes || localNotes[tx.id]) && (
                                         <div className="text-xs text-muted-foreground italic mt-1 flex items-center gap-1">
-                                            <span className="w-1 h-1 bg-muted-foreground/30 rounded-full"></span>
-                                            {tx.notes}
+                                            <StickyNote className="w-3 h-3 shrink-0" />
+                                            {tx.notes || localNotes[tx.id]}
                                         </div>
                                     )}
                                 </div>

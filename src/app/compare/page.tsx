@@ -181,12 +181,12 @@ export default function ComparePage() {
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         placeholder="Kode saham, mis. BBRI"
-                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2 min-h-[44px] text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                     <button
                         type="submit"
                         disabled={loading || stocks.length >= MAX_STOCKS}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-4 py-2 min-h-[44px] text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                         Tambah

@@ -10,6 +10,8 @@ import {
     TrendingUp, TrendingDown, Activity, Target,
     BarChart3, ArrowUpRight, ArrowDownRight, Info
 } from "lucide-react";
+import { StatCard } from "@/components/StatCard";
+import { StressTestCard } from "@/components/StressTestCard";
 import {
     AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip,
     BarChart, Bar, CartesianGrid,
@@ -229,15 +231,18 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
 
-                {/* KPI Cards */}
+                {/* KPI Cards — StatCard */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <KPICard label="Total Value" value={`Rp ${(metrics.totalValue / 1000000).toFixed(2)}M`} sub="IDR" color="primary" />
-                    <KPICard label="Beta" value={riskMetrics.beta.toFixed(2)} sub="vs IHSG" color={riskMetrics.beta > 1 ? "warning" : "success"} />
-                    <KPICard label="Correlation" value={`${(riskMetrics.correlation * 100).toFixed(0)}%`} sub="with IHSG" color="default" />
-                    <KPICard label="Volatility" value={`${riskMetrics.volatility.toFixed(1)}%`} sub="annualized" color={riskMetrics.volatility > 20 ? "destructive" : "success"} />
-                    <KPICard label="Sharpe" value={metrics.sharpe.toFixed(2)} sub="ratio" color={metrics.sharpe > 1 ? "success" : "warning"} />
-                    <KPICard label="Max DD" value={`${metrics.maxDrawdown.toFixed(1)}%`} sub="drawdown" color="destructive" />
+                    <StatCard label="Total Value" value={`Rp ${(metrics.totalValue / 1000000).toFixed(2)}M`} delta="IDR" tone="neutral" icon={BarChart3} />
+                    <StatCard label="Beta" value={riskMetrics.beta.toFixed(2)} delta="vs IHSG" tone={riskMetrics.beta > 1 ? "neutral" : "success"} icon={Activity} />
+                    <StatCard label="Correlation" value={`${(riskMetrics.correlation * 100).toFixed(0)}%`} delta="with IHSG" tone="neutral" icon={Target} />
+                    <StatCard label="Volatility" value={`${riskMetrics.volatility.toFixed(1)}%`} delta="annualized" tone={riskMetrics.volatility > 20 ? "danger" : "success"} icon={Activity} />
+                    <StatCard label="Sharpe" value={metrics.sharpe.toFixed(2)} delta="ratio" tone={metrics.sharpe > 1 ? "success" : "neutral"} icon={TrendingUp} />
+                    <StatCard label="Max DD" value={`${metrics.maxDrawdown.toFixed(1)}%`} delta="drawdown" tone="danger" icon={TrendingDown} />
                 </div>
+
+                {/* 11.B6 Portfolio Stress Test – pure client calc, slider IHSG -5/-10/-20, loss = beta * shock * totalValue */}
+                <StressTestCard beta={riskMetrics.beta} totalValue={metrics.totalValue} />
 
                 {/* Performance Chart - dark style like reference */}
                 <div className="rounded-xl overflow-hidden border shadow-lg bg-[#0a0a0a] border-neutral-800">
@@ -437,27 +442,4 @@ export default function AnalyticsPage() {
     );
 }
 
-function KPICard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
-    const colorMap: Record<string, string> = {
-        primary: 'from-primary/10 to-primary/5 border-primary/20',
-        success: 'from-success/10 to-success/5 border-success/20',
-        warning: 'from-warning/10 to-warning/5 border-warning/20',
-        destructive: 'from-destructive/10 to-destructive/5 border-destructive/20',
-        default: 'from-muted/10 to-muted/5 border-muted/20',
-    };
-    const textColor: Record<string, string> = {
-        primary: 'text-primary',
-        success: 'text-success',
-        warning: 'text-warning',
-        destructive: 'text-destructive',
-        default: 'text-foreground',
-    };
 
-    return (
-        <div className={cn("card p-3 bg-gradient-to-br border", colorMap[color] || colorMap.default)}>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className={cn("text-lg font-black mt-1", textColor[color] || textColor.default)}>{value}</p>
-            <p className="text-[9px] text-muted-foreground">{sub}</p>
-        </div>
-    );
-}

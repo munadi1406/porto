@@ -8,9 +8,11 @@ import { formatIDR, cn, formatCompactIDR } from "@/lib/utils";
 import { ArrowLeft, Search, Loader2, ShieldCheck, Building2, Users, Briefcase, TrendingUp, TrendingDown, Share2, Link2, Star, Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PageTabs } from "@/components/PageTabs";
 import { useFundamentals } from "@/hooks/useFundamentals";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { AlertsPopover } from "@/components/AlertsPopover";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { useCompanyDetail, useFinancialStatement } from "@/hooks/useIdxExtended";
 import TechnicalSignals from "@/components/TechnicalSignals";
 import StockStatistics from "@/components/StockStatistics";
@@ -123,12 +125,14 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
 
     return (
         <div className="space-y-4">
-            {/* Breadcrumb */}
-            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Link href="/" className="hover:text-foreground transition-colors">Market</Link>
-                <span>/</span>
-                <span className="text-foreground font-medium">{ticker.replace(".JK", "")}</span>
-            </nav>
+            {/* Breadcrumb — Pasar › Analisis Saham › {ticker} */}
+            <Breadcrumb
+                items={[
+                    { label: "Pasar", href: "/" },
+                    { label: "Analisis Saham", href: "/screener" },
+                    { label: ticker.replace(".JK", "") },
+                ]}
+            />
 
             {/* Metadata untuk SEO & share (React 19) */}
             <title>{ticker.replace(".JK", "")} — Analisis Saham | Porto</title>
@@ -269,25 +273,8 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                     )}
                 </div>
 
-                {/* Tabs */}
-                <div className="border-b border-border">
-                    <div className="flex gap-0 overflow-x-auto scrollbar-hide">
-                        {TABS.map((tab) => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
-                                className={cn(
-                                    "px-4 py-2.5 text-xs font-bold whitespace-nowrap border-b-2 transition-colors",
-                                    activeTab === tab.key
-                                        ? "border-foreground text-foreground"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* Tabs — PageTabs */}
+                <PageTabs tabs={TABS.map(t => ({ id: t.key, label: t.label }))} active={activeTab} onChange={(id) => setActiveTab(id as Tab)} />
 
                 {/* Overview tab */}
                 {activeTab === "overview" && (

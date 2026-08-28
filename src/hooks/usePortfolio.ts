@@ -58,6 +58,7 @@ async function executeTransactionAPI(data: {
     name: string;
     lots: number;
     pricePerShare: number;
+    notes?: string;
 }) {
     const response = await fetch('/api/transactions', {
         method: 'POST',
@@ -153,7 +154,8 @@ export function usePortfolio() {
         id: string,
         type: 'buy' | 'sell',
         lots: number,
-        price: number
+        price: number,
+        notes?: string
     ) => {
         const item = portfolio.find(p => p.id === id);
         if (!item || !selectedPortfolioId) return;
@@ -166,6 +168,7 @@ export function usePortfolio() {
             name: item.name,
             lots,
             pricePerShare: price,
+            notes,
         });
     };
 

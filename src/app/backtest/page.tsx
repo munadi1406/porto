@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { FlaskConical, Loader2, Search, Target, Trophy, BarChart3, Bot, Calculator, LayoutGrid, TrendingUp, AlertCircle } from "lucide-react";
+import { FlaskConical, Loader2, Search, Target, Trophy, BarChart3, Bot, Calculator, LayoutGrid, TrendingUp, AlertCircle, HelpCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
 import { STRATEGIES, type StrategyId } from "@/lib/quant";
 import { PositionCalculator } from "@/components/PositionCalculator";
 import { BacktestAiSummary } from "@/components/BacktestAiSummary";
+import { PageTabs } from "@/components/PageTabs";
+import { StatCard } from "@/components/StatCard";
 
 interface BtTrade {
     entryDate: string;
@@ -49,6 +51,18 @@ interface BtResponse {
         sharpeRatio: number;
         profitFactor: number | null;
     };
+}
+
+function InfoTip({ text }: { text: string }) {
+    return (
+        <span
+            title={text}
+            aria-label={text}
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-border bg-muted text-muted-foreground hover:text-foreground hover:border-primary/40 cursor-help shrink-0"
+        >
+            <HelpCircle className="w-3 h-3" />
+        </span>
+    );
 }
 
 const YEARS = [1, 2, 3, 5];
@@ -153,16 +167,19 @@ export default function BacktestPage() {
                                 value={ticker}
                                 onChange={e => setTicker(e.target.value)}
                                 placeholder="BBCA"
-                                className="w-full bg-background border border-border rounded-lg pl-8 pr-3 py-2 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                className="w-full bg-background border border-border rounded-lg pl-8 pr-3 py-2 min-h-[44px] text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
                             />
                         </div>
                     </div>
                     <div className="flex-1">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Strategi</label>
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground inline-flex items-center gap-1">
+                            Strategi <InfoTip text={STRATEGIES.find(s=>s.id===strategy)?.description || "Pilih strategi untuk backtest. Tiap strategi punya aturan entry/exit berbeda."} />
+                        </label>
                         <select
                             value={strategy}
+                            title={STRATEGIES.find(s=>s.id===strategy)?.description}
                             onChange={e => setStrategy(e.target.value as StrategyId)}
-                            className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 min-h-[44px] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
                         >
                             {STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                         </select>
@@ -172,7 +189,7 @@ export default function BacktestPage() {
                         <select
                             value={years}
                             onChange={e => setYears(Number(e.target.value))}
-                            className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-2 min-h-[44px] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40"
                         >
                             {YEARS.map(y => <option key={y} value={y}>{y} tahun</option>)}
                         </select>
@@ -180,7 +197,7 @@ export default function BacktestPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-5 py-2 text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                        className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-5 py-2 min-h-[44px] text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
                         Jalankan
@@ -204,27 +221,9 @@ export default function BacktestPage() {
                 </div>
             )}
 
-            {/* Tabs */}
+            {/* Tabs — PageTabs wired */}
             <div className="card p-0 overflow-hidden">
-                <div className="flex items-center border-b border-border bg-muted/10">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            disabled={!result && tab.id !== "ranking"}
-                            className={cn(
-                                "inline-flex items-center gap-1.5 px-5 py-3 text-xs font-bold border-b-2 -mb-px transition-colors",
-                                activeTab === tab.id
-                                    ? "border-primary text-primary bg-background"
-                                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30",
-                                !result && tab.id !== "ranking" && "opacity-40 cursor-not-allowed hover:text-muted-foreground hover:bg-transparent"
-                            )}
-                        >
-                            <tab.icon className="w-3.5 h-3.5" />
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+                <PageTabs tabs={tabs} active={activeTab} onChange={(id) => setActiveTab(id as typeof activeTab)} />
 
                 {/* Tab Content */}
                 <div className="p-4 min-h-[400px]">
@@ -488,37 +487,37 @@ function BacktestResultView({ result }: { result: BtResponse }) {
                 </div>
             )}
 
-            {/* Main stats */}
+            {/* Main stats — StatCard */}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
                 <StatCard
                     label="Return"
                     value={`${result.stats.totalReturnPct >= 0 ? "+" : ""}${result.stats.totalReturnPct.toFixed(1)}%`}
-                    color={result.stats.totalReturnPct >= 0 ? "success" : "destructive"}
+                    tone={result.stats.totalReturnPct >= 0 ? "success" : "danger"}
                 />
                 <StatCard
                     label="vs B&H"
                     value={`${returnVsBH >= 0 ? "+" : ""}${returnVsBH.toFixed(1)}%`}
-                    color={returnVsBH >= 0 ? "success" : "destructive"}
+                    tone={returnVsBH >= 0 ? "success" : "danger"}
                 />
                 <StatCard
                     label="CAGR"
                     value={`${result.stats.annualizedReturnPct >= 0 ? "+" : ""}${result.stats.annualizedReturnPct.toFixed(1)}%`}
-                    color={result.stats.annualizedReturnPct >= 0 ? "success" : "destructive"}
+                    tone={result.stats.annualizedReturnPct >= 0 ? "success" : "danger"}
                 />
                 <StatCard
                     label="Win Rate"
                     value={`${result.stats.winRatePct.toFixed(0)}%`}
-                    color={result.stats.winRatePct >= 50 ? "success" : result.stats.winRatePct >= 40 ? "warning" : "destructive"}
+                    tone={result.stats.winRatePct >= 50 ? "success" : result.stats.winRatePct >= 40 ? "neutral" : "danger"}
                 />
                 <StatCard
                     label="Max DD"
                     value={`${result.stats.maxDrawdownPct.toFixed(1)}%`}
-                    color="destructive"
+                    tone="danger"
                 />
                 <StatCard
                     label="Trades"
                     value={String(result.stats.tradeCount)}
-                    color="default"
+                    tone="neutral"
                 />
             </div>
 
@@ -559,22 +558,6 @@ function BacktestResultView({ result }: { result: BtResponse }) {
             <p className="text-[9px] text-muted-foreground/60 px-1">
                 Asumsi: eksekusi next-day · biaya beli {result.assumptions.feeBuyPct.toFixed(2)}% &amp; jual {result.assumptions.feeSellPct.toFixed(2)}% · B&amp;H bruto.
             </p>
-        </div>
-    );
-}
-
-function StatCard({ label, value, color }: { label: string; value: string; color: "success" | "destructive" | "warning" | "default" }) {
-    const colorClass = {
-        success: "text-success",
-        destructive: "text-destructive",
-        warning: "text-warning",
-        default: "text-foreground",
-    }[color];
-
-    return (
-        <div className="card p-2.5 text-center">
-            <p className="text-[9px] font-bold text-muted-foreground uppercase">{label}</p>
-            <p className={cn("text-sm font-black tabular-nums", colorClass)}>{value}</p>
         </div>
     );
 }

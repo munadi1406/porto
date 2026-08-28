@@ -12,8 +12,11 @@ import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatma
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { StockForm } from "@/components/StockForm";
 import { TargetPortfolio } from "@/components/TargetPortfolio";
+import { StressTestCard } from "@/components/StressTestCard";
+import { RebalancingAdvisor } from "@/components/RebalancingAdvisor";
 import { formatIDR, formatPercentage, cn } from "@/lib/utils";
 import { DashboardSkeleton, ChartSkeleton } from "@/components/Skeleton";
+import { PageTabs } from "@/components/PageTabs";
 import { ExportPDFButton } from "@/components/ExportPDFButton";
 import { exportToPDF } from "@/lib/exportPDF";
 import {
@@ -44,6 +47,14 @@ export default function PortfolioDashboardPage() {
     const [activeTab, setActiveTab] = useState<TabKey>("overview");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const dashboardRef = useRef<HTMLDivElement>(null);
+    const [riskBeta, setRiskBeta] = useState(1);
+    useEffect(() => {
+        if (!portfolio.length) return;
+        const t = portfolio[0].ticker;
+        fetch(`/api/risk?ticker=${t}&period=1y`).then(r=>r.json()).then(j=>{
+            if(j.success && j.data?.beta) setRiskBeta(Number(j.data.beta)||1);
+        }).catch(()=>{});
+    }, [portfolio]);
 
     const summary = useMemo(() => {
         let totalInvested = 0;
@@ -136,10 +147,21 @@ export default function PortfolioDashboardPage() {
         });
     };
 
-    const handleExecuteTransaction = (id: string, type: "buy" | "sell", lots: number, price: number) => {
+    const handleExecuteTransaction = (id: string, type: "buy" | "sell", lots: number, price: number, note?: string) => {
         const item = portfolio.find((p) => p.id === id);
         if (!item) return;
-        executeTransaction(id, type, lots, price);
+        executeTransaction(id, type, lots, price, note);
+        // non-persistent local fallback if model lacks note: store in localStorage
+        if (note) {
+            try {
+                const KEY = "porto_journal_notes";
+                const raw = localStorage.getItem(KEY);
+                const map = raw ? JSON.parse(raw) : {};
+                // use temp key pending server id; will be merged in history via timestamp fallback
+                map[`${item.ticker}_${Date.now()}`] = note;
+                localStorage.setItem(KEY, JSON.stringify(map));
+            } catch {}
+        }
         recordTransaction({
             portfolioId: currentPortfolio?.id || "",
             type,
@@ -148,7 +170,7 @@ export default function PortfolioDashboardPage() {
             lots,
             pricePerShare: price,
             totalAmount: lots * 100 * price,
-            notes: type === "buy" ? "Buy more" : "Partial sell",
+            notes: note || (type === "buy" ? "Buy more" : "Partial sell"),
         });
     };
 
@@ -274,24 +296,8 @@ export default function PortfolioDashboardPage() {
                 </div>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex gap-1 bg-card border border-border rounded-xl p-1 overflow-x-auto scrollbar-hide">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={cn(
-                            "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
-                            activeTab === tab.key
-                                ? "bg-primary text-primary-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                        )}
-                    >
-                        <tab.icon className="w-3.5 h-3.5" />
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            {/* Tab Navigation — PageTabs */}
+            <PageTabs tabs={tabs.map(t => ({ id: t.key, label: t.label, icon: t.icon }))} active={activeTab} onChange={(id) => setActiveTab(id as TabKey)} />
 
             {/* === OVERVIEW TAB === */}
             {activeTab === "overview" && (
@@ -517,6 +523,9 @@ export default function PortfolioDashboardPage() {
                         </div>
                     </div>
 
+                    {/* 11.B6 Stress Test – slider IHSG -5/-10/-20, loss = beta * shock * totalValue */}
+                    <StressTestCard beta={riskBeta} totalValue={summary.totalMarketValue} />
+
                     {/* Charts */}
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         <div className="card-flush">
@@ -586,6 +595,8 @@ export default function PortfolioDashboardPage() {
                         <p className="text-xs text-muted-foreground">Atur alokasi target untuk setiap saham</p>
                     </div>
                     <TargetPortfolio portfolio={portfolio} prices={prices} cash={cash} />
+                    {/* 11.B4 Rebalancing Advisor – diff target vs actual */}
+                    <RebalancingAdvisor portfolio={portfolio} prices={prices} />
                 </div>
             )}
 

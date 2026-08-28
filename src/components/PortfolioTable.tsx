@@ -36,7 +36,7 @@ interface PortfolioTableProps {
     portfolio: PortfolioItem[];    marketData: Record<string, StockPrice>;
     onRemove: (id: string) => void;
     onUpdate: (id: string, data: Partial<PortfolioItem>) => void;
-    onTransaction: (id: string, type: 'buy' | 'sell', lots: number, price: number) => void;
+    onTransaction: (id: string, type: 'buy' | 'sell', lots: number, price: number, note?: string) => void;
 }
 
 export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTransaction }: PortfolioTableProps) {
@@ -515,8 +515,8 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                         <TransactionForm
                             item={portfolio.find(p => p.id === transactionId)!}
                             currentPrice={marketData[portfolio.find(p => p.id === transactionId)!.ticker]?.price || 0}
-                            onConfirm={(id, type, lots, price) => {
-                                onTransaction(id, type, lots, price);
+                            onConfirm={(id, type, lots, price, note) => {
+                                onTransaction(id, type, lots, price, note);
                                 setTransactionId(null);
                             }}
                             onCancel={() => setTransactionId(null)}

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 interface TransactionFormProps {
     item: PortfolioItem;
     currentPrice: number;
-    onConfirm: (id: string, type: 'buy' | 'sell', lots: number, price: number) => void;
+    onConfirm: (id: string, type: 'buy' | 'sell', lots: number, price: number, note?: string) => void;
     onCancel: () => void;
 }
 
@@ -17,6 +17,7 @@ export function TransactionForm({ item, currentPrice, onConfirm, onCancel }: Tra
     const [type, setType] = useState<'buy' | 'sell'>('buy');
     const [lots, setLots] = useState("");
     const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toString() : item.averagePrice.toString());
+    const [note, setNote] = useState("");
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,7 +25,7 @@ export function TransactionForm({ item, currentPrice, onConfirm, onCancel }: Tra
         const priceNum = Number(price);
         if (!lotsNum || lotsNum <= 0 || !priceNum || priceNum < 0) return;
         if (type === 'sell' && lotsNum > item.lots) { alert("Jual melebihi kepemilikan!"); return; }
-        onConfirm(item.id, type, lotsNum, priceNum);
+        onConfirm(item.id, type, lotsNum, priceNum, note.trim() || undefined);
     };
 
     return (
@@ -47,6 +48,19 @@ export function TransactionForm({ item, currentPrice, onConfirm, onCancel }: Tra
             <div className="space-y-2">
                 <Label>Harga per Lembar</Label>
                 <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Harga" required />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="note">Catatan Trading (opsional)</Label>
+                <textarea
+                    id="note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Alasan transaksi, jurnal trading..."
+                    rows={2}
+                    maxLength={200}
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+                <p className="text-[10px] text-muted-foreground text-right">{note.length}/200</p>
             </div>
             <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>

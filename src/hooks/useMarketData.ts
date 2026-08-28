@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { StockPrice } from "@/lib/types";
-import { useWebSocket } from "./useWebSocket";
+import { useSharedWs } from "@/components/WsProvider";
 
 interface MarketDataMap {
     [ticker: string]: StockPrice;
@@ -17,12 +17,9 @@ export function useMarketData(tickers: string[]) {
     const [useWs, setUseWs] = useState(true);
     const isInitialFetch = useRef(true);
 
-    // WebSocket connection
-    const { connected, prices: wsPrices, subscribe, unsubscribe } = useWebSocket({
-        autoConnect: true,
-        reconnectInterval: 3000,
-        maxReconnectAttempts: 3,
-    });
+    // WebSocket connection — shared via WsProvider when mounted (single socket per tab),
+    // otherwise useSharedWs falls back to an isolated connection (backward compat).
+    const { connected, prices: wsPrices, subscribe, unsubscribe } = useSharedWs();
 
     // Update prices from WebSocket
     useEffect(() => {

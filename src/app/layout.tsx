@@ -1,4 +1,5 @@
 import { QueryProvider } from "@/components/QueryProvider";
+import { WsProvider } from "@/components/WsProvider";
 import { Toaster } from "sonner";
 import { TopProgressBar } from "@/components/TopProgressBar";
 import { Inter } from "next/font/google";
@@ -28,7 +29,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeInit />
         <LocaleProvider>
         <QueryProvider>
-          <TooltipProvider>
+          <WsProvider>
+            <TooltipProvider>
             <TopProgressBar />
             <Toaster position="top-right" />
             <SidebarProvider
@@ -51,7 +53,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </SidebarInset>
             </SidebarProvider>
-          </TooltipProvider>
+            </TooltipProvider>
+          </WsProvider>
         </QueryProvider>
         </LocaleProvider>
       </body>

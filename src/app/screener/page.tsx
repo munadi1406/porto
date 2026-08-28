@@ -4,12 +4,13 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { formatIDR, formatPercentage, cn } from "@/lib/utils";
 import {
     TrendingUp, TrendingDown, Zap, BarChart3, Activity,
-    Search, ArrowUp, ArrowDown, Loader2, Play, AlertCircle, Info, Save, Clock, Building2, Target, Bot, Calculator
+    Search, ArrowUp, ArrowDown, Loader2, Play, AlertCircle, Info, Save, Clock, Building2, Target, Bot, Calculator, HelpCircle
 } from "lucide-react";
 import Link from "next/link";
 import stockData from "../../../stocks-idx.json";
 import { useStockScreener } from "@/hooks/useIdxExtended";
 import { PositionCalculator } from "@/components/PositionCalculator";
+import { PageTabs } from "@/components/PageTabs";
 
 interface ScreenerItem {
     ticker: string;
@@ -112,6 +113,18 @@ function SortHeader({ label, k, sortKey, sortAsc, onSort }: {
                 {sortKey === k && (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
             </div>
         </th>
+    );
+}
+
+function InfoTip({ text }: { text: string }) {
+    return (
+        <span
+            title={text}
+            aria-label={text}
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-border bg-muted text-muted-foreground hover:text-foreground hover:border-primary/40 cursor-help shrink-0"
+        >
+            <HelpCircle className="w-3 h-3" />
+        </span>
     );
 }
 
@@ -406,27 +419,9 @@ export default function ScreenerPage() {
                 </div>
             )}
 
-            {/* Tabs */}
+            {/* Tabs — PageTabs wired */}
             <div className="card p-0 overflow-hidden">
-                <div className="flex items-center border-b border-border bg-muted/10">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            disabled={!results.length && tab.id !== 'technical' && tab.id !== 'fundamental'}
-                            className={cn(
-                                "inline-flex items-center gap-1.5 px-5 py-3 text-xs font-bold border-b-2 -mb-px transition-colors",
-                                activeTab === tab.id
-                                    ? "border-primary text-primary bg-background"
-                                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30",
-                                !results.length && tab.id !== 'technical' && tab.id !== 'fundamental' && "opacity-40 cursor-not-allowed hover:text-muted-foreground hover:bg-transparent"
-                            )}
-                        >
-                            <tab.icon className="w-3.5 h-3.5" />
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+                <PageTabs tabs={tabs} active={activeTab} onChange={(id) => setActiveTab(id as typeof activeTab)} />
 
                 {/* Tab Content */}
                 <div className="p-4 min-h-[400px]">
@@ -666,7 +661,8 @@ function TechnicalScreener({
                                 className="w-full pl-8 pr-3 py-1.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                            <InfoTip text="Filter teknikal: Golden Cross = MA20 potong MA50 ke atas (bullish), Accumulation = smart money akumulasi, Volume Surge = volume >1.8× rata-rata." />
                             {([
                                 ['all', 'All'],
                                 ['buy', `Buy (${count('buy')})`],
@@ -679,6 +675,7 @@ function TechnicalScreener({
                                 <button
                                     key={k}
                                     onClick={() => setFilter(k)}
+                                    title={filterDescriptions[k].desc}
                                     className={cn(
                                         "px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-colors",
                                         filter === k
@@ -701,71 +698,109 @@ function TechnicalScreener({
                 </>
             )}
 
-            {/* Table */}
+            {/* Table — desktop table + mobile card */}
             {filtered.length > 0 && (
-                <div className="card overflow-x-auto p-0">
-                    <table className="w-full text-xs tabular-nums">
-                        <thead>
-                            <tr className="border-b border-border bg-muted/30 text-muted-foreground text-left">
-                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Ticker" k="ticker" />
-                                <th className="px-3 py-2 text-[10px] font-black uppercase">Name</th>
-                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Price" k="changePercent" />
-                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Signal" k="signal" />
-                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Score" k="score" />
-                                <th className="px-3 py-2 text-[10px] font-black uppercase">Best Strategy</th>
-                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Win%" k="score" />
-                                <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Sharpe" k="score" />
-                                <th className="px-3 py-2 text-[10px] font-black uppercase">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {filtered.map((item) => {
-                                const sc = formatScore(item.score);
-                                return (
-                                    <tr key={item.ticker} className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center gap-1">
-                                                <span className="font-bold text-foreground font-mono">{item.ticker}</span>
-                                                {item.sharia && <span className="text-[7px] font-black px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500">S</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2 text-muted-foreground max-w-[120px] truncate">{item.name}</td>
-                                        <td className="px-3 py-2 font-semibold">{formatIDR(item.price)}</td>
-                                        <td className="px-3 py-2">
-                                            <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded", sc.color, sc.bg)}>
-                                                {sc.label}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <span className={cn("font-black", sc.color)}>{item.score > 0 ? '+' : ''}{item.score}</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-[10px] text-muted-foreground max-w-[120px] truncate">
-                                            {item.bestStrategy !== '-' ? item.bestStrategy.replace(/\(.*\)/, '').trim() : '-'}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <span className={cn("font-semibold",
-                                                item.winRate >= 50 ? "text-success" : item.winRate >= 40 ? "text-warning" : "text-destructive"
-                                            )}>{item.winRate}%</span>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <span className={cn("font-semibold",
-                                                item.sharpe >= 1 ? "text-success" : item.sharpe >= 0.5 ? "text-warning" : "text-destructive"
-                                            )}>{item.sharpe?.toFixed(2) || '-'}</span>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <button
-                                                onClick={() => onSelectTicker(item.ticker)}
-                                                className="text-[10px] font-black text-primary hover:underline"
-                                            >
-                                                Position →
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                <>
+                    {/* Desktop Table */}
+                    <div className="hidden sm:block card overflow-x-auto p-0">
+                        <table className="w-full text-xs tabular-nums">
+                            <thead>
+                                <tr className="border-b border-border bg-muted/30 text-muted-foreground text-left">
+                                    <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Ticker" k="ticker" />
+                                    <th className="px-3 py-2 text-[10px] font-black uppercase">Name</th>
+                                    <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Price" k="changePercent" />
+                                    <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Signal" k="signal" />
+                                    <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Score" k="score" />
+                                    <th className="px-3 py-2 text-[10px] font-black uppercase">Best Strategy</th>
+                                    <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Win%" k="score" />
+                                    <SortHeader sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} label="Sharpe" k="score" />
+                                    <th className="px-3 py-2 text-[10px] font-black uppercase">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {filtered.map((item) => {
+                                    const sc = formatScore(item.score);
+                                    return (
+                                        <tr key={item.ticker} className="hover:bg-muted/30 transition-colors">
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-bold text-foreground font-mono">{item.ticker}</span>
+                                                    {item.sharia && <span className="text-[7px] font-black px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500">S</span>}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2 text-muted-foreground max-w-[120px] truncate">{item.name}</td>
+                                            <td className="px-3 py-2 font-semibold">{formatIDR(item.price)}</td>
+                                            <td className="px-3 py-2">
+                                                <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded", sc.color, sc.bg)}>
+                                                    {sc.label}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <span className={cn("font-black", sc.color)}>{item.score > 0 ? '+' : ''}{item.score}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-[10px] text-muted-foreground max-w-[120px] truncate">
+                                                {item.bestStrategy !== '-' ? item.bestStrategy.replace(/\(.*\)/, '').trim() : '-'}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <span className={cn("font-semibold",
+                                                    item.winRate >= 50 ? "text-success" : item.winRate >= 40 ? "text-warning" : "text-destructive"
+                                                )}>{item.winRate}%</span>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <span className={cn("font-semibold",
+                                                    item.sharpe >= 1 ? "text-success" : item.sharpe >= 0.5 ? "text-warning" : "text-destructive"
+                                                )}>{item.sharpe?.toFixed(2) || '-'}</span>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <button
+                                                    onClick={() => onSelectTicker(item.ticker)}
+                                                    className="text-[10px] font-black text-primary hover:underline"
+                                                >
+                                                    Position →
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    {/* Mobile Cards */}
+                    <div className="grid grid-cols-1 sm:hidden gap-3">
+                        {filtered.map((item) => {
+                            const sc = formatScore(item.score);
+                            return (
+                                <div key={item.ticker} className="bg-card border border-border rounded-xl p-4 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="font-mono font-bold text-sm text-foreground">{item.ticker}</span>
+                                            {item.sharia && <span className="text-[7px] font-black px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500">S</span>}
+                                        </div>
+                                        <span className={cn("text-[10px] font-black px-2 py-0.5 rounded", sc.color, sc.bg)}>{sc.label}</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate">{item.name}</p>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Price</span>
+                                        <span className="font-mono font-bold text-foreground">{formatIDR(item.price)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Score</span>
+                                        <span className={cn("font-black", sc.color)}>{item.score > 0 ? '+' : ''}{item.score}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Strategy</span>
+                                        <span className="text-[11px] text-muted-foreground truncate max-w-[150px] text-right">{item.bestStrategy !== '-' ? item.bestStrategy.replace(/\(.*\)/, '').trim() : '-'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs">
+                                        <span className={cn("font-semibold", item.winRate >= 50 ? "text-success" : item.winRate >= 40 ? "text-warning" : "text-destructive")}>Win {item.winRate}%</span>
+                                        <span className={cn("font-semibold", item.sharpe >= 1 ? "text-success" : item.sharpe >= 0.5 ? "text-warning" : "text-destructive")}>Sharpe {item.sharpe?.toFixed(2) || '-'}</span>
+                                        <button onClick={() => onSelectTicker(item.ticker)} className="ml-auto text-[11px] font-black text-primary hover:underline">Position →</button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </>
             )}
 
             {filtered.length === 0 && !scanning && results.length > 0 && (
@@ -874,7 +909,8 @@ function FundamentalScreener({
                 </div>
             </div>
 
-            <div className="card overflow-x-auto p-0">
+            {/* Desktop Table */}
+            <div className="hidden sm:block card overflow-x-auto p-0">
                 <table className="w-full text-xs tabular-nums">
                     <thead>
                         <tr className="border-b border-border bg-muted/30 text-muted-foreground text-left">
@@ -907,6 +943,25 @@ function FundamentalScreener({
                         ))}
                     </tbody>
                 </table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="grid grid-cols-1 sm:hidden gap-3">
+                {data.slice(0, 100).map((item) => (
+                    <div key={item.code} className="bg-card border border-border rounded-xl p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Link href={`/analysis/${item.code}.JK`} className="font-mono font-bold text-sm text-primary hover:underline">{item.code}</Link>
+                            <span className={cn("text-xs font-bold", (item.ytd || 0) >= 0 ? "text-success" : "text-destructive")}>{item.ytd != null ? `${item.ytd >= 0 ? '+' : ''}${item.ytd.toFixed(1)}%` : '-'}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{item.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{item.sector}</p>
+                        <div className="grid grid-cols-4 gap-2 text-xs pt-1">
+                            <div><p className="text-[9px] text-muted-foreground uppercase">PER</p><p className="font-semibold">{item.per?.toFixed(2) || '-'}</p></div>
+                            <div><p className="text-[9px] text-muted-foreground uppercase">PBV</p><p className="font-semibold">{item.pbv?.toFixed(2) || '-'}</p></div>
+                            <div><p className="text-[9px] text-muted-foreground uppercase">ROE</p><p className="font-semibold">{item.roe?.toFixed(1) || '-'}</p></div>
+                            <div><p className="text-[9px] text-muted-foreground uppercase">DER</p><p className="font-semibold">{item.der?.toFixed(2) || '-'}</p></div>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

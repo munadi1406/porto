@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, ArrowLeft, Target, Wallet, Zap, Activity, Scale, Users, Info, ChevronRight } from "lucide-react";
+import { Search, Building2, TrendingUp, TrendingDown, DollarSign, Shield, BarChart3, AlertCircle, CheckCircle, XCircle, Loader2, ArrowLeft, Target, Wallet, Zap, Activity, Scale, Users, Info, ChevronRight, HelpCircle } from "lucide-react";
 import { cn, formatIDR, formatCompactIDR, formatNumber } from "@/lib/utils";
 import { useFundamentals } from "@/hooks/useFundamentals";
 import Link from "next/link";
@@ -15,6 +15,18 @@ interface SectionProps {
     children: React.ReactNode;
     subtitle?: string;
     className?: string;
+}
+
+function InfoTip({ text }: { text: string }) {
+    return (
+        <span
+            title={text}
+            aria-label={text}
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-border bg-muted text-muted-foreground hover:text-foreground hover:border-primary/40 cursor-help shrink-0"
+        >
+            <HelpCircle className="w-3 h-3" />
+        </span>
+    );
 }
 
 // --- Helper Components ---
@@ -259,6 +271,7 @@ export default function FundamentalsPage() {
                                             <Scale className="w-5 h-5" />
                                         </div>
                                         <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Health Rating</span>
+                                        <span title="Health Score 0-100 menilai valuasi (P/E), profitabilitas (ROE), dan likuiditas. ≥80 sangat baik, <40 kurang." className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary-foreground/20 text-primary-foreground cursor-help"><HelpCircle className="w-3 h-3" /></span>
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-6xl font-black italic tracking-tighter">{analysis.score}<span className="text-2xl opacity-50 not-italic">/100</span></p>
@@ -381,6 +394,7 @@ export default function FundamentalsPage() {
                                                 <div className="flex items-center gap-2">
                                                     <Zap className="w-4 h-4 text-warning" />
                                                     <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Smart Money</span>
+                                                    <InfoTip text="Smart Money mendeteksi akumulasi/distribusi oleh broker besar. Buy dominan = akumulasi, Sell dominan = distribusi." />
                                                 </div>
                                                 <span className={cn("px-2 py-0.5 rounded text-[10px] font-black uppercase", smartMoney?.bgClass, smartMoney?.colorClass)}>
                                                     {smartMoney?.signal || 'Neutral'}
@@ -458,11 +472,11 @@ export default function FundamentalsPage() {
 
                                         <div className="space-y-3">
                                             <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                                <span>Graham Number</span>
+                                                <span className="inline-flex items-center gap-1">Graham Number <InfoTip text="Graham Number = √(22.5 × EPS × BVPS). Estimasi harga wajar konservatif ala Benjamin Graham." /></span>
                                                 <span className="text-foreground">{valAnalysis ? (isJK ? formatIDR(valAnalysis.graham) : `$${valAnalysis.graham.toFixed(2)}`) : '-'}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                                <span>Intrinsic Value</span>
+                                                <span className="inline-flex items-center gap-1">Intrinsic Value <InfoTip text="Nilai intrinsik dari pertumbuhan laba: EPS × (8.5 + 2×growth). Fair value = rata-rata Graham & intrinsik." /></span>
                                                 <span className="text-foreground">{valAnalysis ? (isJK ? formatIDR(valAnalysis.intrinsic) : `$${valAnalysis.intrinsic.toFixed(2)}`) : '-'}</span>
                                             </div>
                                         </div>

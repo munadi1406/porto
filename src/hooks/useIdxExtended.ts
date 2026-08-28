@@ -29,7 +29,7 @@ export function useStockScreener(sector = '', subSector = '') {
             if (!json.success) throw new Error(json.error);
             return json.data;
         },
-        staleTime: 30 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,
     });
 }
 
@@ -105,7 +105,7 @@ export function useSuspendData(count = 100) {
             if (!json.success) throw new Error(json.error);
             return json.data;
         },
-        staleTime: 5 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,
     });
 }
 
@@ -121,7 +121,7 @@ export function useNewListings(year?: number, month?: number) {
             if (!json.success) throw new Error(json.error);
             return json.data;
         },
-        staleTime: 30 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,
     });
 }
 
@@ -137,7 +137,7 @@ export function useStockSplits(year?: number, month?: number) {
             if (!json.success) throw new Error(json.error);
             return json.data;
         },
-        staleTime: 30 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,
     });
 }
 
@@ -153,7 +153,7 @@ export function useRightOfferings(year?: number, month?: number) {
             if (!json.success) throw new Error(json.error);
             return json.data;
         },
-        staleTime: 30 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,
     });
 }
 
@@ -169,7 +169,7 @@ export function useDelistings(year?: number, month?: number) {
             if (!json.success) throw new Error(json.error);
             return json.data;
         },
-        staleTime: 30 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,
     });
 }
 
@@ -273,5 +273,31 @@ export function useRelistingData() {
             return json.data;
         },
         staleTime: 30 * 60 * 1000,
+    });
+}
+
+export function useShariaList() {
+    return useQuery({
+        queryKey: ['idx-sharia-list'],
+        queryFn: async () => {
+            const res = await fetch('/api/idx/sharia-list');
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error);
+            return json.data;
+        },
+        staleTime: 10 * 60 * 1000,
+    });
+}
+
+export function useCorporateActions() {
+    return useQuery({
+        queryKey: ['idx-corporate-actions'],
+        queryFn: async () => {
+            const res = await fetch('/api/idx/corporate-actions');
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error);
+            return json.data;
+        },
+        staleTime: 10 * 60 * 1000,
     });
 }
