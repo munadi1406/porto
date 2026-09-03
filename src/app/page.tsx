@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { formatPercentage, formatCompactIDR, cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Clock, Search, BarChart3, Zap, DollarSign, Layers } from "lucide-react";
-import { StatCard } from "@/components/StatCard";
+import { TrendingUp, TrendingDown, Clock, DollarSign, Layers, AlertTriangle, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import TickerTape from "@/components/TickerTape";
@@ -12,7 +11,7 @@ import LivePrice from "@/components/LivePrice";
 import SectorHeatmap from "@/components/SectorHeatmap";
 import BrokerSummaryPanel from "@/components/BrokerSummaryPanel";
 import NewsCarousel from "@/components/NewsCarousel";
-import { SectorRotationDashboard, SectorRotationTeaser } from "@/components/SectorRotationDashboard";
+import { SectorRotationDashboard } from "@/components/SectorRotationDashboard";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -23,6 +22,7 @@ import { useAlerts } from "@/hooks/useAlerts";
 const IHSGChart = dynamic(() => import("@/components/IHSGChart"), { ssr: false, loading: () => <div className="h-[300px] bg-muted animate-pulse rounded-lg" /> });
 
 type TabKey = "overview" | "gainers" | "brokers" | "all-stocks" | "sectors";
+type MoverKey = "value" | "volume" | "gainers" | "losers";
 
 interface MarketIndex { symbol: string; name: string; label: string; lastPrice: number; change: number; changePercent: number; previousClose: number; open: number; dayHigh: number; dayLow: number; volume: number; }
 interface MostActiveStock { ticker: string; name: string; price: number; change: number; changePercent: number; volume: number; value: number; }
@@ -50,6 +50,7 @@ function IndexCard({ index, sparkData, live }: { index: MarketIndex; sparkData: 
     const target = live?.price ?? index.lastPrice;
     const price = useCountUp(target);
     const chgPct = live ? live.changePercent : index.changePercent;
+    const changeValue = live?.change ?? index.change ?? 0;
     const isUp = (chgPct ?? index.change ?? 0) >= 0;
     return (
         <div className="card-glow bg-card border border-border rounded-lg p-3 cursor-default">
@@ -62,7 +63,7 @@ function IndexCard({ index, sparkData, live }: { index: MarketIndex; sparkData: 
                 "inline-flex items-center gap-1 mt-1 text-[10px] font-black rounded-full px-2 py-0.5",
                 isUp ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
             )}>
-                {isUp ? "▲" : "▼"} {formatPercentage(chgPct ?? index.change)}
+                {isUp ? "▲" : "▼"} {changeValue >= 0 ? "+" : ""}{changeValue.toLocaleString("id-ID", { maximumFractionDigits: 2 })} ({formatPercentage(chgPct ?? index.change)})
             </span>
         </div>
     );
@@ -88,37 +89,40 @@ function MarketBreadthSection({ breadth, total }: { breadth: { advancing: number
     );
 }
 
-function ForeignFlowCard({ foreignFlow, official }: { foreignFlow: ForeignFlowItem[]; official?: boolean }) {
+function ForeignFlowCard({ foreignFlow, official, mode = "net" }: { foreignFlow: ForeignFlowItem[]; official?: boolean; mode?: "net" | "value" }) {
     const foreign = foreignFlow.find(f => f.investor === "Foreign");
     if (!foreign) return null;
     const max = Math.max(Math.abs(foreign.buyValue), Math.abs(foreign.sellValue), 1);
+    const isValueOnly = mode === "value";
     return (
         <div className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Foreign Flow (All Market)</h3>
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{isValueOnly ? "Foreign Value" : "Foreign Flow (All Market)"}</h3>
                 {official && (
-                    <span className="text-[8px] font-black uppercase tracking-wider rounded-full bg-success/10 text-success px-1.5 py-0.5">Resmi IDX</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider rounded-full bg-success/10 text-success px-1.5 py-0.5">Resmi IDX</span>
                 )}
             </div>
             <div className="flex items-baseline gap-2">
-                <span className="text-xs text-muted-foreground">Net {foreign.netValue >= 0 ? "Buy" : "Sell"}</span>
-                <span className={cn("text-lg font-bold tabular-nums", foreign.netValue >= 0 ? "text-success" : "text-destructive")}>
-                    {foreign.netValue >= 0 ? "+" : ""}{formatCompactIDR(foreign.netValue)}
+                <span className="text-xs text-muted-foreground">{isValueOnly ? "Total transaksi asing" : `Net ${foreign.netValue >= 0 ? "Buy" : "Sell"}`}</span>
+                <span className={cn("text-lg font-bold tabular-nums", isValueOnly ? "text-foreground" : foreign.netValue >= 0 ? "text-success" : "text-destructive")}>
+                    {!isValueOnly && foreign.netValue >= 0 ? "+" : ""}{formatCompactIDR(isValueOnly ? foreign.buyValue : foreign.netValue)}
                 </span>
             </div>
             <div className="mt-3 space-y-2">
                 <div>
-                    <div className="flex justify-between text-[9px] font-bold text-muted-foreground mb-0.5"><span>BUY</span><span className="tabular-nums">{formatCompactIDR(foreign.buyValue)}</span></div>
+                    <div className="flex justify-between text-[11px] font-bold text-muted-foreground mb-1"><span>{isValueOnly ? "FOREIGN" : "BUY"}</span><span className="tabular-nums">{formatCompactIDR(foreign.buyValue)}</span></div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                         <div className="h-full rounded-full bg-success transition-all duration-700" style={{ width: `${(Math.abs(foreign.buyValue) / max) * 100}%` }} />
                     </div>
                 </div>
-                <div>
-                    <div className="flex justify-between text-[9px] font-bold text-muted-foreground mb-0.5"><span>SELL</span><span className="tabular-nums">{formatCompactIDR(foreign.sellValue)}</span></div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-destructive transition-all duration-700" style={{ width: `${(Math.abs(foreign.sellValue) / max) * 100}%` }} />
+                {!isValueOnly ? (
+                    <div>
+                        <div className="flex justify-between text-[11px] font-bold text-muted-foreground mb-1"><span>SELL</span><span className="tabular-nums">{formatCompactIDR(foreign.sellValue)}</span></div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-destructive transition-all duration-700" style={{ width: `${(Math.abs(foreign.sellValue) / max) * 100}%` }} />
+                        </div>
                     </div>
-                </div>
+                ) : <p className="text-[11px] text-muted-foreground">Sumber ringkasan broker · bukan net buy/sell</p>}
             </div>
         </div>
     );
@@ -201,6 +205,7 @@ function SectorPerformanceCard({ sectors, onViewAll }: { sectors: SectorSummary[
 export default function MarketPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<TabKey>("overview");
+    const [activeMover, setActiveMover] = useState<MoverKey>("value");
     const [indices, setIndices] = useState<MarketIndex[]>([]);
     const [mostActive, setMostActive] = useState<{ byVolume: MostActiveStock[]; byValue: MostActiveStock[] }>({ byVolume: [], byValue: [] });
     const [sectors, setSectors] = useState<SectorSummary[]>([]);
@@ -216,6 +221,9 @@ export default function MarketPage() {
     const [idxLoading, setIdxLoading] = useState(true);
     const [activeLoading, setActiveLoading] = useState(true);
     const [sectorLoading, setSectorLoading] = useState(true);
+    const [indexError, setIndexError] = useState<string | null>(null);
+    const [scanError, setScanError] = useState<string | null>(null);
+    const [reloadKey, setReloadKey] = useState(0);
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
     const [sparkDataMap, setSparkDataMap] = useState<Record<string, number[]>>({});
 
@@ -257,10 +265,15 @@ export default function MarketPage() {
 
     // Fetch market index dari Yahoo Finance (cepat)
     useEffect(() => {
+        setIdxLoading(true);
+        setIndexError(null);
         fetch("/api/idx/market-index")
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error(`Indeks: HTTP ${r.status}`);
+                return r.json();
+            })
             .then(res => {
-                if (res.success && res.data) {
+                if (res.success && Array.isArray(res.data) && res.data.length > 0) {
                     setIndices(res.data);
                     setLastUpdate(new Date());
                     res.data.forEach((idx: any) => {
@@ -272,34 +285,49 @@ export default function MarketPage() {
                         pts.push(idx.lastPrice || 100);
                         setSparkDataMap(prev => ({ ...prev, [idx.symbol]: pts }));
                     });
-                }
+                } else throw new Error(res.error || "Data indeks tidak tersedia");
             })
-            .catch(() => {})
+            .catch(error => setIndexError(error instanceof Error ? error.message : "Gagal memuat indeks"))
             .finally(() => setIdxLoading(false));
-    }, []);
+    }, [reloadKey]);
 
     // Market Scan — fetch SEMUA 959 saham, derive most-active/gainers/losers/sector/breadth
     useEffect(() => {
-        fetch("/api/idx/market-scan")
-            .then(r => r.json())
-            .then(res => {
-                if (res.success && res.data) {
-                    const d = res.data;
-                    setTotalStocks(d.total || 0);
-                    setBreadth(d.breadth || { advancing: 0, declining: 0, unchanged: 0 });
-                    setMostActive(d.mostActive || { byVolume: [], byValue: [] });
-                    setGainers((d.gainers || []).map((s: any) => ({
-                        KODE_SAHAM: s.code, NAMA_SAHAM: s.name, HARGA_PENUTUPAN: s.price, PERSEN_PERUBAHAN: s.changePercent,
-                    })));
-                    setLosers((d.losers || []).map((s: any) => ({
-                        KODE_SAHAM: s.code, NAMA_SAHAM: s.name, HARGA_PENUTUPAN: s.price, PERSEN_PERUBAHAN: s.changePercent,
-                    })));
-                    setSectors(d.sectors || []);
-                    setAllStocks(d.all || []);
-                    setLastUpdate(new Date());
-                }
+        setActiveLoading(true);
+        setSectorLoading(true);
+        setScanError(null);
+        Promise.allSettled([
+            fetch("/api/idx/market-breadth", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(`Breadth: HTTP ${r.status}`); return r.json(); }),
+            fetch("/api/idx/market-movers", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(`Movers: HTTP ${r.status}`); return r.json(); }),
+            fetch("/api/idx/market-sectors", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(`Sektor: HTTP ${r.status}`); return r.json(); }),
+            fetch("/api/idx/market-stocks", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(`Saham: HTTP ${r.status}`); return r.json(); }),
+        ])
+            .then(([breadthResult, moversResult, sectorsResult, stocksResult]) => {
+                const errors: string[] = [];
+                if (breadthResult.status === 'fulfilled' && breadthResult.value.success && breadthResult.value.source !== 'unavailable') {
+                    setBreadth(breadthResult.value.data?.breadth || { advancing: 0, declining: 0, unchanged: 0 });
+                    setTotalStocks(breadthResult.value.data?.total || 0);
+                } else errors.push(breadthResult.status === 'rejected' ? breadthResult.reason?.message || 'Breadth gagal' : breadthResult.value.warning || 'Breadth belum tersedia');
+
+                if (moversResult.status === 'fulfilled' && moversResult.value.success) {
+                    const data = moversResult.value.data || {};
+                    setMostActive(data.mostActive || { byVolume: [], byValue: [] });
+                    setGainers((data.gainers || []).map((s: any) => ({ KODE_SAHAM: s.code, NAMA_SAHAM: s.name, HARGA_PENUTUPAN: s.price, PERSEN_PERUBAHAN: s.changePercent })));
+                    setLosers((data.losers || []).map((s: any) => ({ KODE_SAHAM: s.code, NAMA_SAHAM: s.name, HARGA_PENUTUPAN: s.price, PERSEN_PERUBAHAN: s.changePercent })));
+                } else errors.push(moversResult.status === 'rejected' ? moversResult.reason?.message || 'Movers gagal' : 'Movers belum tersedia');
+
+                if (sectorsResult.status === 'fulfilled' && sectorsResult.value.success) setSectors(sectorsResult.value.data?.sectors || []);
+                else errors.push(sectorsResult.status === 'rejected' ? sectorsResult.reason?.message || 'Sektor gagal' : 'Sektor belum tersedia');
+
+                if (stocksResult.status === 'fulfilled' && stocksResult.value.success) {
+                    setAllStocks(stocksResult.value.data?.stocks || []);
+                    if (stocksResult.value.data?.total) setTotalStocks(stocksResult.value.data.total);
+                } else errors.push(stocksResult.status === 'rejected' ? stocksResult.reason?.message || 'Daftar saham gagal' : 'Daftar saham belum tersedia');
+
+                setScanError(errors.length > 0 ? `Sebagian data pasar gagal dimuat: ${errors.join(' · ')}` : null);
+                setLastUpdate(new Date());
             })
-            .catch(() => {})
+            .catch(error => setScanError(error instanceof Error ? error.message : "Gagal memuat ringkasan saham"))
             .finally(() => { setActiveLoading(false); setSectorLoading(false); });
 
         // Broker summary — fire-and-forget
@@ -313,90 +341,121 @@ export default function MarketPage() {
             .then(r => r.json())
             .then(res => { if (res.success) setOfficialFF(res); })
             .catch(() => {});
-    }, []);
+    }, [reloadKey]);
 
     const ihsg = indices.find(i => i.symbol === "^JKSE" || i.name?.includes("IHSG"));
+    const brokerForeign = foreignFlow.find(f => f.investor === "Foreign");
+    const hasOfficialNet = officialFF?.netValue != null;
+    const hasOfficialParticipation = officialFF?.participationValue > 0;
+    const foreignCardMode: "net" | "value" = hasOfficialNet || (brokerForeign?.sellValue ?? 0) > 0 ? "net" : "value";
+    const foreignCardData: ForeignFlowItem[] = hasOfficialNet ? [
+        { investor: "Foreign", buyValue: officialFF.buyValue ?? 0, sellValue: officialFF.sellValue ?? 0, netValue: officialFF.netValue },
+        { investor: "Domestic", buyValue: 0, sellValue: 0, netValue: 0 },
+    ] : hasOfficialParticipation ? [
+        { investor: "Foreign", buyValue: officialFF.participationValue, sellValue: 0, netValue: 0 },
+        { investor: "Domestic", buyValue: officialFF.domesticValue ?? 0, sellValue: 0, netValue: 0 },
+    ] : foreignFlow;
     const tabs: { key: TabKey; label: string }[] = [
-        { key: "overview", label: "Overview" },
-        { key: "gainers", label: "Gainers / Losers" },
-        { key: "brokers", label: "Broker Summary" },
-        { key: "all-stocks", label: "All Stocks" },
-        { key: "sectors", label: "Sector" },
+        { key: "overview", label: "Ringkasan" },
+        { key: "gainers", label: "Naik / Turun" },
+        { key: "brokers", label: "Ringkasan Broker" },
+        { key: "all-stocks", label: "Semua Saham" },
+        { key: "sectors", label: "Sektor" },
     ];
 
+    const proxyForeign = foreignFlow.find(f => f.investor === "Foreign");
+    const proxyNet = proxyForeign && proxyForeign.sellValue > 0 ? proxyForeign.netValue : null;
+    const proxyForeignValue = proxyForeign?.buyValue && proxyForeign.buyValue > 0 ? proxyForeign.buyValue : null;
+    const realNet: number | null = officialFF?.netValue ?? null;
+    const partVal: number | null = officialFF?.participationValue > 0 ? officialFF.participationValue : null;
+    const foreignHeadline = realNet != null
+        ? { label: "Net asing", value: `${realNet >= 0 ? "+" : ""}${formatCompactIDR(realNet)}`, tone: realNet >= 0 ? "text-success" : "text-destructive", source: "IDX" }
+        : partVal != null
+            ? { label: "Nilai asing", value: formatCompactIDR(partVal), tone: "text-foreground", source: "IDX bulanan" }
+            : proxyNet != null
+                ? { label: "Net asing", value: `${proxyNet >= 0 ? "+" : ""}${formatCompactIDR(proxyNet)}`, tone: proxyNet >= 0 ? "text-success" : "text-destructive", source: "Proxy" }
+                : { label: "Nilai asing", value: proxyForeignValue != null ? formatCompactIDR(proxyForeignValue) : "—", tone: "text-foreground", source: proxyForeignValue != null ? "Broker" : "Belum tersedia" };
+    const movers: Record<MoverKey, { label: string; icon: typeof DollarSign; items: any[]; type: "active" | "volume" | "gainer" | "loser" }> = {
+        value: { label: "Nilai", icon: DollarSign, items: mostActive.byValue, type: "active" },
+        volume: { label: "Volume", icon: Layers, items: mostActive.byVolume, type: "volume" },
+        gainers: { label: "Top naik", icon: TrendingUp, items: gainers, type: "gainer" },
+        losers: { label: "Top turun", icon: TrendingDown, items: losers, type: "loser" },
+    };
+    const selectedMover = movers[activeMover];
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
             <MarketStatusBar />
             <AlertChecker prices={livePrices} />
             <TechnicalAlertChecker />
 
-            {/* Hero header ala terminal */}
-            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-r from-primary/10 via-card to-card p-5">
-                <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
-                <div className="relative flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-1">IDX · Bursa Efek Indonesia</p>
-                        <h1 className="text-2xl font-black tracking-tight"><span className="text-gradient">Market Overview</span></h1>
-                        <p className="text-xs text-muted-foreground mt-1">Pantau pasar real-time — indeks, breadth, arus dana & sektor</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Bursa Efek Indonesia</p>
+                        <h1 className="mt-0.5 text-xl font-black tracking-tight sm:text-2xl">Ringkasan Pasar</h1>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 shrink-0">
-                        {(() => {
-                            const proxyNet = foreignFlow.find(f => f.investor === "Foreign")?.netValue;
-                            const realNet: number | null = officialFF?.netValue ?? null;
-                            const partVal: number | null = officialFF?.participationValue ?? null;
-
-                            const tiles: { label: string; value: string; tone: "success"|"danger"|"neutral"; icon: any; delta?: string }[] = [
-                                { label: "Naik", value: String(breadth.advancing), tone: "success", icon: TrendingUp },
-                                { label: "Turun", value: String(breadth.declining), tone: "danger", icon: TrendingDown },
-                                { label: "Tetap", value: String(breadth.unchanged), tone: "neutral", icon: Layers },
-                            ];
-                            if (realNet != null) {
-                                tiles.push({ label: "Net Foreign", value: `${realNet >= 0 ? "+" : ""}${formatCompactIDR(realNet)}`, tone: realNet >= 0 ? "success" : "danger", icon: DollarSign, delta: "Resmi IDX" });
-                            } else if (partVal != null) {
-                                tiles.push({ label: "Foreign Value", value: formatCompactIDR(partVal), tone: "neutral", icon: DollarSign, delta: "IDX bulanan" });
-                            } else if (proxyNet != null) {
-                                tiles.push({ label: "Net Foreign", value: `${proxyNet >= 0 ? "+" : ""}${formatCompactIDR(proxyNet)}`, tone: proxyNet >= 0 ? "success" : "danger", icon: DollarSign, delta: "≈ proxy" });
-                            } else {
-                                tiles.push({ label: "Net Foreign", value: "—", tone: "neutral", icon: DollarSign });
-                            }
-                            tiles.push({ label: "Saham", value: String(totalStocks), tone: "neutral", icon: BarChart3 });
-
-                            return tiles.map(s => (
-                                <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={s.icon} delta={s.delta} />
-                            ));
-                        })()}
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                        <AlertBadge count={activeAlertCount} />
+                        {lastUpdate && <span className="flex items-center gap-1"><Clock className="size-3" /> Diperbarui {lastUpdate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>}
                     </div>
                 </div>
-                {lastUpdate && (
-                    <span className="absolute bottom-1.5 right-3 text-[9px] text-muted-foreground/70 flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5" />{lastUpdate.toLocaleTimeString("id-ID")}
-                    </span>
-                )}
-                <AlertBadge count={activeAlertCount} className="absolute bottom-1.5 left-3" />
-            </div>
+                <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-5 sm:divide-y-0">
+                    {[
+                        { label: "Naik", value: activeLoading ? "—" : String(breadth.advancing), tone: "text-success", note: "saham" },
+                        { label: "Turun", value: activeLoading ? "—" : String(breadth.declining), tone: "text-destructive", note: "saham" },
+                        { label: "Tetap", value: activeLoading ? "—" : String(breadth.unchanged), tone: "text-muted-foreground", note: "saham" },
+                        { label: foreignHeadline.label, value: foreignHeadline.value, tone: foreignHeadline.tone, note: foreignHeadline.source },
+                        { label: "Cakupan", value: activeLoading ? "—" : String(totalStocks), tone: "text-foreground", note: "saham IDX" },
+                    ].map((item, index) => (
+                        <div key={item.label} className={cn("min-w-0 px-4 py-3", index === 4 && "col-span-2 sm:col-span-1")}>
+                            <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{item.label}</p>
+                            <div className="mt-1 flex items-baseline gap-1.5">
+                                <span className={cn("truncate font-mono text-xl font-black tabular-nums", item.tone)}>{item.value}</span>
+                                <span className="truncate text-[9px] text-muted-foreground">{item.note}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
 
             {/* Tabs */}
-            <div className="flex gap-0 border-b border-border">
-                {tabs.map(tab => (
-                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                        className={cn("px-4 py-2.5 text-xs font-bold transition-colors border-b-2 -mb-px",
-                            activeTab === tab.key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
-                        {tab.label}
-                    </button>
-                ))}
+            <div className="relative border-b border-border">
+                <div className="flex gap-1 overflow-x-auto pr-10 scrollbar-none" role="tablist" aria-label="Data pasar">
+                    {tabs.map(tab => (
+                        <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                            role="tab" aria-selected={activeTab === tab.key}
+                            className={cn("min-h-11 shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 text-xs font-bold transition-colors border-b-2 -mb-px",
+                                activeTab === tab.key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden" aria-hidden="true" />
             </div>
 
             {activeTab === "overview" && (
-                <div className="space-y-6">
-                    {/* News Carousel — IHSG, geopolitik/emas + semua ticker trending (auto) */}
-                    <NewsCarousel symbols={["IHSG", "EMAS", "GEOPOLITIK", "FED", ...tapeTickers.slice(0, 4).map(t => t.replace(".JK","")), ...mostActive.byValue.slice(0, 4).map((s:any) => (s.ticker || s.code || "").replace(".JK","")), ...gainers.slice(0, 2).map((g:any) => g.KODE_SAHAM)]} />
-
+                <div className="space-y-4 md:space-y-6">
+                    {(indexError || scanError) && (
+                        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 sm:flex-row sm:items-center">
+                            <AlertTriangle className="size-5 shrink-0 text-amber-600" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold">Sebagian data pasar gagal dimuat</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{[indexError, scanError].filter(Boolean).join(" · ")}</p>
+                            </div>
+                            <button onClick={() => setReloadKey(key => key + 1)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border bg-card px-3 text-xs font-bold hover:bg-muted">
+                                <RefreshCw className="size-3.5" /> Coba lagi
+                            </button>
+                        </div>
+                    )}
                     {/* Ticker Tape live */}
                     {tapeTickers.length > 0 && <TickerTape tickers={tapeTickers} prices={livePrices} />}
 
                     {/* Index Strip */}
                     {idxLoading ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />)}</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 sm:h-24 bg-muted animate-pulse rounded-lg" />)}</div>
+                    ) : indexError ? (
+                        <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Data indeks belum dapat ditampilkan.</div>
                     ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {indices.slice(0, 4).map(idx => <IndexCard key={idx.symbol} index={idx} sparkData={sparkDataMap[idx.symbol] || []} live={livePrices[idx.symbol]} />)}
@@ -409,41 +468,51 @@ export default function MarketPage() {
                             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                                 <h3 className="card-title">IHSG Chart</h3>
                             </div>
-                            <IHSGChart height={300} />
+                            {indexError ? (
+                                <div className="flex h-56 sm:h-[300px] items-center justify-center px-6 text-center text-xs text-muted-foreground">Chart belum tersedia. Coba muat ulang data pasar.</div>
+                            ) : <IHSGChart height={300} />}
                         </div>
                         <div className="space-y-4">
                             <MarketBreadthSection breadth={breadth} total={totalStocks} />
-                            <ForeignFlowCard foreignFlow={officialFF?.netValue != null ? [
-                                { investor: "Foreign", buyValue: officialFF.buyValue ?? 0, sellValue: officialFF.sellValue ?? 0, netValue: officialFF.netValue },
-                                { investor: "Domestic", buyValue: 0, sellValue: 0, netValue: 0 },
-                            ] : foreignFlow} official={officialFF?.source === "indexalpha"} />
+                            <ForeignFlowCard foreignFlow={foreignCardData} mode={foreignCardMode} official={officialFF?.source === "indexalpha" || hasOfficialParticipation} />
                         </div>
                     </div>
 
-                    {/* 4-column grid: Value, Volume, Gainers, Losers */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <section className="overflow-hidden rounded-xl border border-border bg-card [content-visibility:auto] [contain-intrinsic-size:auto_360px]">
+                        <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h2 className="text-xs font-black uppercase tracking-wider">Pergerakan Saham</h2>
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">Pilih satu kategori untuk menjaga fokus analisis.</p>
+                            </div>
+                            <div className="flex gap-1 overflow-x-auto rounded-lg bg-muted/60 p-1" role="tablist" aria-label="Kategori pergerakan saham">
+                                {(Object.keys(movers) as MoverKey[]).map(key => (
+                                    <button key={key} onClick={() => setActiveMover(key)} role="tab" aria-selected={activeMover === key}
+                                        className={cn("min-h-8 shrink-0 rounded-md px-3 text-[10px] font-bold transition-colors", activeMover === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                                        {movers[key].label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         {activeLoading ? (
-                            Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-64 bg-muted animate-pulse rounded-lg" />)
+                            <div className="h-64 animate-pulse bg-muted" />
+                        ) : scanError ? (
+                            <div className="p-8 text-center text-sm text-muted-foreground">Daftar saham belum dapat ditampilkan.</div>
                         ) : (
-                            <>
-                                <TableCard title="Top Value" icon={DollarSign} items={mostActive.byValue} type="active" livePrices={livePrices} onViewAll={() => setActiveTab("all-stocks")} />
-                                <TableCard title="Top Volume" icon={Layers} items={mostActive.byVolume} type="volume" livePrices={livePrices} onViewAll={() => setActiveTab("all-stocks")} />
-                                <TableCard title="Top Gainers" icon={TrendingUp} items={gainers} type="gainer" livePrices={livePrices} onViewAll={() => setActiveTab("gainers")} />
-                                <TableCard title="Top Losers" icon={TrendingDown} items={losers} type="loser" livePrices={livePrices} onViewAll={() => setActiveTab("gainers")} />
-                            </>
+                            <TableCard title={selectedMover.label} icon={selectedMover.icon} items={selectedMover.items} type={selectedMover.type} livePrices={livePrices} onViewAll={() => setActiveTab(activeMover === "gainers" || activeMover === "losers" ? "gainers" : "all-stocks")} />
                         )}
-                    </div>
+                    </section>
 
-                    {/* Sector Heatmap ala Finviz */}
-                    <SectorHeatmap sectors={sectors} />
-
-                    {/* C9 teaser — compact leaders preview linking to full quadrant */}
-                    {!sectorLoading && sectors.length > 0 && (
-                        <SectorRotationTeaser sectors={sectors} onViewAll={() => setActiveTab("sectors")} />
+                    {!scanError && sectors.length > 0 && (
+                        <section className="space-y-3">
+                            <SectorHeatmap sectors={sectors} />
+                            <div className="flex items-center justify-between px-1">
+                                <p className="text-[10px] text-muted-foreground">Analisis momentum dan breadth sektor tersedia pada tampilan lengkap.</p>
+                                <button onClick={() => setActiveTab("sectors")} className="min-h-9 shrink-0 rounded-lg border border-border bg-card px-3 text-[10px] font-bold hover:bg-muted">Lihat rotasi sektor</button>
+                            </div>
+                        </section>
                     )}
 
-                    {/* Sector Performance — full rotation dashboard (chart + fallback table) */}
-                    <SectorPerformanceCard sectors={sectors} onViewAll={() => setActiveTab("sectors")} />
+                    <NewsCarousel symbols={["IHSG", "EMAS", "GEOPOLITIK", "FED", ...tapeTickers.slice(0, 4).map(t => t.replace(".JK","")), ...mostActive.byValue.slice(0, 4).map((s:any) => (s.ticker || s.code || "").replace(".JK","")), ...gainers.slice(0, 2).map((g:any) => g.KODE_SAHAM)]} />
                 </div>
             )}
 

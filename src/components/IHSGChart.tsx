@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ArrowDownRight, ArrowUpRight, Sparkles, RefreshCw } from "lucide-react";
-import { useWebSocket } from "@/hooks/useWebSocket";
+import { useMarketData } from "@/hooks/useMarketData";
+import { isMarketOpen } from "@/lib/market-hours";
 import { cn } from "@/lib/utils";
+import { CHART_SERIES } from "@/lib/chart-theme";
 
 const RechartsArea = dynamic(() => import("recharts").then((mod) => {
     const { ComposedChart, Area, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } = mod;
@@ -61,8 +63,8 @@ const RechartsArea = dynamic(() => import("recharts").then((mod) => {
                         />
                         {hasVolume && <Bar yAxisId="vol" dataKey="Volume" name="Vol" fill="var(--primary)" fillOpacity={0.18} isAnimationActive={false} />}
                         <Area yAxisId="price" type="monotone" dataKey="Close" name="IHSG" stroke="var(--success)" strokeWidth={2} fill="url(#ihsgGrad)" isAnimationActive animationDuration={280} animationEasing="linear" connectNulls={false} />
-                        <Line yAxisId="price" type="monotone" dataKey="ma20" name="MA20" stroke="#f59e0b" strokeWidth={1.3} dot={false} connectNulls={false} isAnimationActive={false} />
-                        <Line yAxisId="price" type="monotone" dataKey="ma50" name="MA50" stroke="#a967ff" strokeWidth={1.3} dot={false} connectNulls={false} isAnimationActive={false} />
+                        <Line yAxisId="price" type="monotone" dataKey="ma20" name="MA20" stroke={CHART_SERIES.ma20} strokeWidth={1.3} dot={false} connectNulls={false} isAnimationActive={false} />
+                        <Line yAxisId="price" type="monotone" dataKey="ma50" name="MA50" stroke={CHART_SERIES.ma50} strokeWidth={1.3} dot={false} connectNulls={false} isAnimationActive={false} />
                     </ComposedChart>
                 </ResponsiveContainer>
             );
@@ -190,13 +192,9 @@ export default function IHSGChart({ height = 300 }: { height?: number }) {
         return () => clearInterval(t);
     }, [loadChart]);
 
-    // WebSocket harga real
-    const { connected, marketOpen, prices, subscribe, unsubscribe } = useWebSocket({ autoConnect: true });
-    useEffect(() => {
-        if (!connected) return;
-        subscribe(["^JKSE"]);
-        return () => unsubscribe(["^JKSE"]);
-    }, [connected, subscribe, unsubscribe]);
+    // Harga live melalui API polling (tanpa WebSocket), konsisten di semua hosting.
+    const { prices } = useMarketData(["^JKSE"]);
+    const marketOpen = isMarketOpen();
     useEffect(() => {
         const q = prices["^JKSE"];
         if (q && q.price > 0) {
@@ -208,26 +206,6 @@ export default function IHSGChart({ height = 300 }: { height?: number }) {
             setLastUpdate(new Date().toLocaleTimeString("id-ID"));
         }
     }, [prices, applyReal]);
-
-    // Tick engine — hanya saat market buka
-    useEffect(() => {
-        if (!marketOpen) { setTickDir("flat"); return; }
-        const id = setInterval(() => {
-            const base = baseRef.current;
-            if (base == null || base <= 0) return;
-            const cur = liveRef.current ?? base;
-            const step = base * (Math.random() - 0.5) * 0.0008;
-            const band = base * 0.0012;
-            const next = Math.max(base - band, Math.min(base + band, cur + step));
-            setTickDir(next >= cur ? "up" : "down");
-            liveRef.current = next;
-            setLivePrice(next);
-            const chart = mergeTail(dataRef.current, next);
-            dataRef.current = chart;
-            setData(chart);
-        }, 600);
-        return () => clearInterval(id);
-    }, [marketOpen]);
 
     const chartData = useMemo(() => withMa(data), [data]);
     const isIntraday = ["1d", "5d"].includes(period.value);

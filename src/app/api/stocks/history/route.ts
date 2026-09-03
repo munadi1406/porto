@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const ticker = searchParams.get('ticker');
     const period = searchParams.get('period') || '3mo';
     const interval = searchParams.get('interval') || '1d';
+    const from = searchParams.get('from');
 
     if (!ticker) {
         return NextResponse.json({ success: false, error: 'Ticker is required' }, { status: 400 });
@@ -15,8 +16,9 @@ export async function GET(request: NextRequest) {
 
     try {
         const queryOptions: any = {
-            period1: getPeriodStartDate(period),
+            period1: from && Number.isFinite(Number(from)) ? new Date(Number(from)) : getPeriodStartDate(period),
             interval: interval as any,
+            events: 'div|split',
         };
 
         const result: any = await yahooFinance.chart(ticker, queryOptions);
@@ -52,11 +54,27 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             success: true,
             data: chartData,
+            dividends: Array.isArray(result.events?.dividends)
+                ? result.events.dividends.map((item: any) => ({
+                    time: Math.floor(new Date(item.date).getTime() / 1000),
+                    amount: Number(item.amount) || 0,
+                }))
+                : [],
             meta: result.meta
         });
     } catch (error: any) {
+        const msg = error?.message || 'Unknown error';
+        // Yahoo throws "No data found, symbol may be delisted" untuk ticker delisted / tidak ada data periode itu
+        const isNoData = /no data|delisted|not found|404/i.test(msg);
+        if (isNoData) {
+            console.warn(`[history] No data for ${ticker} (${period}/${interval}): ${msg}`);
+            return NextResponse.json(
+                { success: false, error: 'No data found - symbol may be delisted or no trading data for period', data: [] },
+                { status: 404 }
+            );
+        }
         console.error('Yahoo Finance Chart Error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        return NextResponse.json({ success: false, error: msg }, { status: 500 });
     }
 }
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState, useRef } from "react";
-import { PortfolioItem, StockPrice } from "@/lib/types";
+import { PortfolioItem, StockPrice, Transaction } from "@/lib/types";
 import { formatIDR, formatNumber, formatPercentage, cn } from "@/lib/utils";
-import { Trash2, Edit2, TrendingUp, TrendingDown, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, Target, Calculator } from "lucide-react";
+import { Trash2, Edit2, TrendingUp, TrendingDown, ArrowRightLeft, Download, FileText, Image as ImageIcon, Shield, Target, Calculator, Share2 } from "lucide-react";
 import { StockForm } from "./StockForm";
 import { TransactionForm } from "./TransactionForm";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -16,6 +16,36 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+
+type ShareChartPoint = { time: number; close: number };
+
+function sparklinePath(values: number[], width = 380, height = 82) {
+    if (values.length < 2) return "";
+    let min = values[0];
+    let max = values[0];
+    for (const value of values) { min = Math.min(min, value); max = Math.max(max, value); }
+    const range = max - min || 1;
+    return values.map((value, index) => {
+        const x = (index / (values.length - 1)) * width;
+        const y = height - ((value - min) / range) * (height - 8) - 4;
+        return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+}
+
+function getTrend(values: number[]) {
+    if (values.length < 2) return { label: "BELUM ADA DATA", color: "#64748b", direction: "flat" as const, percent: null };
+    const change = values[values.length - 1] - values[0];
+    const percent = values[0] !== 0 ? (change / values[0]) * 100 : 0;
+    if (change > 0) return { label: "MENGUAT", color: "#34d399", direction: "up" as const, percent };
+    if (change < 0) return { label: "MELEMAH", color: "#fb7185", direction: "down" as const, percent };
+    return { label: "DATAR", color: "#94a3b8", direction: "flat" as const, percent };
+}
+
+function trendLabel(trend: ReturnType<typeof getTrend>) {
+    if (trend.percent == null) return trend.label;
+    return `${trend.label} ${trend.percent >= 0 ? "+" : ""}${trend.percent.toFixed(2)}%`;
+}
 
 // Teks dengan flash hijau/merah saat nilai berubah (hook-safe per baris)
 function FlashText({ value, text, className }: { value: number; text: string; className?: string }) {
@@ -34,12 +64,15 @@ function FlashText({ value, text, className }: { value: number; text: string; cl
 
 interface PortfolioTableProps {
     portfolio: PortfolioItem[];    marketData: Record<string, StockPrice>;
+    transactions: Transaction[];
+    marketError?: string | null;
+    marketLastUpdated?: Date | null;
     onRemove: (id: string) => void;
     onUpdate: (id: string, data: Partial<PortfolioItem>) => void;
     onTransaction: (id: string, type: 'buy' | 'sell', lots: number, price: number, note?: string) => void;
 }
 
-export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTransaction }: PortfolioTableProps) {
+export function PortfolioTable({ portfolio, marketData, transactions, marketError, marketLastUpdated, onRemove, onUpdate, onTransaction }: PortfolioTableProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [transactionId, setTransactionId] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; ticker: string; name: string } | null>(null);
@@ -52,29 +85,63 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
     const tickerList = useMemo(() => portfolio.map(p => p.ticker), [portfolio]);
     const companyNames = useCompanyNames(tickerList);
 
-    // Random harmonious color palette for export cards
+    // One stable brand palette keeps every shared card recognisable.
     interface CardPalette {
         bg: string; cardBg: string; textPrimary: string; textSecondary: string;
         textTertiary: string; border: string; accent: string;
         gradientFrom: string; gradientTo: string;
     }
     const palettes: CardPalette[] = [
-        { bg:'#ffffff', cardBg:'#fafafa', textPrimary:'#18181b', textSecondary:'#71717a', textTertiary:'#a1a1aa', border:'#f0f0f0', accent:'#18181b', gradientFrom:'#18181b', gradientTo:'#52525b' },
-        { bg:'#fefcf5', cardBg:'#faf6ed', textPrimary:'#1c1917', textSecondary:'#78716c', textTertiary:'#a8a29e', border:'#e7e5e4', accent:'#1c1917', gradientFrom:'#d97706', gradientTo:'#fbbf24' },
-        { bg:'#f8fafc', cardBg:'#f1f5f9', textPrimary:'#0f172a', textSecondary:'#64748b', textTertiary:'#94a3b8', border:'#e2e8f0', accent:'#0f172a', gradientFrom:'#3b82f6', gradientTo:'#93c5fd' },
-        { bg:'#faf5ff', cardBg:'#f3e8ff', textPrimary:'#1a1a2e', textSecondary:'#7c3aed', textTertiary:'#a78bfa', border:'#e9d5ff', accent:'#1a1a2e', gradientFrom:'#7c3aed', gradientTo:'#c084fc' },
-        { bg:'#f0fdf4', cardBg:'#dcfce7', textPrimary:'#052e16', textSecondary:'#166534', textTertiary:'#4ade80', border:'#bbf7d0', accent:'#052e16', gradientFrom:'#16a34a', gradientTo:'#86efac' },
-        { bg:'#fef2f2', cardBg:'#fee2e2', textPrimary:'#1f1315', textSecondary:'#9f1239', textTertiary:'#fb7185', border:'#fecaca', accent:'#1f1315', gradientFrom:'#e11d48', gradientTo:'#fda4af' },
-        { bg:'#f0f9ff', cardBg:'#e0f2fe', textPrimary:'#0c4a6e', textSecondary:'#0369a1', textTertiary:'#7dd3fc', border:'#bae6fd', accent:'#0c4a6e', gradientFrom:'#0284c7', gradientTo:'#60a5fa' },
-        { bg:'#fff7ed', cardBg:'#ffedd5', textPrimary:'#1a1625', textSecondary:'#9a5531', textTertiary:'#fdba74', border:'#fed7aa', accent:'#1a1625', gradientFrom:'#ea580c', gradientTo:'#fb923c' },
+        { bg:'#07111f', cardBg:'#0d1b2a', textPrimary:'#f8fafc', textSecondary:'#94a3b8', textTertiary:'#64748b', border:'#1e293b', accent:'#38bdf8', gradientFrom:'#0ea5e9', gradientTo:'#22c55e' },
     ];
-    const paletteRef = useRef<CardPalette>(palettes[Math.floor(Math.random() * palettes.length)]);
+    const paletteRef = useRef<CardPalette>(palettes[0]);
 
     const sortedPortfolio = useMemo(() => {
         return [...portfolio].sort((a, b) => a.ticker.localeCompare(b.ticker));
     }, [portfolio]);
 
-    const handleExportAction = async (item: PortfolioItem, format: 'pdf' | 'image', hideValues: boolean) => {
+    const shareDialogOpen = exportTarget !== null || isSummarySelected;
+    const { data: shareHistories = {}, isFetching: shareHistoryLoading } = useQuery<Record<string, ShareChartPoint[]>>({
+        queryKey: ["portfolio-share-history", portfolio.map(item => `${item.ticker}:${item.lots}`).join("|"), transactions.map(tx => `${tx.ticker}:${tx.lots}:${tx.type}:${tx.timestamp}`).join("|")],
+        enabled: shareDialogOpen && portfolio.length > 0,
+        staleTime: 15 * 60 * 1000,
+        queryFn: async () => {
+            const tickers = [...new Set([...portfolio.map(item => item.ticker), ...transactions.map(tx => tx.ticker)])];
+            const entries = await Promise.all(tickers.map(async ticker => {
+                const response = await fetch(`/api/stocks/history?ticker=${encodeURIComponent(ticker)}&period=1mo&interval=1d`);
+                if (!response.ok) return [ticker, []] as const;
+                const payload = await response.json();
+                const points = payload.success && Array.isArray(payload.data)
+                    ? payload.data
+                        .filter((point: ShareChartPoint) => Number.isFinite(Number(point.time)) && Number.isFinite(Number(point.close)))
+                        .map((point: ShareChartPoint) => ({ time: Number(point.time), close: Number(point.close) }))
+                        .sort((a: ShareChartPoint, b: ShareChartPoint) => a.time - b.time)
+                    : [];
+                return [ticker, points] as const;
+            }));
+            return Object.fromEntries(entries);
+        },
+    });
+
+    const portfolioSparkline = useMemo(() => {
+        const byDate = new Map<number, number>();
+        const currentLots = new Map(portfolio.map(item => [item.ticker, Number(item.lots)]));
+        for (const [ticker, points] of Object.entries(shareHistories)) {
+            const tickerTransactions = transactions.filter(tx => tx.ticker === ticker);
+            for (const point of points) {
+                const pointTime = point.time * 1000;
+                const laterLotDelta = tickerTransactions.reduce((sum, tx) => {
+                    if (new Date(tx.timestamp).getTime() <= pointTime) return sum;
+                    return sum + (tx.type === 'buy' ? Number(tx.lots) : -Number(tx.lots));
+                }, 0);
+                const lotsAtDate = Math.max(0, (currentLots.get(ticker) || 0) - laterLotDelta);
+                byDate.set(point.time, (byDate.get(point.time) || 0) + Number(point.close) * lotsAtDate * 100);
+            }
+        }
+        return [...byDate.entries()].sort((a, b) => a[0] - b[0]).map(([, value]) => value);
+    }, [portfolio, shareHistories, transactions]);
+
+    const handleExportAction = async (item: PortfolioItem, format: 'pdf' | 'image' | 'share', hideValues: boolean) => {
         setIsExporting(true);
 
         const quote = marketData[item.ticker];
@@ -88,6 +155,10 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         const mask = (val: string) => hideValues ? '••••••••' : val;
 
         const pal2 = paletteRef.current;
+        const tickerTrend = (shareHistories[item.ticker] || []).map(point => Number(point.close)).filter(Number.isFinite);
+        const tickerPath = sparklinePath(tickerTrend);
+        const tickerTrendMeta = getTrend(tickerTrend);
+        const trendColor = tickerTrendMeta.color;
 
         const exportEl = document.createElement('div');
         exportEl.style.width = format === 'pdf' ? '210mm' : '500px';
@@ -100,7 +171,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         exportEl.style.borderRadius = '24px';
 
         const prc = isProfit ? '#059669' : '#dc2626';
-        const prcl = isProfit ? '#ecfdf5' : '#fef2f2';
+        const prcl = isProfit ? 'rgba(5,150,105,.15)' : 'rgba(220,38,38,.15)';
 
         exportEl.innerHTML = `
             <div style="display: flex; flex-direction: column;">
@@ -128,11 +199,18 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                     </div>
 
                     <!-- Return Hero -->
-                    <div style="background: linear-gradient(135deg, ${prcl} 0%, #ffffff 80%); border-radius: 20px; padding: 24px 20px; margin-bottom: 24px; text-align: center;">
-                        <span style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Return</span>
+                    <div style="background: linear-gradient(135deg, ${prcl} 0%, ${pal2.cardBg} 80%); border: 1px solid ${pal2.border}; border-radius: 20px; padding: 24px 20px; margin-bottom: 24px; text-align: left;">
+                        <span style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Return sejak beli</span>
                         <div style="font-size: 48px; font-weight: 700; color: ${prc}; letter-spacing: -0.03em; line-height: 1.1; margin-top: 6px; font-feature-settings: 'tnum' 1; text-shadow: 0 1px 3px rgba(0,0,0,0.06);">
                             ${formatPercentage(gainLossPercent)}
                         </div>
+                        <div style="display:flex; align-items:end; justify-content:space-between; margin-top:18px;">
+                            <span style="font-size:10px; color:${pal2.textTertiary};">MOMENTUM 1 BULAN</span>
+                            <span style="font-size:10px; color:${trendColor};">${trendLabel(tickerTrendMeta)}</span>
+                        </div>
+                        <svg viewBox="0 0 380 82" width="100%" height="82" style="display:block; margin-top:8px; overflow:visible;">
+                            <path d="${tickerPath}" fill="none" stroke="${trendColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                     </div>
 
                     <!-- Stats Grid -->
@@ -140,7 +218,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                         <div style="background: ${pal2.cardBg}; border-radius: 14px; padding: 16px 18px;">
                             <div style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Market Value</div>
                             <div style="font-size: 17px; font-weight: 600; color: ${pal2.textPrimary}; letter-spacing: -0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.04);">${mask(formatIDR(marketValue))}</div>
-                            <div style="font-size: 10px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">Current price × shares</div>
+                            <div style="font-size: 10px; font-weight: 400; color: ${pal2.textTertiary}; margin-top: 2px;">Harga terkini × jumlah saham</div>
                         </div>
                         <div style="background: ${pal2.cardBg}; border-radius: 14px; padding: 16px 18px;">
                             <div style="font-size: 10px; font-weight: 500; color: ${pal2.textSecondary}; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">P/L</div>
@@ -191,7 +269,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
             if (format === 'pdf') {
                 exportToPDF(exportEl, { title: `${item.ticker}_Report` });
             } else {
-                await exportToImage(exportEl, { fileName: `${item.ticker}_Profit_Card` });
+                await exportToImage(exportEl, { fileName: `${item.ticker}_Profit_Card`, share: format === 'share', shareTitle: `Return ${item.ticker.replace('.JK', '')}` });
             }
         } finally {
             document.body.removeChild(exportEl);
@@ -200,7 +278,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         }
     };
 
-    const handleExportPortfolioAction = async (portfolioItems: PortfolioItem[], market: Record<string, StockPrice>, format: 'pdf' | 'image', hideValues: boolean = false) => {
+    const handleExportPortfolioAction = async (portfolioItems: PortfolioItem[], market: Record<string, StockPrice>, format: 'image' | 'share', hideValues: boolean = false) => {
         setIsExporting(true);
 
         let totalInvested = 0;
@@ -219,6 +297,9 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         const mask = (val: string) => hideValues ? '••••••••' : val;
 
         const pal = paletteRef.current;
+        const portfolioPath = sparklinePath(portfolioSparkline);
+        const portfolioTrendMeta = getTrend(portfolioSparkline);
+        const portfolioTrendColor = portfolioTrendMeta.color;
 
         const exportEl = document.createElement('div');
         exportEl.style.width = '500px';
@@ -231,7 +312,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
         exportEl.style.borderRadius = '24px';
 
         const rc = isProfit ? '#059669' : '#dc2626';
-        const rclight = isProfit ? '#ecfdf5' : '#fef2f2';
+        const rclight = isProfit ? 'rgba(5,150,105,.15)' : 'rgba(220,38,38,.15)';
 
         exportEl.innerHTML = `
             <div style="display: flex; flex-direction: column;">
@@ -250,11 +331,18 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                     </div>
 
                     <!-- Return Hero -->
-                    <div style="background: linear-gradient(135deg, ${rclight} 0%, #ffffff 80%); border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; text-align: center;">
-                        <span style="font-size: 11px; font-weight: 500; color: ${pal.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Total Return</span>
+                    <div style="background: linear-gradient(135deg, ${rclight} 0%, ${pal.cardBg} 80%); border: 1px solid ${pal.border}; border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; text-align: left;">
+                        <span style="font-size: 11px; font-weight: 500; color: ${pal.textSecondary}; letter-spacing: 0.02em; text-transform: uppercase;">Return sejak beli</span>
                         <div style="font-size: 56px; font-weight: 700; color: ${rc}; letter-spacing: -0.03em; line-height: 1.1; margin-top: 8px; font-feature-settings: 'tnum' 1; text-shadow: 0 1px 3px rgba(0,0,0,0.06);">
                             ${formatPercentage(totalReturn)}
                         </div>
+                        <div style="display:flex; align-items:end; justify-content:space-between; margin-top:18px;">
+                            <span style="font-size:10px; color:${pal.textTertiary};">MOMENTUM PORTFOLIO · 1 BULAN</span>
+                            <span style="font-size:10px; color:${portfolioTrendColor};">${trendLabel(portfolioTrendMeta)}</span>
+                        </div>
+                        <svg viewBox="0 0 380 82" width="100%" height="82" style="display:block; margin-top:8px; overflow:visible;">
+                            <path d="${portfolioPath}" fill="none" stroke="${portfolioTrendColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                     </div>
 
                     <!-- Stats Grid -->
@@ -334,7 +422,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
         document.body.appendChild(exportEl);
         try {
-            await exportToImage(exportEl, { fileName: `Portfolio_Summary_Card` });
+            await exportToImage(exportEl, { fileName: `Portfolio_Summary_Card`, share: format === 'share', shareTitle: 'Portfolio Return' });
         } finally {
             document.body.removeChild(exportEl);
             setIsExporting(false);
@@ -358,10 +446,13 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <p className="text-lg font-bold">Daftar Aset</p>
-                    <p className="text-xs text-muted-foreground">Monitoring performa per aset</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <span>Monitoring performa per aset</span><span aria-hidden="true">·</span>
+                        <span className={marketError ? "text-destructive" : undefined}>{marketError ? "Provider harga bermasalah—menampilkan data terakhir" : marketLastUpdated ? `Diperbarui ${marketLastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}` : "Memuat harga…"}</span>
+                    </div>
                 </div>
                 <Button disabled={isExporting} onClick={() => setIsSummarySelected(true)}>
-                    <ImageIcon className="w-3.5 h-3.5 mr-1" />Share Return
+                    <ImageIcon className="mr-1.5 h-3.5 w-3.5" />Bagikan Return
                 </Button>
             </div>
 
@@ -369,11 +460,11 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-left">Saham</TableHead>
-                            <TableHead className="text-right">Lot</TableHead>
-                            <TableHead className="text-right">Avg Price</TableHead>
-                            <TableHead className="text-right">Current</TableHead>
-                            <TableHead className="text-right">Day Chg</TableHead>
+                            <TableHead className="sticky left-0 z-20 bg-card text-left">Saham</TableHead>
+                            <TableHead className="hidden text-right sm:table-cell">Lot</TableHead>
+                            <TableHead className="hidden text-right lg:table-cell">Avg Price</TableHead>
+                            <TableHead className="hidden text-right md:table-cell">Current</TableHead>
+                            <TableHead className="hidden text-right xl:table-cell">Day Chg</TableHead>
                             <TableHead className="text-right">Value</TableHead>
                             <TableHead className="text-right">P/L</TableHead>
                             <TableHead className="text-right">Return</TableHead>
@@ -398,16 +489,16 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
 
                             return (
                                 <TableRow key={item.id}>
-                                    <TableCell>
+                                        <TableCell className="sticky left-0 z-10 bg-card">
                                         <Badge variant="outline" className="font-mono font-bold text-primary mr-1 mb-0.5">{item.ticker}</Badge>
                                         <div className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider truncate max-w-[150px]">{quote?.name || companyNames[item.ticker] || item.name}</div>
                                     </TableCell>
-                                    <TableCell className="text-right font-semibold">{formatNumber(item.lots)}</TableCell>
-                                    <TableCell className="text-right text-muted-foreground">{formatIDR(item.averagePrice)}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="hidden text-right font-semibold sm:table-cell">{formatNumber(item.lots)}</TableCell>
+                                    <TableCell className="hidden text-right text-muted-foreground lg:table-cell">{formatIDR(item.averagePrice)}</TableCell>
+                                    <TableCell className="hidden text-right md:table-cell">
                                         <FlashText value={currentPrice} text={currentPrice > 0 ? formatIDR(currentPrice) : '...'} className="font-semibold" />
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="hidden text-right xl:table-cell">
                                         <div className={cn("font-semibold", isDayProfit && "text-success", isDayLoss && "text-destructive")}>
                                             {dailyChangeValue > 0 ? "+" : ""}{formatIDR(dailyChangeValue)}
                                         </div>
@@ -428,7 +519,7 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
                                         <div className="flex items-center justify-center gap-0.5">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setProjectionTarget(item)} title="Proyeksi Harga"><Target className="w-3.5 h-3.5" /></Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAvgDownTarget(item)} title="Average Down"><Calculator className="w-3.5 h-3.5" /></Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExportTarget(item)} title="Export"><Download className="w-3.5 h-3.5" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExportTarget(item)} title={`Bagikan return ${item.ticker}`} aria-label={`Bagikan return ${item.ticker}`}><Download className="w-3.5 h-3.5" /></Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionId(item.id)} title="Beli/Jual"><ArrowRightLeft className="w-3.5 h-3.5" /></Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingId(item.id)} title="Edit"><Edit2 className="w-3.5 h-3.5" /></Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteConfirm({ id: item.id, ticker: item.ticker, name: item.name })} title="Hapus"><Trash2 className="w-3.5 h-3.5" /></Button>
@@ -526,40 +617,80 @@ export function PortfolioTable({ portfolio, marketData, onRemove, onUpdate, onTr
             </Dialog>
 
             <Dialog open={exportTarget !== null} onOpenChange={() => setExportTarget(null)}>
-                <DialogContent className="sm:max-w-sm">
+                <DialogContent className="overflow-hidden p-0 sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Export Laporan</DialogTitle>
-                        <DialogDescription>{exportTarget?.ticker} — {exportTarget && (marketData[exportTarget.ticker]?.name || companyNames[exportTarget.ticker] || exportTarget.name)}</DialogDescription>
+                        <div className="border-b px-6 pb-4 pt-6">
+                            <DialogTitle>Bagikan return saham</DialogTitle>
+                            <DialogDescription className="mt-1">Buat kartu performa {exportTarget?.ticker.replace('.JK', '')} yang siap dibagikan.</DialogDescription>
+                        </div>
                     </DialogHeader>
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                            <Button disabled={isExporting} onClick={() => exportTarget && handleExportAction(exportTarget, 'pdf', false)} variant="outline">
-                                <FileText className="w-4 h-4 mr-2" />PDF
+                    <div className="space-y-4 px-6 pb-6">
+                        {exportTarget ? (() => {
+                            const price = marketData[exportTarget.ticker]?.price || 0;
+                            const cost = exportTarget.averagePrice * exportTarget.lots * 100;
+                            const pnl = price * exportTarget.lots * 100 - cost;
+                            const returns = cost > 0 ? pnl / cost * 100 : 0;
+                            const trend = (shareHistories[exportTarget.ticker] || []).map(point => Number(point.close)).filter(Number.isFinite);
+                            const path = sparklinePath(trend, 360, 72);
+                            const trendMeta = getTrend(trend);
+                            return (
+                                <div className="rounded-2xl border bg-[#07111f] p-5 text-white shadow-sm">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div><p className="font-mono text-lg font-bold">{exportTarget.ticker.replace('.JK', '')}</p><p className="mt-0.5 max-w-56 truncate text-[11px] text-slate-400">{marketData[exportTarget.ticker]?.name || companyNames[exportTarget.ticker] || exportTarget.name}</p></div>
+                                        <span className="rounded-full border border-slate-700 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">Preview</span>
+                                    </div>
+                                    <p className="mt-7 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Return sejak beli</p>
+                                    <p className={cn("mt-1 font-mono text-4xl font-bold tracking-tight", returns >= 0 ? "text-emerald-400" : "text-rose-400")}>{returns >= 0 ? "+" : ""}{returns.toFixed(2)}%</p>
+                                    <div className="mt-5 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider"><span className="text-slate-500">Momentum 1 bulan</span><span style={{ color: trendMeta.color }}>{trendLabel(trendMeta)}</span></div>
+                                    {path ? <svg viewBox="0 0 360 72" className="mt-2 h-16 w-full overflow-visible" aria-label={`Tren harga ${trendMeta.label.toLowerCase()}`}><path d={path} fill="none" stroke={trendMeta.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg> : <div className="mt-2 flex h-16 items-center justify-center rounded-lg bg-slate-900 text-[10px] text-slate-500">Histori belum tersedia</div>}
+                                    <div className="mt-5 flex justify-between border-t border-slate-800 pt-3 text-xs"><span className="text-slate-400">P&amp;L</span><span className={cn("font-mono font-semibold", pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>{pnl >= 0 ? "+" : ""}{formatIDR(pnl)}</span></div>
+                                </div>
+                            );
+                        })() : null}
+                        <div className="grid grid-cols-3 gap-2">
+                            <Button disabled={isExporting || shareHistoryLoading} onClick={() => exportTarget && handleExportAction(exportTarget, 'share', false)}>
+                                <Share2 className="mr-2 h-4 w-4" />Bagikan
                             </Button>
-                            <Button disabled={isExporting} onClick={() => exportTarget && handleExportAction(exportTarget, 'image', false)} variant="outline">
-                                <ImageIcon className="w-4 h-4 mr-2" />Image
+                            <Button disabled={isExporting || shareHistoryLoading} onClick={() => exportTarget && handleExportAction(exportTarget, 'image', false)}>
+                                <ImageIcon className="mr-2 h-4 w-4" />PNG
+                            </Button>
+                            <Button disabled={isExporting || shareHistoryLoading} onClick={() => exportTarget && handleExportAction(exportTarget, 'pdf', false)} variant="outline">
+                                <FileText className="mr-2 h-4 w-4" />PDF
                             </Button>
                         </div>
-                        <Button disabled={isExporting} onClick={() => exportTarget && handleExportAction(exportTarget, 'image', true)} variant="outline" className="w-full">
-                            <Shield className="w-4 h-4 mr-2" />Mode Privasi
+                        <Button disabled={isExporting || shareHistoryLoading} onClick={() => exportTarget && handleExportAction(exportTarget, 'image', true)} variant="outline" className="w-full">
+                            <Shield className="mr-2 h-4 w-4" />Unduh tanpa nominal
                         </Button>
+                        <p className="text-center text-[10px] leading-relaxed text-muted-foreground">Mode privasi tetap menampilkan persentase return, tetapi menyamarkan nilai investasi dan P&amp;L.</p>
                     </div>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={isSummarySelected} onOpenChange={() => setIsSummarySelected(false)}>
-                <DialogContent className="sm:max-w-sm">
+                <DialogContent className="overflow-hidden p-0 sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Portfolio Summary</DialogTitle>
-                        <DialogDescription>Bagikan ringkasan performa</DialogDescription>
+                        <div className="border-b px-6 pb-4 pt-6">
+                            <DialogTitle>Bagikan return portofolio</DialogTitle>
+                            <DialogDescription className="mt-1">Ringkasan seluruh posisi dalam satu kartu visual.</DialogDescription>
+                        </div>
                     </DialogHeader>
-                    <div className="space-y-3">
-                        <Button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', false); setIsSummarySelected(false); }} variant="outline" className="w-full">
-                            <ImageIcon className="w-4 h-4 mr-2" />Normal Card
+                    <div className="space-y-4 px-6 pb-6">
+                        {(() => {
+                            const stats = portfolio.reduce((acc, item) => { const price = marketData[item.ticker]?.price || 0; const shares = item.lots * 100; acc.cost += item.averagePrice * shares; acc.value += price * shares; return acc; }, { cost: 0, value: 0 });
+                            const pnl = stats.value - stats.cost;
+                            const returns = stats.cost > 0 ? pnl / stats.cost * 100 : 0;
+                            const path = sparklinePath(portfolioSparkline, 360, 72);
+                            const trendMeta = getTrend(portfolioSparkline);
+                            return <div className="rounded-2xl border bg-[#07111f] p-5 text-white shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-semibold">Portfolio Return</p><span className="text-[10px] text-slate-500">{portfolio.length} saham</span></div><p className="mt-7 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Return sejak beli</p><p className={cn("mt-1 font-mono text-4xl font-bold", returns >= 0 ? "text-emerald-400" : "text-rose-400")}>{returns >= 0 ? "+" : ""}{returns.toFixed(2)}%</p><div className="mt-5 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider"><span className="text-slate-500">Momentum 1 bulan</span><span style={{ color: trendMeta.color }}>{trendLabel(trendMeta)}</span></div>{path ? <svg viewBox="0 0 360 72" className="mt-2 h-16 w-full overflow-visible"><path d={path} fill="none" stroke={trendMeta.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg> : <div className="mt-2 flex h-16 items-center justify-center rounded-lg bg-slate-900 text-[10px] text-slate-500">Histori belum tersedia</div>}<div className="mt-5 flex justify-between border-t border-slate-800 pt-3 text-xs"><span className="text-slate-400">Total P&amp;L</span><span className={cn("font-mono font-semibold", pnl >= 0 ? "text-emerald-400" : "text-rose-400")}>{pnl >= 0 ? "+" : ""}{formatIDR(pnl)}</span></div></div>;
+                        })()}
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button disabled={isExporting || shareHistoryLoading} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'share', false); setIsSummarySelected(false); }}><Share2 className="mr-2 h-4 w-4" />Bagikan</Button>
+                            <Button disabled={isExporting || shareHistoryLoading} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', false); setIsSummarySelected(false); }} variant="outline"><ImageIcon className="mr-2 h-4 w-4" />Unduh PNG</Button>
+                        </div>
+                        <Button disabled={isExporting || shareHistoryLoading} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', true); setIsSummarySelected(false); }} variant="outline" className="w-full">
+                            <Shield className="mr-2 h-4 w-4" />Unduh tanpa nominal
                         </Button>
-                        <Button disabled={isExporting} onClick={async () => { await handleExportPortfolioAction(portfolio, marketData, 'image', true); setIsSummarySelected(false); }} variant="outline" className="w-full">
-                            <Shield className="w-4 h-4 mr-2" />Mode Privasi
-                        </Button>
+                        <p className="text-center text-[10px] text-muted-foreground">Ekspor PNG resolusi tinggi, cocok untuk WhatsApp dan media sosial.</p>
                     </div>
                 </DialogContent>
             </Dialog>

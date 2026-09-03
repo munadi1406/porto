@@ -231,21 +231,27 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
 
-                {/* KPI Cards — StatCard */}
+                {/* KPI Cards — staggered entrance (focal hierarchy, 80ms) */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <StatCard label="Total Value" value={`Rp ${(metrics.totalValue / 1000000).toFixed(2)}M`} delta="IDR" tone="neutral" icon={BarChart3} />
-                    <StatCard label="Beta" value={riskMetrics.beta.toFixed(2)} delta="vs IHSG" tone={riskMetrics.beta > 1 ? "neutral" : "success"} icon={Activity} />
-                    <StatCard label="Correlation" value={`${(riskMetrics.correlation * 100).toFixed(0)}%`} delta="with IHSG" tone="neutral" icon={Target} />
-                    <StatCard label="Volatility" value={`${riskMetrics.volatility.toFixed(1)}%`} delta="annualized" tone={riskMetrics.volatility > 20 ? "danger" : "success"} icon={Activity} />
-                    <StatCard label="Sharpe" value={metrics.sharpe.toFixed(2)} delta="ratio" tone={metrics.sharpe > 1 ? "success" : "neutral"} icon={TrendingUp} />
-                    <StatCard label="Max DD" value={`${metrics.maxDrawdown.toFixed(1)}%`} delta="drawdown" tone="danger" icon={TrendingDown} />
+                    {[
+                        { label:"Total Value", value:`Rp ${(metrics.totalValue / 1000000).toFixed(2)}M`, delta:"IDR", tone:"neutral" as const, icon:BarChart3 },
+                        { label:"Beta", value:riskMetrics.beta.toFixed(2), delta:"vs IHSG", tone:(riskMetrics.beta > 1 ? "neutral" : "success") as any, icon:Activity },
+                        { label:"Correlation", value:`${(riskMetrics.correlation * 100).toFixed(0)}%`, delta:"with IHSG", tone:"neutral" as const, icon:Target },
+                        { label:"Volatility", value:`${riskMetrics.volatility.toFixed(1)}%`, delta:"annualized", tone:(riskMetrics.volatility > 20 ? "danger" : "success") as any, icon:Activity },
+                        { label:"Sharpe", value:metrics.sharpe.toFixed(2), delta:"ratio", tone:(metrics.sharpe > 1 ? "success" : "neutral") as any, icon:TrendingUp },
+                        { label:"Max DD", value:`${metrics.maxDrawdown.toFixed(1)}%`, delta:"drawdown", tone:"danger" as const, icon:TrendingDown },
+                    ].map((c,i) => (
+                        <div key={c.label} className="animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none" style={{ animationDelay: `${i*80}ms`, animationFillMode: 'backwards' }}>
+                            <StatCard label={c.label} value={c.value} delta={c.delta} tone={c.tone} icon={c.icon} />
+                        </div>
+                    ))}
                 </div>
 
                 {/* 11.B6 Portfolio Stress Test – pure client calc, slider IHSG -5/-10/-20, loss = beta * shock * totalValue */}
                 <StressTestCard beta={riskMetrics.beta} totalValue={metrics.totalValue} />
 
-                {/* Performance Chart - dark style like reference */}
-                <div className="rounded-xl overflow-hidden border shadow-lg bg-[#0a0a0a] border-neutral-800">
+                {/* Performance Chart - focal authored entrance */}
+                <div className="rounded-xl overflow-hidden border border-neutral-800 shadow-[0_4px_24px_rgba(0,0,0,0.4)] bg-[#0a0a0a] animate-in fade-in duration-500 motion-reduce:animate-none">
                     <div className="p-4 pb-2">
                         <div className="flex items-center gap-1.5 mb-3">
                             <h3 className="text-sm font-bold text-white">Cumulative Portfolio Return</h3>
@@ -257,7 +263,7 @@ export default function AnalyticsPage() {
                             const iVal = Number(last.ihsg);
                             return (
                                 <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div className="flex items-center justify-between px-3 py-2 rounded bg-neutral-900 border border-neutral-800">
+                                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-800 transition-colors duration-150">
                                         <span className="flex items-center gap-2 text-xs text-neutral-300">
                                             <span className="w-0.5 h-4 bg-emerald-500 rounded" /> Portfolio
                                         </span>
@@ -265,7 +271,7 @@ export default function AnalyticsPage() {
                                             {pVal > 0 ? "+" : ""}{pVal.toFixed(2)}%
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between px-3 py-2 rounded bg-neutral-900 border border-neutral-800">
+                                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-800 transition-colors duration-150">
                                         <span className="flex items-center gap-2 text-xs text-neutral-300">
                                             <span className="w-0.5 h-4 bg-purple-500 rounded" /> IHSG
                                         </span>
@@ -307,7 +313,7 @@ export default function AnalyticsPage() {
                             <button
                                 key={p}
                                 onClick={() => setPeriod(p)}
-                                className={cn("pb-1 border-b-2 transition-colors", period === p ? "border-emerald-500 text-white font-bold" : "border-transparent text-neutral-500 hover:text-neutral-300")}
+                                className={cn("pb-1 border-b-2 will-change-transform active:scale-[0.96] transition-[color,border-color,transform] duration-150 ease-out", period === p ? "border-emerald-500 text-white font-bold" : "border-transparent text-neutral-500 hover:text-neutral-300")}
                             >{p}</button>
                         ))}
                     </div>

@@ -2,9 +2,30 @@
 
 > **IDX Investment Terminal** — Next.js 16.1.1 (App Router) + Custom WebSocket Server (`server.ts`) + MySQL (Sequelize) + Yahoo Finance + IDX Bridge + OpenCode AI
 >
-> Generated: 2026-08-28 (updated after Sprint 1-5) | Workspace: `D:\qna\porto` | Branch: `main` | Commit `e49159c`-`ff983af`
+> Generated: 2026-09-03 (updated after portfolio reliability + market-data sprint) | Workspace: `D:\qna\porto` | Branch: `main`
 >
 > **Language:** English (primary) — each API endpoint includes **EN / ID** description.
+
+---
+
+## Current Update — 2026-09-03
+
+This blueprint reflects the current implementation, not the earlier sprint assumptions.
+
+| Area | Current state |
+|------|---------------|
+| Portfolio return | Total Equity remains a chart; Total Equity Return is a Daily/Monthly table with normalized P&L, percentage return, and dividends. |
+| Cash accounting | `CashHolding` is the current balance; `CashLedger` persists deposits, withdrawals, buys, sells, and adjustments. External cash flows are excluded from normalized return. |
+| Historical portfolio | Equity history uses Yahoo Finance prices, ledger cash reconstruction, transaction-aware lots, and dividend events. Legacy cash changes before ledger creation cannot be reconstructed. |
+| Market breadth | `/api/idx/market-breadth` is independent from the full market scan, accepts partial Yahoo quotes, stores a persistent cache, and returns stale/unavailable states instead of a hard 502. |
+| Market dashboard | Breadth, movers, sectors, and stocks load with `Promise.allSettled`; one provider failure no longer hides successful panels. |
+| Share return | Portfolio and per-ticker cards include a real one-month sparkline, explicit momentum percentage, native share-sheet support, PNG/PDF export, and privacy mode. |
+| Mobile tables | Holdings prioritise core columns on small screens; financial tables use horizontal scrolling with a sticky metric column. |
+| Data freshness | Portfolio and equity surfaces show source and update time; empty states distinguish loading, provider failure, market closed, and no history. |
+
+### Data-flow note
+
+The market overview uses Yahoo Finance for the broad 959-stock scan. IDX/Firecrawl settings do not control breadth. The JSON ticker catalogue is statically bundled so `.next`-only deployments do not lose the ticker list.
 
 ---
 
@@ -27,13 +48,13 @@
 | Dimension | Value |
 |-----------|-------|
 | **Framework** | Next.js 16.1.1 App Router, Turbopack, `src/app/layout.tsx` RootLayout |
-| **Runtime WS** | `server.js` cPanel-ready (`node server.js`, `HOST 0.0.0.0`) + `server.ts` dev (`npx tsx server.ts`), Socket.IO `path /ws` (was `ws`), fallback polling 5s |
+| **Runtime** | Next custom server remains cPanel-ready; market prices are currently fetched through HTTP polling (`POST /api/price-batch`) every 5s. Socket.IO infrastructure remains available for legacy/live consumers but is not the primary portfolio market-data path. |
 | **State** | Zustand (`usePortfolios`, `useWatchlist`), TanStack Query (`useCashAndHistory`), localStorage cache |
 | **DB** | MySQL via `sequelize` + `mysql2`, auto-migrate `src/lib/migrate.ts` |
 | **Charts** | `lightweight-charts` + `recharts` + `html2canvas` |
-| **Page Routes** | 16 `page.tsx` (11 active + 5 redirect dead) + 1 dynamic `[ticker]` + 20 `error.tsx`/`loading.tsx` (Sprint 2) |
+| **Page Routes** | 16 `page.tsx` (visible active routes plus compatibility redirects) + 1 dynamic `[ticker]` + route-level error/loading boundaries |
 | **API Routes** | 64 active `route.ts` (61 + 3 new: `news/ihsg`, `backtest/ai-*` ) + 12 scaffold now 501 (was 16 empty) |
-| **Sidebar Items** | 13 active (4 groups: Pasar / Analisis Saham / Data Referensi / Portofolio) + 0 dead visible (`Agregat` hidden via `status:dead`) + 2 dynamic (Watchlist, Portofolio Saya) + Locale EN/ID toggle |
+| **Sidebar Items** | Active navigation is sourced from `src/config/navigation.ts`; Performance is no longer a visible portfolio menu item, while the legacy `/analytics` route remains compatible. |
 
 ---
 
@@ -74,7 +95,7 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 |---|-------|-----|------|------|--------|----|----|
 | 10 | Ringkasan Portofolio | `/portfolio-dashboard` | `LayoutDashboard` | `src/app/portfolio-dashboard/page.tsx` | **ACTIVE** | Holdings overview, P/L, allocation, equity growth, target, **StressTest, RebalancingAdvisor**, tax 0.1% | Overview holdings, stress test, rebalancing |
 | 11 | Agregat | `/aggregate` | `Layers` | `src/app/aggregate/page.tsx` | **HIDDEN** `status:dead` filtered via `getActiveNav()` — redirect kept for compat | Hidden | Disembunyikan |
-| 12 | Performa | `/analytics` | `TrendingUp` | `src/app/analytics/page.tsx` | **ACTIVE** | `Performa Portofolio / Portfolio Analytics` bilingual, dark cumulative return vs IHSG, `var(--chart-1/2)` tokens | Performa bilingual, chart token |
+| 12 | Performa | `/analytics` | `TrendingUp` | `src/app/analytics/page.tsx` | **ROUTE KEPT, MENU REMOVED** | Legacy analytics route retained for compatibility; primary performance view is now inside Ringkasan Portofolio | Route lama dipertahankan, menu dihapus |
 | 13 | Transaksi | `/history` | `History` | `src/app/history/page.tsx` | **ACTIVE** | Transactions + Tax 0.1% card + Journal note | Transaksi + pajak |
 
 ### 2.5 Dynamic Sections
@@ -106,8 +127,8 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
   - `brokers`: `<BrokerSummaryPanel />`.
   - `all-stocks`: searchable table 100 rows (code, name, price, change, volume, value).
   - `sectors`: SectorPerformanceCard full.
-- **Data:** `GET /api/idx/market-index`, `GET /api/idx/market-scan` (959 stocks → mostActive/gainers/losers/breadth/sectors), `GET /api/idx/broker-summary` (warmup session+proxy 15-60s), `GET /api/idx/foreign-flow` (official).
-- **WS:** Build `liveTickers` ~40 (tape + indices + mostActive + gainers/losers) single WS via `useMarketData`.
+- **Data:** `GET /api/idx/market-index`, independent `/api/idx/market-breadth`, `/api/idx/market-movers`, `/api/idx/market-sectors`, `/api/idx/market-stocks`, `GET /api/idx/broker-summary`, and `GET /api/idx/foreign-flow`.
+- **Live prices:** `useMarketData` currently uses HTTP `POST /api/price-batch` polling every 5s. The market scan endpoints use Yahoo Finance and persistent/stale cache behavior.
 
 ### 3.2 `/screener` — Stock Screener
 
@@ -136,7 +157,7 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 - **Tabs:** **Statistik** (6 StatCards + EquityCurve vs B&H + NextEntryCard + TradesTable), **Entry AI** (`BacktestAiSummary` POST `/api/backtest/ai-summary` + `PositionCalculator` ranking-aware), **Kalkulator** (`PositionCalculator` manual/avg_down/avg_up), **Banding** (`RankTable` trophy, barsUsed warning for SMA200 <210).
 - **Calculator:** `src/lib/positionCalc.ts` pure, lot = floor(shares/100)*100, riskBudget, slPrice, avgEntry.
 
-### 3.4 `/analytics` — Performa (Portfolio Analytics)
+### 3.4 `/analytics` — Performa (legacy compatibility route)
 
 ![Screenshot: Analytics — KPI Cards](docs/screenshots/analytics-kpi.png)
 ![Screenshot: Analytics — Cumulative Return Dark Chart](docs/screenshots/analytics-cumulative.png)
@@ -156,7 +177,7 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 
 - **File:** `src/app/portfolio-dashboard/page.tsx` 600+ lines.
 - **Hooks:** `usePortfolio` + `usePortfolios` + `useMarketData(tickers)` + `useCashAndHistory` (cash, transactions, history, `getHistoryForPeriod`, `recordSnapshot` throttled 5min).
-- **Tabs:** `overview | holdings | analytics | target`. Overview: SummaryCard 4 (Net Worth, Unreal P/L, Modal, Cash), 4 stat mini (Total Saham, Best/Worst, Cash Ratio), `EquityGrowthChart`, `AllocationChart` pie, `GainLossChart`, `MonthlyPerformanceHeatmap`, Holdings Preview 5 rows → `/analysis`, `CashManager`, `ExportPDFButton`. Holdings: `PortfolioTable` + add modal. Target: `TargetPortfolio`.
+- **Tabs:** `overview | holdings | target | compare`. Overview: SummaryCard 4 (Net Worth, Unreal P/L, Modal, Cash), 4 stat mini (Total Saham, Best/Worst, Cash Ratio), `EquityGrowthChart` plus Total Equity Return table, `AllocationChart` pie, `GainLossChart`, `MonthlyPerformanceHeatmap`, `StressTestCard`, Holdings Preview 5 rows → `/analysis`, `CashManager`, `ExportPDFButton`. Holdings: `PortfolioTable` + add modal + share return per ticker. Target: `TargetPortfolio`. Performa is no longer a visible tab.
 
 ### 3.6 `/fundamentals` — Fundamental Terminal
 
@@ -255,7 +276,11 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 | # | Method & Path | File | EN | ID | Query | Response | Consumer |
 |---|---------------|------|----|----|-------|----------|----------|
 | 10 | `GET /api/idx/market-index` | `api/idx/market-index/route.ts` | Yahoo `YAHOO_INDICES` (^JKSE, ^JKSE etc) | Indeks Yahoo | — | `{success:true,data:[{symbol,price,change}]}` | `/` Index Strip, `getMarketStatus` |
-| 11 | `GET /api/idx/market-scan` | `api/idx/market-scan/route.ts` | **Core** — fetch ALL 959 Yahoo, derive mostActive byVolume/byValue, gainers/losers, breadth (advance/decline), sector performance, allStocks | Inti — fetch SEMUA 959 saham | — | `{mostActive, gainers, losers, breadth, sectorPerformance, all}` | `/` 4-card + all-stocks, breadth |
+| 11 | `GET /api/idx/market-scan` | `api/idx/market-scan/route.ts` | Full Yahoo scan for movers/sectors/stocks; breadth has its own fast route | Scan penuh untuk movers/sektor/daftar saham | — | `{mostActive, gainers, losers, breadth, sectorPerformance, all}` | Legacy/full-scan consumers |
+| 11a | `GET /api/idx/market-breadth` | `api/idx/market-breadth/route.ts` | Independent breadth scan with partial coverage + persistent/stale cache | Breadth independen dengan coverage parsial + cache persisten | — | `{total,breadth,coverage,timestamp,source}` | Market overview breadth |
+| 11b | `GET /api/idx/market-movers` | `api/idx/market-movers/route.ts` | Most active, gainers, losers projection | Top aktif, naik, turun | — | `{mostActive,gainers,losers,timestamp}` | Market overview movers |
+| 11c | `GET /api/idx/market-sectors` | `api/idx/market-sectors/route.ts` | Sector projection | Performa sektor | — | `{sectors,timestamp}` | Market overview sectors |
+| 11d | `GET /api/idx/market-stocks` | `api/idx/market-stocks/route.ts` | Full stock list projection | Daftar saham penuh | — | `{total,stocks,timestamp}` | Market overview all stocks |
 | 12 | `GET /api/idx/index-chart?period=&interval=` | `api/idx/index-chart/route.ts` | `PERIOD_DAYS` 1d 5m → 5y 1d, `^JKSE` chart, pivot calc, lastPrice from quote, gap separator | Chart indeks, pivot | `?period=1mo&interval=30m` | `{success:true,data:[{Date,Close,Open,High,Low,Volume}], pivot, lastPrice, quote}` | Analytics, IHSGChart |
 | 13 | `GET /api/idx/all-stocks` | `api/idx/all-stocks/route.ts` | `getStockSummary` + `getLastTradingDate` + Yahoo fallback | Legacy all-stocks | — | `{data:[{code,name}]}` | — |
 | 14 | `GET /api/idx/most-active` | `api/idx/most-active/route.ts` | TOP_TICKERS 30 hard-coded Yahoo most active | Most active legacy | — | `{data:[...]}` | — |
@@ -336,7 +361,7 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 | 58 | `GET /api/portfolios/aggregate` | `api/portfolios/aggregate/route.ts` | Aggregate all portfolios items + cash | Agregat semua | — |
 | 59 | `GET /api/portfolios/aggregate/history` | `api/portfolios/aggregate/history/route.ts` | `getAggregateHistory()` | Histori agregat | — |
 | 60 | `GET/POST/PUT /api/portfolio?id=&portfolioId=` | `api/portfolio/route.ts` | `PortfolioItem` CRUD per portfolio | CRUD item per portofolio | `?id=&portfolioId=` |
-| 61 | `GET/POST /api/cash?portfolioId=` | `api/cash/route.ts` | `CashHolding`, userId aware, validate portfolio exists | Cash | `GET ?portfolioId`, `POST {portfolioId,amount,operation:set|add|subtract}` |
+| 61 | `GET/POST /api/cash?portfolioId=` | `api/cash/route.ts` | `CashHolding` + persistent `CashLedger`; `GET ?history=true` includes ledger | Cash + riwayat cash | `GET ?portfolioId&history=true`, `POST {portfolioId,amount,operation:set|add|subtract,kind?}` |
 | 62 | `GET/POST /api/transactions?portfolioId=` | `api/transactions/route.ts` | `Transaction` + `PortfolioItem` buy/sell | Transaksi | `GET ?portfolioId`, `POST {type,amount}` |
 | 63 | `GET/POST /api/snapshots?portfolioId=&period=` | `api/snapshots/route.ts` | `PortfolioSnapshot` equity growth, `portfolioId`+`period=all|today|...`, 5s refetch | Snapshot ekuitas | `GET ?portfolioId&period=all`, `POST {portfolioId,stockValue,cashValue}`, `DELETE ?portfolioId` |
 
@@ -355,7 +380,7 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 
 ---
 
-## 6. WebSocket Architecture (migrated `ws` → `socket.io` in `51254c7`)
+## 6. Realtime Architecture (HTTP primary, Socket.IO optional)
 
 ![Diagram: WS Flow](docs/screenshots/ws-diagram.png)
 
@@ -369,18 +394,20 @@ Source: `src/config/navigation.ts:1` (central bilingual EN/ID, was `src/componen
 | **Types** | `src/lib/ws-types.ts:1` 70 lines | Same `Subscribe/Unsubscribe/Ping` + `PriceUpdate/MarketStatus/Pong/Welcome/Error`. Socket.IO events: `subscribe`, `unsubscribe`, `price_update`, `market_status`, `pong`, `welcome`. |
 | **Market Hours** | `src/lib/market-hours.ts` | `getMarketStatus()` WIB session. |
 | **Hook `useWebSocket`** | `src/hooks/useWebSocket.ts:1` ~120 lines | Now `socket.io-client` `io(origin,{path:"/ws", transports:["websocket","polling"], reconnection 10×3s})`, `on("connect")` re-subscribe, `on("price_update")` → `setPrices`, `on("market_status"/"welcome"/"pong")`, `on("disconnect")`. `subscribe` → `socket.emit("subscribe",{tickers})`. |
-| **Hook `useMarketData`** | `src/hooks/useMarketData.ts:1` ~130 lines | Wrapper over `useSharedWs()` (was `useWebSocket`), same fallback HTTP `POST /api/price-batch` 5s after 2s if not connected. |
+| **Hook `useMarketData`** | `src/hooks/useMarketData.ts:1` | Primary path is HTTP `POST /api/price-batch` polling every 5s with retry, timeout, last-value retention, and explicit `loading/error/lastUpdated`. |
 | **Consumers** | `/`, `LiveIhsgChip` (now `useSharedWs`), `portfolio-dashboard`, `analytics`, `analysis/[ticker]`, `TickerTape`, `LivePrice`, `AlertChecker` | Single shared socket per tab via `WsProvider` (was dual). |
 
-**Flow (Socket.IO):**
+**Primary flow (HTTP polling):**
 
 ```
 Browser useMarketData(["BBCA.JK","^JKSE"]) → useSharedWs() → socket.emit("subscribe",{tickers})
   → ws-server io.on("subscribe") → manager.subscribe + socket.join(room)
   → PricePublisher 3s/30s → io.to(ticker).emit("price_update",{data})
   → client on("price_update") → setPrices → LivePrice
-Fallback: !connected 2s → POST /api/price-batch 5s
+Browser `useMarketData` → `POST /api/price-batch` → Yahoo quote cache → `setPrices` → market UI. Retry and last-value retention handle transient failures. Socket.IO `/ws` remains an optional legacy path.
 ```
+
+The Socket.IO sequence above documents the retained legacy infrastructure only. Portfolio and market overview values currently follow the HTTP polling flow described in the table and the current-update section.
 
 ---
 
@@ -392,7 +419,7 @@ Fallback: !connected 2s → POST /api/price-batch 5s
 | **IDX Direct** | `src/lib/idxApiClient.ts` (3-strategy: direct→proxy→Chromium) + `idxApiClientExtended` + `idxBrowserFetch` (Playwright) | Corporate actions, company, financial statement, broker summary anti-Cloudflare | `/api/idx/*` (22 bridge) + `/api/idxx/[...path]` | `INDEXALPHA_API_KEY` |
 | **Index Alpha** | REST `indexalpha.id`, quota 5/day | Broker stock top buy/sell | `/api/idx/broker-stock` (MySQL `brokerCacheDb`) | `INDEXALPHA_API_KEY` |
 | **AI OpenCode Zen Go** | `opencode.ai/zen/go/v1` `MODEL_CHAIN mimo-v2.5→ox-alpha→deepseek` | IHSG ai-analysis, backtest ai-summary/ai-entry, screener ai-analysis, prospectus deepseek-chat | `/api/idx/ai-analysis`, `/api/backtest/ai-*`, `/api/screener/ai-analysis`, `/api/analyze/prospectus` | `OPENCODE_API_KEY`, `OPENCODE_MODEL`, `OPENCODE_BASE_URL`, `DEEPSEEK_API_KEY` |
-| **DB** | `sequelize` + `mysql2`, auto-migrate | Portfolios, snapshots, broker cache, screener history | `/api/portfolios*`, `/api/snapshots`, `/api/cash`, `brokerCacheDb` | `DATABASE_URL` |
+| **DB** | `sequelize` + `mysql2`, auto-migrate | Portfolios, snapshots, cash ledger, persistent API cache, broker cache, screener history | `/api/portfolios*`, `/api/snapshots`, `/api/cash`, market breadth, `brokerCacheDb` | `DATABASE_URL` |
 
 ---
 
@@ -403,12 +430,15 @@ Fallback: !connected 2s → POST /api/price-batch 5s
 | P0 | Dead sidebar `Agregat` | **FIXED** `agregat` hidden via `status:dead` in `navigation.ts` | Keep hidden, route stays for compat |
 | P0 | Orphan `/analysis/[ticker]` | **FIXED** via `CommandPalette` global search (959 stocks) + `Breadcrumb` `Pasar › Analisis › BBCA` | — |
 | P1 | 16 empty API scaffolds | **FIXED** → 12 stubs `501 Not Implemented` + 4 parents kept | — |
-| P1 | Dual WS per tab | **FIXED** `WsProvider` in `layout.tsx` + `useSharedWs()` (`LiveIhsgChip` + `useMarketData` share 1 socket) | — |
+| P1 | Dual realtime paths | **UPDATED** portfolio market prices use HTTP polling as the primary path; Socket.IO remains optional for legacy consumers | Consolidate further when all consumers migrate |
 | P1 | WS `localhost` | **FIXED** `server.js` `HOST 0.0.0.0` + `PORT||port` + `server.ts` cPanel-ready, fallback polling if WS init fails | — |
 | P2 | Publisher 3s even closed | **FIXED** dynamic `3s→30s` when `session===closed` (`price-publisher.ts`) | — |
 | P2 | `MENU_GROUPS` hard-coded | **FIXED** → `src/config/navigation.ts` + `src/config/locale.tsx` EN/ID | — |
 | P2 | Naming mismatch `/analytics` | **FIXED** bilingual `Performa Portofolio / Portfolio Analytics` via `useLocale` | — |
 | P2 | Chart hardcode `#10b981` | **FIXED** → `var(--chart-1/2)` tokens | — |
+| P1 | Breadth 502 on cold start | **FIXED** independent partial scan + persistent/stale cache + HTTP 200 unavailable state | Monitor Yahoo quote coverage |
+| P1 | `stocks-idx.json` missing in `.next`-only deployment | **FIXED** static JSON import in `screenerStockList.ts` | Rebuild `.next` after catalogue changes |
+| P1 | Portfolio return double-counted trades | **FIXED** cash ledger + external-flow normalization | Legacy pre-ledger cash changes remain unrecoverable |
 | P3 | Dashboard layout passthrough | **TODO** still `return children` | Remove |
 | P3 | No WS auth | TODO | Sign clientId + allowlist |
 
@@ -480,4 +510,3 @@ src/server.js                     cPanel-ready 0.0.0.0 + PORT + WS graceful fall
 ---
 
 > **Screenshot Checklist for maintainer:** Create `docs/screenshots/` and capture each placeholder tagged above. File naming mirrors section anchors for auto-link.
-

@@ -14,7 +14,7 @@ async function fetchCash(portfolioId: string | null) {
     return result.data.amount;
 }
 
-async function updateCashAPI(data: { amount: number; operation: 'set' | 'add' | 'subtract' }) {
+async function updateCashAPI(data: { portfolioId: string; amount: number; operation: 'set' | 'add' | 'subtract'; kind?: 'deposit' | 'withdrawal' | 'trade_buy' | 'trade_sell' | 'adjustment' }) {
     const response = await fetch('/api/cash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,25 +127,26 @@ export function useCashAndHistory() {
 
     const updateCash = async (amount: number) => {
         if (!selectedPortfolioId) return;
-        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'set' } as any);
+        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'set', kind: 'adjustment' });
     };
 
     const addCash = async (amount: number) => {
         if (!selectedPortfolioId) return;
-        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'add' } as any);
+        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'add', kind: 'deposit' });
     };
 
     const subtractCash = async (amount: number) => {
         if (!selectedPortfolioId) return;
-        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'subtract' } as any);
+        await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'subtract', kind: 'withdrawal' });
     };
 
     const recordTransaction = async (transaction: Omit<Transaction, "id" | "timestamp">) => {
         const amount = transaction.totalAmount;
+        if (!selectedPortfolioId) return;
         if (transaction.type === 'buy') {
-            await subtractCash(amount);
+            await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'subtract', kind: 'trade_buy' });
         } else if (transaction.type === 'sell') {
-            await addCash(amount);
+            await updateCashMutation.mutateAsync({ portfolioId: selectedPortfolioId, amount, operation: 'add', kind: 'trade_sell' });
         }
     };
 

@@ -52,6 +52,7 @@ interface FinancialStatementTableProps {
     incomeData: any[];
     balanceData: any[];
     cashflowData: any[];
+    mode?: "annual" | "quarterly";
 }
 
 const METRICS: MetricItem[] = [
@@ -70,7 +71,7 @@ function buildQuarterlyTable(data: any[], metric: MetricItem): { rows: any[]; ye
     // Group by year
     const byYear = new Map<number, any[]>();
     for (const item of data) {
-        const d = item.period || item.year || "";
+        const d = item.rawPeriod || item.period || item.year || "";
         const year = getYear(d);
         if (!byYear.has(year)) byYear.set(year, []);
         byYear.get(year)!.push({ ...item, quarter: quarterLabel(d), rawDate: d });
@@ -92,7 +93,7 @@ function buildQuarterlyTable(data: any[], metric: MetricItem): { rows: any[]; ye
     for (const q of quarters) {
         const row: any = { period: q };
         let hasData = false;
-        let annualisedValues: number[] = [];
+        const annualisedValues: number[] = [];
         for (const year of years) {
             const items = byYear.get(year) || [];
             const match = items.find((i) => i.quarter === q);
@@ -161,7 +162,7 @@ function buildBalanceTable(data: any[], metric: MetricItem): { rows: any[]; year
     return { rows, years };
 }
 
-export default function FinancialStatementTable({ incomeData, balanceData, cashflowData }: FinancialStatementTableProps) {
+export default function FinancialStatementTable({ incomeData, mode = "quarterly" }: FinancialStatementTableProps) {
     const [metric, setMetric] = useState("netIncome");
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -173,7 +174,7 @@ export default function FinancialStatementTable({ incomeData, balanceData, cashf
         return buildQuarterlyTable(incomeData, currentMetric);
     }, [incomeData, currentMetric]);
 
-    if (incomeData.length === 0) return null;
+    if (incomeData.length === 0 || mode !== "quarterly") return null;
 
     return (
         <div className="card-flush">

@@ -21,6 +21,7 @@ interface StockSnapshot {
 
 // In-memory cache
 let scanCache: { data: any; ts: number } | null = null;
+let scanInFlight: Promise<StockSnapshot[]> | null = null;
 const CACHE_TTL = 10 * 60 * 1000; // 10 menit
 const CONCURRENCY = 20; // jumlah request paralel
 
@@ -73,12 +74,29 @@ async function fetchAllStockSnapshots(): Promise<StockSnapshot[]> {
 
 export async function GET() {
     // Serve cache jika masih fresh
-    if (scanCache && Date.now() - scanCache.ts < CACHE_TTL) {
+    if (scanCache && scanCache.data?.total > 0 && Date.now() - scanCache.ts < CACHE_TTL) {
         return NextResponse.json({ success: true, data: scanCache.data, source: 'cache' });
     }
 
     try {
-        const stocks = await fetchAllStockSnapshots();
+        if (!scanInFlight) scanInFlight = fetchAllStockSnapshots();
+        let stocks: StockSnapshot[];
+        try {
+            stocks = await scanInFlight;
+        } finally {
+            scanInFlight = null;
+        }
+
+        // Jangan pernah menyimpan hasil kosong sebagai cache valid. Hal ini
+        // biasanya terjadi saat Yahoo timeout/rate-limit dan sebelumnya
+        // membuat dashboard terus menerima total=0 selama TTL cache.
+        if (stocks.length === 0) {
+            const staleCache = scanCache;
+            if (staleCache && staleCache.data?.total > 0) {
+                return NextResponse.json({ success: true, data: staleCache.data, source: 'stale-cache', warning: 'Yahoo Finance belum merespons; menampilkan data terakhir.' });
+            }
+            return NextResponse.json({ success: false, error: 'Yahoo Finance tidak mengembalikan quote saham. Coba lagi beberapa saat.' }, { status: 502 });
+        }
 
         const withValue = stocks.filter(s => s.value > 0);
         const withChange = stocks.filter(s => Number.isFinite(s.changePercent));

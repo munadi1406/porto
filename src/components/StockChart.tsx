@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as LightweightCharts from "lightweight-charts";
 import { useTheme } from "@/hooks/useTheme";
+import { Activity, AreaChart, BarChart3, CandlestickChart, ChartNoAxesCombined, Maximize2, Minimize2, PencilRuler, RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { CHART_SERIES, getLightweightChartPalette } from "@/lib/chart-theme";
 
 // ── Kalkulasi indikator ──
 function emaArr(values: number[], period: number): (number | null)[] {
@@ -74,6 +77,8 @@ interface StockChartProps {
         fillDir?: 'above' | 'below';
     }[];
     indicators?: boolean;
+    ticker?: string;
+    compact?: boolean;
     patternMarkers?: {
         time: number;
         position: 'aboveBar' | 'belowBar';
@@ -84,37 +89,50 @@ interface StockChartProps {
     }[];
 }
 
-export default function StockChart({ data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, indicators = true }: StockChartProps) {
+type ChartType = "candlestick" | "line" | "area";
+type HoverOhlc = { open: number; high: number; low: number; close: number; volume?: number } | null;
+
+export default function StockChart({ data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, indicators = true, ticker, compact = false }: StockChartProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const terminalRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<any>(null);
     const { theme } = useTheme();
     const isDark = theme === "dark";
+    const palette = getLightweightChartPalette(isDark);
+    const [chartType, setChartType] = useState<ChartType>(() => {
+        if (typeof window === "undefined") return "candlestick";
+        const saved = localStorage.getItem("porto-chart-type");
+        return saved === "line" || saved === "area" ? saved : "candlestick";
+    });
+    const [showIndicators, setShowIndicators] = useState(indicators);
+    const [showMa, setShowMa] = useState(true);
+    const [showVolume, setShowVolume] = useState(true);
+    const [showDrawings, setShowDrawings] = useState(() => typeof window === "undefined" || window.innerWidth >= 768);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [hoverOhlc, setHoverOhlc] = useState<HoverOhlc>(null);
 
-    const palette = isDark
-        ? {
-              background: "#0d1726",
-              text: "#8a93a6",
-              grid: "#1c2b42",
-              border: "#1c2b42",
-              up: "#1ed98b",
-              down: "#ef5c70",
-              ma20: "#6d7dff",
-              ma50: "#a967ff",
-              buy: "#eaa82e",
-              forecast: "#14b8a6",
-          }
-        : {
-              background: "#ffffff",
-              text: "#64748b",
-              grid: "#e5e9f0",
-              border: "#e5e9f0",
-              up: "#0eaa68",
-              down: "#df4d61",
-              ma20: "#5366ea",
-              ma50: "#a967ff",
-              buy: "#eaa82e",
-              forecast: "#14b8a6",
-          };
+    useEffect(() => { localStorage.setItem("porto-chart-type", chartType); }, [chartType]);
+    useEffect(() => {
+        const onFullscreen = () => setIsFullscreen(document.fullscreenElement === terminalRef.current);
+        document.addEventListener("fullscreenchange", onFullscreen);
+        return () => document.removeEventListener("fullscreenchange", onFullscreen);
+    }, []);
+
+    const toggleFullscreen = async () => {
+        if (!terminalRef.current) return;
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await terminalRef.current.requestFullscreen();
+    };
+
+    const applyTemplate = (template: "clean" | "technical" | "momentum") => {
+        if (template === "clean") {
+            setShowMa(true); setShowVolume(true); setShowIndicators(false); setShowDrawings(false);
+        } else if (template === "momentum") {
+            setShowMa(false); setShowVolume(true); setShowIndicators(true); setShowDrawings(false);
+        } else {
+            setShowMa(true); setShowVolume(true); setShowIndicators(true); setShowDrawings(true);
+        }
+    };
 
     useEffect(() => {
         if (!chartContainerRef.current || !data || data.length === 0) return;
@@ -184,16 +202,28 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                 return null;
             };
 
-            const candlestickSeries = createSeries('Candlestick', {
-                upColor: palette.up,
-                downColor: palette.down,
-                borderVisible: false,
-                wickUpColor: palette.up,
-                wickDownColor: palette.down,
-            });
+            const candlestickSeries = chartType === 'candlestick'
+                ? createSeries('Candlestick', {
+                    upColor: palette.up,
+                    downColor: palette.down,
+                    borderVisible: false,
+                    wickUpColor: palette.up,
+                    wickDownColor: palette.down,
+                })
+                : chartType === 'area'
+                    ? createSeries('Area', {
+                        lineColor: palette.up,
+                        topColor: isDark ? 'rgba(30,217,139,0.26)' : 'rgba(22,128,60,0.20)',
+                        bottomColor: 'rgba(22,128,60,0.01)',
+                        lineWidth: 2,
+                        priceLineVisible: false,
+                    })
+                    : createSeries('Line', { color: palette.up, lineWidth: 2, priceLineVisible: false });
 
             if (candlestickSeries) {
-                candlestickSeries.setData(cleanData);
+                candlestickSeries.setData(chartType === 'candlestick'
+                    ? cleanData
+                    : cleanData.map(d => ({ time: d.time, value: Number(d.close) })));
 
                 // Safe Markers (gabungan marker sinyal + marker pola chart)
                 if (((markers?.length ?? 0) > 0 || (patternMarkers?.length ?? 0) > 0) && typeof candlestickSeries.setMarkers === 'function') {
@@ -221,8 +251,23 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                 }
             }
 
+            // Volume follows the same palette and sits in a compact pane, similar to a trading terminal.
+            if (showVolume && cleanData.some(d => Number(d.volume ?? d.Volume ?? 0) > 0)) {
+                const volumePane = 1;
+                const volumeSeries = createSeries('Histogram', {
+                    priceFormat: { type: 'volume' },
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                }, volumePane);
+                volumeSeries?.setData(cleanData.map(d => ({
+                    time: d.time,
+                    value: Number(d.volume ?? d.Volume ?? 0),
+                    color: Number(d.close) >= Number(d.open) ? `${palette.up}66` : `${palette.down}66`,
+                })));
+            }
+
             // Draw MA Lines
-            if (maLines) {
+            if (showMa && maLines) {
                 const ma20Series = createSeries('Line', { color: palette.ma20, lineWidth: 1, title: "MA20", priceLineVisible: false });
                 if (ma20Series) ma20Series.setData(sanitize(maLines.ma20));
 
@@ -251,7 +296,7 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
             }
 
             // Draw chart patterns (zona, support/resistance + trendline berwarna)
-            if (drawings && drawings.length > 0) {
+            if (showDrawings && drawings && drawings.length > 0) {
                 const t0 = cleanData[0].time as number;
                 const t1 = cleanData[cleanData.length - 1].time as number;
 
@@ -368,7 +413,7 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
             }
 
             // ── Pane indikator: RSI (pane 1) + MACD (pane 2) — lightweight-charts v5 ──
-            if (indicators && cleanData.length > 30) {
+            if (showIndicators && cleanData.length > 30) {
                 try {
                     const closes = cleanData.map(d => Number(d.close));
                     const timeAt = (i: number) => cleanData[i].time;
@@ -376,9 +421,10 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                     // RSI pane
                     const rsiVals = computeRsi(closes, 14);
                     const rsiData = rsiVals.map((v, i) => (v == null ? null : { time: timeAt(i), value: +v.toFixed(2) })).filter(Boolean) as any[];
+                    const indicatorPaneStart = showVolume ? 2 : 1;
                     const rsiSeries = createSeries('Line', {
-                        color: '#a967ff', lineWidth: 1, lastValueVisible: false, priceLineVisible: false,
-                    }, 1);
+                        color: CHART_SERIES.rsi, lineWidth: 1, lastValueVisible: false, priceLineVisible: false,
+                    }, indicatorPaneStart);
                     if (rsiSeries) {
                         rsiSeries.setData(rsiData);
                         if (typeof rsiSeries.createPriceLine === 'function') {
@@ -390,24 +436,34 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                     // MACD pane (histogram + macd + signal)
                     const { macd, signal, hist } = computeMacd(closes);
                     const toSeries = (arr: (number | null)[]) => arr.map((v, i) => (v == null ? null : { time: timeAt(i), value: v })).filter(Boolean) as any[];
-                    const hSeries = createSeries('Histogram', { color: 'rgba(109,125,255,0.45)', lastValueVisible: false, priceLineVisible: false }, 2);
+                    const hSeries = createSeries('Histogram', { color: 'rgba(100,116,139,0.45)', lastValueVisible: false, priceLineVisible: false }, indicatorPaneStart + 1);
                     hSeries?.setData(toSeries(hist));
-                    const mSeries = createSeries('Line', { color: '#14b8a6', lineWidth: 1, lastValueVisible: false, priceLineVisible: false }, 2);
+                    const mSeries = createSeries('Line', { color: CHART_SERIES.macd, lineWidth: 1, lastValueVisible: false, priceLineVisible: false }, indicatorPaneStart + 1);
                     mSeries?.setData(toSeries(macd));
-                    const sSeries = createSeries('Line', { color: '#eaa82e', lineWidth: 1, lastValueVisible: false, priceLineVisible: false }, 2);
+                    const sSeries = createSeries('Line', { color: CHART_SERIES.signal, lineWidth: 1, lastValueVisible: false, priceLineVisible: false }, indicatorPaneStart + 1);
                     sSeries?.setData(toSeries(signal));
 
                     // Tinggi pane
                     const panes = (chart as any).panes?.();
                     if (Array.isArray(panes)) {
-                        panes[1]?.setHeight?.(90);
-                        panes[2]?.setHeight?.(80);
+                        if (showVolume) panes[1]?.setHeight?.(72);
+                        panes[indicatorPaneStart]?.setHeight?.(90);
+                        panes[indicatorPaneStart + 1]?.setHeight?.(80);
                     }
                 } catch (e) {
                     console.warn('[StockChart] indikator gagal:', e);
                 }
             }
 
+            chart.subscribeCrosshairMove?.((param: any) => {
+                if (!param?.time) { setHoverOhlc(null); return; }
+                const row = cleanData.find(d => d.time === param.time);
+                if (!row) return;
+                setHoverOhlc({
+                    open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close),
+                    volume: Number(row.volume ?? row.Volume ?? 0),
+                });
+            });
             chart.timeScale().fitContent();
         } catch (err: any) {
             console.error("[Chart Error] Failed to assemble:", err);
@@ -427,7 +483,61 @@ export default function StockChart({ data, markers, prediction, buyPrice, maLine
                 chartRef.current = null;
             }
         };
-    }, [data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, indicators, palette.background, palette.text, palette.grid, palette.border, palette.up, palette.down, palette.ma20, palette.ma50, palette.buy, palette.forecast, theme]);
+    }, [data, markers, prediction, buyPrice, maLines, drawings, patternMarkers, chartType, showIndicators, showMa, showVolume, showDrawings, palette.background, palette.text, palette.grid, palette.border, palette.up, palette.down, palette.ma20, palette.ma50, palette.buy, palette.forecast, theme, isDark]);
 
-    return <div ref={chartContainerRef} className="w-full h-[480px]" />;
+    const latest = data[data.length - 1];
+    const ohlc = hoverOhlc ?? (latest ? {
+        open: Number(latest.open), high: Number(latest.high), low: Number(latest.low), close: Number(latest.close),
+        volume: Number(latest.volume ?? latest.Volume ?? 0),
+    } : null);
+    const fmt = (value: number | undefined) => Number.isFinite(value) ? Number(value).toLocaleString("id-ID", { maximumFractionDigits: 2 }) : "—";
+    const toolClass = (active?: boolean) => cn(
+        "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold transition-colors",
+        active ? "border-primary/35 bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+    );
+
+    return (
+        <div ref={terminalRef} className="w-full bg-card text-card-foreground">
+            {!compact ? (
+                <>
+                    <div className="flex items-center gap-1.5 overflow-x-auto border-b bg-muted/20 px-2 py-2 scrollbar-none sm:px-3">
+                        <select aria-label="Template chart" defaultValue={showDrawings ? "technical" : "clean"} onChange={event => applyTemplate(event.target.value as "clean" | "technical" | "momentum")} className="min-h-9 shrink-0 rounded-md border bg-card px-2 text-[11px] font-bold text-foreground outline-none">
+                            <option value="clean">Template: Clean</option>
+                            <option value="technical">Template: Technical</option>
+                            <option value="momentum">Template: Momentum</option>
+                        </select>
+                        {([
+                            ["candlestick", CandlestickChart, "Candle"],
+                            ["line", ChartNoAxesCombined, "Line"],
+                            ["area", AreaChart, "Area"],
+                        ] as const).map(([type, Icon, label]) => (
+                            <button key={type} onClick={() => setChartType(type)} className={toolClass(chartType === type)} aria-pressed={chartType === type}>
+                                <Icon className="size-3.5" />{label}
+                            </button>
+                        ))}
+                        <span className="mx-0.5 h-6 w-px shrink-0 bg-border" />
+                        <button onClick={() => setShowMa(v => !v)} className={toolClass(showMa)} aria-pressed={showMa}>MA 20/50</button>
+                        <button onClick={() => setShowVolume(v => !v)} className={toolClass(showVolume)} aria-pressed={showVolume}><BarChart3 className="size-3.5" />Volume</button>
+                        <button onClick={() => setShowIndicators(v => !v)} className={toolClass(showIndicators)} aria-pressed={showIndicators}><Activity className="size-3.5" />RSI & MACD</button>
+                        <button onClick={() => setShowDrawings(v => !v)} className={toolClass(showDrawings)} aria-pressed={showDrawings}><PencilRuler className="size-3.5" />Drawing</button>
+                        <span className="flex-1" />
+                        <button onClick={() => chartRef.current?.timeScale?.().fitContent?.()} className={toolClass()} title="Reset tampilan"><RotateCcw className="size-3.5" /></button>
+                        <button onClick={() => void toggleFullscreen()} className={toolClass(isFullscreen)} title="Layar penuh">
+                            {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                        </button>
+                    </div>
+                    <div className="flex min-h-9 items-center gap-x-3 overflow-x-auto border-b px-3 text-[11px] tabular-nums text-muted-foreground scrollbar-none">
+                        {ticker ? <b className="text-foreground">{ticker.replace(".JK", "")}</b> : null}
+                        <span>O <b className="text-foreground">{fmt(ohlc?.open)}</b></span>
+                        <span>H <b className="text-success">{fmt(ohlc?.high)}</b></span>
+                        <span>L <b className="text-destructive">{fmt(ohlc?.low)}</b></span>
+                        <span>C <b className="text-foreground">{fmt(ohlc?.close)}</b></span>
+                        <span>Vol <b className="text-foreground">{fmt(ohlc?.volume)}</b></span>
+                        <span className="ml-auto hidden whitespace-nowrap text-[10px] sm:inline">Scroll untuk zoom · drag untuk geser · crosshair untuk detail</span>
+                    </div>
+                </>
+            ) : null}
+            <div ref={chartContainerRef} className={cn("w-full", isFullscreen ? "h-[calc(100vh-92px)]" : compact ? "h-[300px]" : "h-[480px]")} />
+        </div>
+    );
 }

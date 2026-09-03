@@ -6,7 +6,6 @@ import { usePortfolios } from "@/hooks/usePortfolios";
 import { useMarketData } from "@/hooks/useMarketData";
 import { useCashAndHistory } from "@/hooks/useCashAndHistory";
 import dynamic from "next/dynamic";
-import { SummaryCard } from "@/components/SummaryCard";
 import { CashManager } from "@/components/CashManager";
 import { MonthlyPerformanceHeatmap } from "@/components/MonthlyPerformanceHeatmap";
 import { PortfolioTable } from "@/components/PortfolioTable";
@@ -22,11 +21,13 @@ import { ScheduledReportButton } from "@/components/ScheduledReportButton";
 import { PortfolioCompareTab } from "@/components/PortfolioCompare";
 import { exportToPDF } from "@/lib/exportPDF";
 import {
-    Briefcase, DollarSign, TrendingUp, TrendingDown, Activity, Calendar,
+    Briefcase, DollarSign, TrendingUp, TrendingDown, Calendar,
     Wallet, Plus, Layers, Target, BarChart3, PieChart,
-    Clock, ChevronRight, Shield, Columns2
+    Clock, ChevronRight, Columns2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { PrivacyWrapper } from "@/components/PrivacyWrapper";
+import { usePrivacyMode } from "@/hooks/usePrivacyMode";
 
 type TabKey = "overview" | "holdings" | "analytics" | "target" | "compare";
 
@@ -36,15 +37,17 @@ const EquityGrowthChart = dynamic(() => import("@/components/EquityGrowthChart")
 
 export default function PortfolioDashboardPage() {
     const router = useRouter();
+    const { isPrivacyMode } = usePrivacyMode();
     const { portfolio, addStock, removeStock, updateStock, executeTransaction, isLoaded } = usePortfolio();
     const { currentPortfolio } = usePortfolios();
     const {
-        cash, updateCash, getHistoryForPeriod, recordSnapshot, history,
+        cash, updateCash, getHistoryForPeriod, recordSnapshot, history, transactions,
         isLoaded: cashLoaded, recordTransaction
     } = useCashAndHistory();
-    const { prices, loading: pricesLoading, lastUpdated } = useMarketData(
+    const { prices, loading: pricesLoading, lastUpdated, error: marketError } = useMarketData(
         useMemo(() => portfolio.map((p) => p.ticker), [portfolio])
     );
+    const pricesReady = portfolio.length === 0 || portfolio.every(item => (prices[item.ticker]?.price || 0) > 0);
 
     const [activeTab, setActiveTab] = useState<TabKey>("overview");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -68,36 +71,36 @@ export default function PortfolioDashboardPage() {
         portfolio.forEach((item) => {
             const livePrice = prices[item.ticker]?.price || 0;
             const change = prices[item.ticker]?.change || 0;
-            const marketPrice = livePrice > 0 ? livePrice : 0;
+            const marketPrice = livePrice > 0 ? livePrice : item.averagePrice;
             const shares = item.lots * 100;
             const invested = item.averagePrice * shares;
             const marketValue = marketPrice * shares;
 
             totalInvested += invested;
             totalMarketValue += marketValue;
-            dayChange += shares * change;
+            if (pricesReady) dayChange += shares * change;
 
-            if (change > bestPerformer.change && livePrice > 0) {
+            if (pricesReady && change > bestPerformer.change && livePrice > 0) {
                 bestPerformer = { ticker: item.ticker, change };
             }
-            if (change < worstPerformer.change && livePrice > 0) {
+            if (pricesReady && change < worstPerformer.change && livePrice > 0) {
                 worstPerformer = { ticker: item.ticker, change };
             }
         });
 
         const totalEquity = totalMarketValue + cash;
-        const totalGainLoss = totalMarketValue - totalInvested;
-        const totalReturn = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
-        const dayChangePercent = totalMarketValue - dayChange > 0
+        const totalGainLoss = pricesReady ? totalMarketValue - totalInvested : 0;
+        const totalReturn = pricesReady && totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
+        const dayChangePercent = pricesReady && totalMarketValue - dayChange > 0
             ? (dayChange / (totalMarketValue - dayChange)) * 100
             : 0;
 
         return {
             totalInvested, totalMarketValue, totalEquity, totalGainLoss,
             totalReturn, dayChange, dayChangePercent, cash,
-            bestPerformer, worstPerformer, stockCount: portfolio.length,
+            bestPerformer, worstPerformer, stockCount: portfolio.length, pricesReady,
         };
-    }, [portfolio, prices, cash]);
+    }, [portfolio, prices, cash, pricesReady]);
 
     const lastRecordTimeRef = useRef<number>(0);
 
@@ -108,24 +111,24 @@ export default function PortfolioDashboardPage() {
         const now = Date.now();
         const isThrottleExpired = now - lastRecordTimeRef.current > 5 * 60 * 1000;
 
-        if (isLoaded && cashLoaded && !pricesLoading && hasPrices && isValidValue && isThrottleExpired) {
+        if (isLoaded && cashLoaded && !pricesLoading && pricesReady && hasPrices && isValidValue && isThrottleExpired) {
             recordSnapshot(summary.totalMarketValue, cash);
             lastRecordTimeRef.current = now;
         }
-    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, lastUpdated, portfolio.length, recordSnapshot]);
+    }, [summary.totalMarketValue, cash, isLoaded, cashLoaded, pricesLoading, pricesReady, lastUpdated, portfolio.length, recordSnapshot]);
 
     const gainLossData = useMemo(() => {
         return portfolio.map((item) => {
             const livePrice = prices[item.ticker]?.price || 0;
-            const marketPrice = livePrice > 0 ? livePrice : 0;
+            const marketPrice = livePrice > 0 ? livePrice : item.averagePrice;
             const shares = item.lots * 100;
             const invested = item.averagePrice * shares;
             const marketValue = marketPrice * shares;
             const gainLoss = marketValue - invested;
             const percentage = invested > 0 ? (gainLoss / invested) * 100 : 0;
             return { ticker: item.ticker, name: item.name, value: Math.abs(gainLoss), gainLoss, percentage };
-        }).filter((d) => d.gainLoss !== 0);
-    }, [portfolio, prices]);
+        }).filter((d) => d.gainLoss !== 0 && pricesReady);
+    }, [portfolio, prices, pricesReady]);
 
     const chartData = useMemo(() => {
         return portfolio.map((item) => ({
@@ -187,118 +190,72 @@ export default function PortfolioDashboardPage() {
     }
 
     const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-        { key: "overview", label: "Overview", icon: BarChart3 },
-        { key: "holdings", label: "Holdings", icon: Layers },
-        { key: "analytics", label: "Performance", icon: PieChart },
+        { key: "overview", label: "Ringkasan", icon: BarChart3 },
+        { key: "holdings", label: "Kepemilikan", icon: Layers },
         { key: "target", label: "Target", icon: Target },
         { key: "compare", label: "Bandingkan", icon: Columns2 },
     ];
 
     return (
         <div ref={dashboardRef} className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: currentPortfolio?.color || "#3b82f6" }} />
-                        {currentPortfolio?.name || "Portfolio"}
-                    </h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        {portfolio.length} holdings &middot; {currentPortfolio?.description || "Kelola investasi Anda"}
-                    </p>
+            <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: currentPortfolio?.color || "#3b82f6" }} />
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Portofolio aktif</p>
+                        </div>
+                        <h1 className="mt-1 truncate text-2xl font-black tracking-tight">{currentPortfolio?.name || "Portofolio"}</h1>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{currentPortfolio?.description || "Kelola dan pantau investasi Anda"}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {lastUpdated && <span className="mr-auto flex items-center gap-1 text-[10px] text-muted-foreground sm:mr-1"><Clock className="size-3" /> {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>}
+                        <button onClick={() => setIsAddModalOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90">
+                            <Plus className="size-3.5" /> Tambah saham
+                        </button>
+                        <ExportPDFButton onClick={handleExportPDF} size="md" />
+                        <ScheduledReportButton dashboardRef={dashboardRef as any} onExport={handleExportPDF} />
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    {lastUpdated && (
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {lastUpdated.toLocaleTimeString("id-ID")}
-                        </span>
-                    )}
-                    <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        Tambah Saham
-                    </button>
-                    <ExportPDFButton onClick={handleExportPDF} size="md" />
-                    <ScheduledReportButton dashboardRef={dashboardRef as any} onExport={handleExportPDF} />
-                </div>
-            </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <SummaryCard
-                    title="Net Worth"
-                    value={formatIDR(summary.totalEquity)}
-                    subValue={pricesLoading ? "..." : formatPercentage(summary.dayChangePercent)}
-                    icon={Activity}
-                    trend={summary.dayChange >= 0 ? "up" : "down"}
-                />
-                <SummaryCard
-                    title="Unrealized P/L"
-                    value={summary.totalGainLoss > 0 ? `+${formatIDR(summary.totalGainLoss)}` : formatIDR(summary.totalGainLoss)}
-                    subValue={formatPercentage(summary.totalReturn)}
-                    icon={DollarSign}
-                    trend={summary.totalGainLoss >= 0 ? "up" : "down"}
-                />
-                <SummaryCard
-                    title="Total Modal"
-                    value={formatIDR(summary.totalInvested)}
-                    icon={Briefcase}
-                />
-                <SummaryCard
-                    title="Cash Balance"
-                    value={formatIDR(summary.cash)}
-                    icon={Wallet}
-                    trend="neutral"
-                />
-            </div>
+                <div className="grid lg:grid-cols-[1.35fr_2fr]">
+                    <div className="border-b border-border p-4 sm:p-5 lg:border-b-0 lg:border-r">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Total equity</p>
+                        <PrivacyWrapper isPrivate={isPrivacyMode}><p className="mt-1 font-mono text-3xl font-black tracking-tight tabular-nums sm:text-4xl">{formatIDR(summary.totalEquity)}</p></PrivacyWrapper>
+                        <div className={cn("mt-2 flex items-center gap-2 text-xs font-bold", summary.dayChange >= 0 ? "text-success" : "text-destructive")}>
+                            {summary.dayChange >= 0 ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
+                            <PrivacyWrapper isPrivate={isPrivacyMode}>{!pricesReady ? "Harga belum tersedia" : `${summary.dayChange >= 0 ? "+" : ""}${formatIDR(summary.dayChange)} (${formatPercentage(summary.dayChangePercent)}) hari ini`}</PrivacyWrapper>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                        {[
+                            { label: "Modal", value: formatIDR(summary.totalInvested), icon: Briefcase },
+                            { label: "Unrealized P/L", value: pricesReady ? `${summary.totalGainLoss > 0 ? "+" : ""}${formatIDR(summary.totalGainLoss)}` : "—", note: pricesReady ? formatPercentage(summary.totalReturn) : "Menunggu harga", icon: DollarSign, tone: pricesReady ? (summary.totalGainLoss >= 0 ? "text-success" : "text-destructive") : "text-muted-foreground" },
+                            { label: "Cash", value: formatIDR(summary.cash), note: `${summary.totalEquity > 0 ? ((summary.cash / summary.totalEquity) * 100).toFixed(1) : "0"}% dari equity`, icon: Wallet },
+                        ].map(metric => (
+                            <div key={metric.label} className="p-4 sm:p-5">
+                                <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground"><metric.icon className="size-3.5" /> {metric.label}</div>
+                                <PrivacyWrapper isPrivate={isPrivacyMode}><p className={cn("mt-2 truncate font-mono text-lg font-black tabular-nums", metric.tone)}>{metric.value}</p></PrivacyWrapper>
+                                {metric.note && <p className={cn("mt-0.5 text-[10px]", metric.tone || "text-muted-foreground")}>{metric.note}</p>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
-            {/* Portfolio Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-card border border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Layers className="w-4 h-4 text-primary" />
-                        <span className="card-title">Total Saham</span>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">{summary.stockCount}</p>
+                <div className="grid grid-cols-2 border-t border-border bg-muted/20 sm:grid-cols-4">
+                    {[
+                        { label: "Kepemilikan", value: `${summary.stockCount} saham` },
+                        { label: "Terbaik hari ini", value: summary.bestPerformer.ticker || "—", note: summary.bestPerformer.ticker ? `+${formatPercentage(Math.abs(prices[summary.bestPerformer.ticker]?.changePercent || 0))}` : undefined, tone: "text-success" },
+                        { label: "Terlemah hari ini", value: summary.worstPerformer.ticker || "—", note: summary.worstPerformer.ticker ? formatPercentage(prices[summary.worstPerformer.ticker]?.changePercent || 0) : undefined, tone: "text-destructive" },
+                        { label: "Status harga", value: pricesLoading ? "Memuat" : "Terkini" },
+                    ].map(item => (
+                        <div key={item.label} className="min-w-0 border-r border-t border-border px-4 py-3 first:border-t-0 sm:border-t-0">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{item.label}</p>
+                            <div className="mt-1 flex items-baseline gap-1.5"><span className="truncate text-sm font-black">{item.value}</span>{item.note && <span className={cn("text-[10px] font-bold", item.tone)}>{item.note}</span>}</div>
+                        </div>
+                    ))}
                 </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-4 h-4 text-success" />
-                        <span className="card-title">Best Performer</span>
-                    </div>
-                    <p className="text-lg font-bold text-foreground">{summary.bestPerformer.ticker || "-"}</p>
-                    {summary.bestPerformer.ticker && (
-                        <p className="text-xs font-bold text-success">
-                            +{formatPercentage(Math.abs(prices[summary.bestPerformer.ticker]?.changePercent || 0))}
-                        </p>
-                    )}
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <TrendingDown className="w-4 h-4 text-destructive" />
-                        <span className="card-title">Worst Performer</span>
-                    </div>
-                    <p className="text-lg font-bold text-foreground">{summary.worstPerformer.ticker || "-"}</p>
-                    {summary.worstPerformer.ticker && (
-                        <p className="text-xs font-bold text-destructive">
-                            {formatPercentage(prices[summary.worstPerformer.ticker]?.changePercent || 0)}
-                        </p>
-                    )}
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Shield className="w-4 h-4 text-primary" />
-                        <span className="card-title">Cash Ratio</span>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">
-                        {summary.totalEquity > 0 ? ((summary.cash / summary.totalEquity) * 100).toFixed(1) : "0"}%
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">dari total equity</p>
-                </div>
-            </div>
+            </section>
 
             {/* Tab Navigation — PageTabs */}
             <PageTabs tabs={tabs.map(t => ({ id: t.key, label: t.label, icon: t.icon }))} active={activeTab} onChange={(id) => setActiveTab(id as TabKey)} />
@@ -307,67 +264,18 @@ export default function PortfolioDashboardPage() {
             {activeTab === "overview" && (
                 <div className="space-y-6">
                     {/* Charts Row */}
-                    <div className="grid grid-cols-1 xl:grid-cols-[1.8fr_0.82fr] gap-4">
-                        <div className="card-flush">
-                            <div className="px-4 py-3 border-b border-border">
-                                <div className="flex items-center gap-2">
-                                    <TrendingUp className="w-4 h-4 text-primary" />
-                                    <span className="card-title">Equity Growth</span>
-                                </div>
-                            </div>
-                            <div className="p-4">
-                                <EquityGrowthChart getHistoryForPeriod={getHistoryForPeriod} currentEquity={summary.totalEquity} />
-                            </div>
-                        </div>
+                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.8fr_0.82fr]">
+                        <EquityGrowthChart getHistoryForPeriod={getHistoryForPeriod} currentEquity={summary.totalEquity} portfolio={portfolio} currentCash={cash} transactions={transactions} />
 
-                        <div className="grid gap-4 content-start">
-                            {/* Allocation */}
-                            <div className="card-flush">
-                                <div className="px-4 py-3 border-b border-border">
-                                    <div className="flex items-center gap-2">
-                                        <PieChart className="w-4 h-4 text-primary" />
-                                        <span className="card-title">Alokasi</span>
-                                    </div>
-                                </div>
-                                <div className="p-4">
-                                    {chartData.length > 0 ? (
-                                        <AllocationChart data={chartData} />
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground text-center py-8">Belum ada data alokasi</p>
-                                    )}
-                                </div>
-                            </div>
+                        <div className="content-start">
+                            {chartData.length > 0 ? <AllocationChart data={chartData} /> : <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">Belum ada data alokasi</div>}
                         </div>
                     </div>
 
                     {/* Gain/Loss + Heatmap */}
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="card-flush">
-                            <div className="px-4 py-3 border-b border-border">
-                                <div className="flex items-center gap-2">
-                                    <DollarSign className="w-4 h-4 text-primary" />
-                                    <span className="card-title">Gain / Loss</span>
-                                </div>
-                            </div>
-                            <div className="p-4">
-                                {gainLossData.length > 0 ? (
-                                    <GainLossChart data={gainLossData} />
-                                ) : (
-                                    <p className="text-xs text-muted-foreground text-center py-8">Belum ada data gain/loss</p>
-                                )}
-                            </div>
-                        </div>
-                        <div className="card-flush">
-                            <div className="px-4 py-3 border-b border-border">
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-primary" />
-                                    <span className="card-title">Performa Bulanan</span>
-                                </div>
-                            </div>
-                            <div className="p-4">
-                                <MonthlyPerformanceHeatmap history={history} />
-                            </div>
-                        </div>
+                        {gainLossData.length > 0 ? <GainLossChart data={gainLossData} /> : <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">Belum ada data gain/loss</div>}
+                        <MonthlyPerformanceHeatmap history={history} />
                     </div>
 
                     {/* Holdings Preview */}
@@ -402,7 +310,8 @@ export default function PortfolioDashboardPage() {
                                             const livePrice = prices[item.ticker]?.price || 0;
                                             const change = prices[item.ticker]?.change || 0;
                                             const changePercent = prices[item.ticker]?.changePercent || 0;
-                                            const marketValue = livePrice * item.lots * 100;
+                                            const marketPrice = livePrice > 0 ? livePrice : item.averagePrice;
+                                            const marketValue = marketPrice * item.lots * 100;
                                             const invested = item.averagePrice * item.lots * 100;
                                             const pl = marketValue - invested;
                                             const isUp = change >= 0;
@@ -422,16 +331,16 @@ export default function PortfolioDashboardPage() {
                                                         Rp{item.averagePrice.toLocaleString("id-ID")}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right font-mono font-bold text-foreground">
-                                                        {livePrice > 0 ? `Rp${livePrice.toLocaleString("id-ID")}` : "-"}
+                                                        {livePrice > 0 ? `Rp${livePrice.toLocaleString("id-ID")}` : <span className="text-muted-foreground">Menunggu</span>}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right">
                                                         <span className={cn("font-bold font-mono", pl >= 0 ? "text-success" : "text-destructive")}>
-                                                            {pl >= 0 ? "+" : ""}{formatIDR(pl)}
+                                                            {pricesReady ? <>{pl >= 0 ? "+" : ""}{formatIDR(pl)}</> : <span className="text-muted-foreground">—</span>}
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right">
                                                         <span className={cn("font-bold font-mono", isUp ? "text-success" : "text-destructive")}>
-                                                            {formatPercentage(changePercent)}
+                                                            {pricesReady ? formatPercentage(changePercent) : "—"}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -449,6 +358,8 @@ export default function PortfolioDashboardPage() {
                             )}
                         </div>
                     )}
+
+                    <StressTestCard beta={riskBeta} totalValue={summary.totalMarketValue} />
 
                     {/* Cash Manager */}
                     <CashManager cash={cash} onUpdateCash={updateCash} />
@@ -489,6 +400,9 @@ export default function PortfolioDashboardPage() {
                         <PortfolioTable
                             portfolio={portfolio}
                             marketData={prices}
+                            transactions={transactions}
+                            marketError={marketError}
+                            marketLastUpdated={lastUpdated}
                             onRemove={removeStock}
                             onUpdate={updateStock}
                             onTransaction={handleExecuteTransaction}
@@ -540,7 +454,7 @@ export default function PortfolioDashboardPage() {
                                 </div>
                             </div>
                             <div className="p-4">
-                                <EquityGrowthChart getHistoryForPeriod={getHistoryForPeriod} currentEquity={summary.totalEquity} />
+                                <EquityGrowthChart getHistoryForPeriod={getHistoryForPeriod} currentEquity={summary.totalEquity} portfolio={portfolio} currentCash={cash} transactions={transactions} />
                             </div>
                         </div>
                         <div className="card-flush">

@@ -1,6 +1,6 @@
 // API Route: Cash Management (with userId support)
 import { NextRequest, NextResponse } from 'next/server';
-import { CashHolding, Portfolio, syncDatabase } from '@/lib/models';
+import { CashHolding, CashLedger, Portfolio, syncDatabase } from '@/lib/models';
 
 let dbInitialized = false;
 async function ensureDbInitialized() {
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
         await ensureDbInitialized();
         const { searchParams } = new URL(request.url);
         const portfolioId = searchParams.get('portfolioId');
+        const includeHistory = searchParams.get('history') === 'true';
 
         if (!portfolioId) {
             return NextResponse.json(
@@ -45,11 +46,24 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        let ledger = includeHistory ? await CashLedger.findAll({ where: { portfolioId }, order: [['timestamp', 'ASC']], limit: 10000 }) : undefined;
+        // One-time baseline for portfolios created before the cash ledger existed.
+        if (includeHistory && ledger?.length === 0 && Number(cash.amount) !== 0) {
+            const baseline = await CashLedger.create({
+                portfolioId,
+                amount: Number(cash.amount),
+                balanceAfter: Number(cash.amount),
+                kind: 'adjustment',
+                timestamp: cash.createdAt || cash.lastUpdated,
+            });
+            ledger = [baseline];
+        }
         return NextResponse.json({
             success: true,
             data: {
                 amount: cash.amount ? parseFloat(cash.amount.toString()) : 0,
                 lastUpdated: cash.lastUpdated,
+                ...(includeHistory ? { ledger } : {}),
             },
         });
     } catch (error: any) {
@@ -67,7 +81,7 @@ export async function POST(request: NextRequest) {
         await ensureDbInitialized();
 
         const body = await request.json();
-        const { portfolioId, amount, operation } = body;
+        const { portfolioId, amount, operation, kind } = body;
 
         if (!portfolioId) {
             return NextResponse.json(
@@ -122,6 +136,14 @@ export async function POST(request: NextRequest) {
             amount: newAmount,
             lastUpdated: new Date(),
         });
+
+        const delta = newAmount - currentAmount;
+        if (delta !== 0) {
+            const ledgerKind = ['deposit', 'withdrawal', 'trade_buy', 'trade_sell', 'adjustment'].includes(kind)
+                ? kind
+                : operation === 'add' ? 'deposit' : operation === 'subtract' ? 'withdrawal' : 'adjustment';
+            await CashLedger.create({ portfolioId, amount: delta, balanceAfter: newAmount, kind: ledgerKind, timestamp: new Date() });
+        }
 
         return NextResponse.json({
             success: true,

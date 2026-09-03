@@ -164,10 +164,20 @@ Jawab HANYA JSON array.`;
                     });
                 }
             } else {
-                throw new Error('AI empty');
+                // AI returned no parseable JSON — fallback ke heuristic tanpa throw agar tidak spam error log
+                console.log('[AI] mimo-v2.5 batch empty response, using heuristic fallback');
+                for (const it of batch) {
+                    const h = heuristicImpact(it.title, it.snippet);
+                    let base = it.title.split(' - ')[0];
+                    if ((base.match(/,/g) || []).length >= 3) base = 'IHSG diprediksi sideways, analis soroti peluang selective buy di beberapa saham pilihan';
+                    const paraphrased = base.replace('Perkirakan','diprediksi').replace('Amati Peluang','rekomendasikan pantau peluang').replace('Sideways','konsolidasi sideways');
+                    const summary = `${paraphrased.slice(0, 130)} — ${h.reason === 'Tidak ada sinyal arah jelas' ? 'Konsolidasi, strategi wait-and-see' : h.reason}.`.slice(0, 220);
+                    results.push({ impact: h.impact, confidence: h.confidence, reason: h.reason === 'Tidak ada sinyal arah jelas' ? 'Konsolidasi sideways — peluang terbatas' : h.reason, tickers: [], category: 'IHSG', summary });
+                }
             }
         } catch (e) {
-            console.warn('[AI] mimo-v2.5 batch chunk failed, heuristic', e);
+            // Hanya log sekali sebagai info, bukan error — heuristic sudah handle
+            console.log('[AI] mimo-v2.5 batch chunk failed, heuristic fallback', (e as any)?.message || e);
                 for (const it of batch) {
                 const h = heuristicImpact(it.title, it.snippet);
                 // Buat ringkasan yang tidak copy title verbatim — kompres daftar saham

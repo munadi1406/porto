@@ -36,6 +36,30 @@ async function fetchModule(symbol: string, module: string, type = 'annual') {
     return [];
 }
 
+// Yahoo membatasi fundamentalsTimeSeries quarterly sekitar lima titik per request.
+// Ambil beberapa window historis lalu gabungkan agar tersedia tiga tahun kuartal.
+async function fetchQuarterlyHistory(symbol: string, module: string) {
+    const now = period2();
+    const year = 365 * 24 * 60 * 60;
+    const rows: any[] = [];
+    for (const offset of [0, 2, 4]) {
+        const end = now - offset * year;
+        const start = end - 2 * year;
+        try {
+            const result = await getYf().then((y: any) =>
+                y.fundamentalsTimeSeries(symbol, { module, type: 'quarterly', period1: start, period2: end })
+            );
+            if (Array.isArray(result)) rows.push(...result);
+        } catch {}
+    }
+    const unique = new Map<string, any>();
+    for (const row of rows) {
+        const key = normDate(row);
+        if (key) unique.set(key, row);
+    }
+    return [...unique.values()].sort((a, b) => normDate(a).localeCompare(normDate(b)));
+}
+
 // Ambil nilai dari item (bisa number langsung atau {raw, fmt})
 function val(item: any, ...keys: string[]): number | null {
     for (const k of keys) {
@@ -62,9 +86,10 @@ export async function GET(req: NextRequest) {
 
         // Fetch 3 laporan keuangan (sequential untuk hindari rate limit)
         const periodType = req.nextUrl.searchParams.get('period') === 'quarterly' ? 'quarterly' : 'annual';
-        const incomeRaw = await fetchModule(symbol, 'financials', periodType);
-        const balanceRaw = await fetchModule(symbol, 'balance-sheet', periodType);
-        const cashflowRaw = await fetchModule(symbol, 'cash-flow', periodType);
+        const fetchHistory = periodType === 'quarterly' ? fetchQuarterlyHistory : fetchModule;
+        const incomeRaw = await fetchHistory(symbol, 'financials', periodType);
+        const balanceRaw = await fetchHistory(symbol, 'balance-sheet', periodType);
+        const cashflowRaw = await fetchHistory(symbol, 'cash-flow', periodType);
 
         // Normalisasi income statement + metrik turunan per periode
         const incomeStatementHistory = incomeRaw.map((r: any) => ({
@@ -225,6 +250,9 @@ export async function GET(req: NextRequest) {
             source: 'yahoo-timeseries',
             code,
             name: quote?.shortName || quote?.longName || code,
+            // Seluruh laporan emiten BEI dilaporkan dalam rupiah; simpan metadata
+            // currency agar UI tidak memberi kesan angka sudah dikonversi kurs.
+            financialCurrency: quote?.financialCurrency || quote?.currency || 'IDR',
             // Balance sheet
             totalAssets: bAssets,
             totalLiabilities: bLiab,

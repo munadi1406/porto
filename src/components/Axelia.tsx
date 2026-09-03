@@ -8,7 +8,16 @@ type Role = "user" | "assistant";
 interface ChatMessage { id: string; role: Role; text: string; sparkline?: number[]; badge?: { label: string; tone: "success" | "danger" | "warning" | "neutral" }; meta?: string; ticker?: string; }
 const QUICK_SUGGESTIONS = ["Analisis teknikal","Fundamental & valuasi","Ranking strategi backtest","Harga & tren terakhir"];
 function extractTickerFromPath(pathname: string | null): string | null { if (!pathname) return null; const m = pathname.match(/\/analysis\/([^/?#]+)/i); if (!m) return null; const raw = decodeURIComponent(m[1]).replace(".JK","").toUpperCase(); if (!/^[A-Z0-9]{2,6}$/.test(raw)) return null; return raw; }
-function extractTickerFromText(text: string): string | null { const m = text.toUpperCase().match(/\b([A-Z]{4})\b/); if (m) return m[1]; return null; }
+const BLOCKLIST_TICKER = new Set(["NAMA","ANDA","SIAPA","KOK","SAYA","KAMU","HALO","HAI","APA","DAN","YANG","UNTUK","DENGAN","MASIH","NGAWUR","GINI","YAK","DAH","SIH","KAH","BISA","TIDAK","JADI","JUGA","TOLONG","BANTU","MOHON","TERIMA","KASIH","JELAS","MILIK","BAGAIMANA","KENAPA","TANYA","JAWAB"]);
+function isHelpQuery(text: string): boolean { return /bisa bantu|tolong bantu|mohon bantu|butuh bantuan|help me|bisa tidak|bisa nggak|bantu saya/i.test(text.toLowerCase()); }
+function isIdentityQuery(text: string): boolean { return /nama anda|siapa (kamu|anda|lo|lu|dia)|kamu siapa|anda siapa|siapa axelia|siapa kamu|identitas/i.test(text.toLowerCase()); }
+function extractTickerFromText(text: string): string | null {
+  if (isIdentityQuery(text) || isHelpQuery(text)) return null;
+  const ms = text.toUpperCase().match(/\b([A-Z]{3,4})\b/g);
+  if (!ms) return null;
+  for (const t of ms) if (!BLOCKLIST_TICKER.has(t) && !["IHSG","JKSE","AI","API"].includes(t)) return t;
+  return null;
+}
 function Sparkline({ data, width = 120, height = 36 }: { data: number[]; width?: number; height?: number }) { if (!data || data.length < 2) return null; const min = Math.min(...data); const max = Math.max(...data); const range = max - min || 1; const up = data[data.length - 1] >= data[0]; const points = data.map((v, i) => { const x = (i / (data.length - 1)) * width; const y = height - ((v - min) / range) * height; return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(" "); const stroke = up ? "var(--success)" : "var(--danger)"; return (<svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible"><polyline fill="none" stroke={stroke} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" points={points} /><circle cx={width} cy={height - ((data[data.length - 1] - min) / range) * height} r={2.5} fill={stroke} /></svg>); }
 function Badge({ label, tone }: { label: string; tone: "success" | "danger" | "warning" | "neutral" }) { const cls = tone === "success" ? "bg-[color-mix(in_srgb,var(--success)_14%,transparent)] text-[var(--success)] border-[color-mix(in_srgb,var(--success)_20%,transparent)]" : tone === "danger" ? "bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] text-[var(--danger)] border-[color-mix(in_srgb,var(--danger)_20%,transparent)]" : tone === "warning" ? "bg-[color-mix(in_srgb,var(--warning)_16%,transparent)] text-[var(--warning)] border-[color-mix(in_srgb,var(--warning)_20%,transparent)]" : "bg-muted text-muted-foreground border-border"; return (<span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cls}`}>{label}</span>); }
 function TypingIndicator() { return (<div className="flex items-center gap-1.5 rounded-2xl bg-muted px-3 py-2.5 w-fit"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" /></div>); }
@@ -30,7 +39,24 @@ export default function Axelia() {
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages, typing, open]);
   useEffect(() => { if (open) { setUnread(0); setTimeout(() => inputRef.current?.focus(), 120); } }, [open]);
   const handleToggle = () => setOpen((v) => { const nv = !v; if (nv) setUnread(0); return nv; });
-  const pushMessage = (msg: ChatMessage, opts?: { incUnread?: boolean }) => { setMessages((prev) => [...prev, msg]); if (opts?.incUnread && !open) setUnread((c) => c + 1); };
+  const pushMessage = (msg: ChatMessage, opts?: { incUnread?: boolean }) => {
+    setMessages((prev) => {
+      const last = prev[prev.length-1];
+      if (last && last.role === msg.role && last.text === msg.text && last.ticker === msg.ticker && Date.now() - parseInt(last.id.split('-')[1]||'0') < 1500) return prev;
+      return [...prev, msg];
+    });
+    if (opts?.incUnread && !open) setUnread((c) => c + 1);
+  };
+  // Track in-flight to prevent double send
+  const sendingRef = useRef(false);
+  const callAgent = async (userText: string): Promise<{ text:string; sparkline?:number[]; badge?:{label:string;tone:any}; ticker?:string; via?:string; steps?:any[] }> => {
+    try {
+      const r = await fetch('/api/ai/axelia', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ message: userText, contextTicker, history: messages.slice(-6).map(m=>({role:m.role,text:m.text})) }) });
+      const j = await r.json();
+      if (j.success) return { text: j.text, sparkline: j.sparkline, badge: j.badge, ticker: j.ticker, via: j.via, steps: j.steps };
+    } catch {}
+    return { text: '', via: 'fail' } as any;
+  };
   const buildLocalFallback = async (userText: string): Promise<ChatMessage> => {
     const tickerInText = extractTickerFromText(userText);
     const ticker = tickerInText || contextTicker;
@@ -40,6 +66,8 @@ export default function Axelia() {
     const wantsFundamental = /fundamental|valuasi|pe\b|pbv|roe|eps|dividen|keuangan|graham|fair/i.test(lower);
     const wantsRank = /rank|ranking|strategi|backtest|win rate|sharpe|terbaik/i.test(lower);
     if (!ticker) return { id: `a-${Date.now()}`, role: "assistant", text: `Sebutkan kode saham ya — contoh: "Analisis BBCA", "RSI TLKM", "Fundamental ASII" atau "Ranking strategi BBRI".\n\nKalau kamu lagi di halaman /analysis/[ticker], saya otomatis pakai chip "Membahas: ${contextTicker ?? "-"}" tanpa perlu ketik ulang.`, badge: { label: "butuh ticker", tone: "warning" } };
+    // dedupe typing guard
+    if (typing) return { id: `a-${Date.now()}`, role: "assistant", text: "Masih memproses...", badge:{label:"tunggu", tone:"neutral"} };
     setTyping(true);
     let bars: HistoryBar[] | null = null;
     let fundamentals: any | null = null;
@@ -127,19 +155,52 @@ export default function Axelia() {
   };
   const handleSend = async (override?: string) => {
     const text = (override ?? input).trim();
-    if (!text || typing) return;
+    if (!text || typing || sendingRef.current) return;
+    sendingRef.current = true;
+    // dedupe identical consecutive user message within 2s
+    const lastUser = [...messages].reverse().find(m=>m.role==='user');
+    if (lastUser && lastUser.text === text && Date.now() - parseInt(lastUser.id.split('-')[1]||'0') < 2000) { sendingRef.current=false; return; }
+    // identity / help — jawab langsung
+    if (isIdentityQuery(text)) {
+      const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", text };
+      pushMessage(userMsg);
+      setInput("");
+      pushMessage({ id: `a-${Date.now()+1}`, role: "assistant", text: "Saya **Axelia** — AI agent Porto (mimo-v2.5). Saya tarik data live Yahoo/IDX + engine `quant.ts` (RSI/MACD/MA, 8 strategi backtest) dulu baru jawab. Coba: *\"Analisis BBCA\"* atau *\"Jelaskan RSI TLKM\"*.", badge:{label:"Axelia • mimo-v2.5", tone:"neutral"} }, {incUnread:true});
+      sendingRef.current=false;
+      return;
+    }
+    if (isHelpQuery(text)) {
+      const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", text };
+      pushMessage(userMsg);
+      setInput("");
+      pushMessage({ id: `a-${Date.now()+1}`, role: "assistant", text: "Tentu bisa! Saya siap bantu. Tanya harga (\"Harga BBCA\"), teknikal (\"RSI TLKM\"), fundamental (\"PER BBCA\") atau ranking (\"Strategi terbaik BUMI\"). Sebutkan kode saham 4 huruf ya.", badge:{label:"Siap bantu", tone:"success"} }, {incUnread:true});
+      sendingRef.current=false;
+      return;
+    }
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", text };
     pushMessage(userMsg);
     setInput("");
     setTyping(true);
-    const reply = await buildLocalFallback(text);
-    pushMessage(reply, { incUnread: true });
+    try {
+      // 1) coba agent LLM (mimo-v2.5 tool-calling, loop max 5)
+      const agent = await callAgent(text);
+      if (agent.text && agent.via !== 'fail' && agent.via !== 'notfound') {
+        pushMessage({ id:`a-${Date.now()}`, role:"assistant", text: agent.text + (agent.steps?.length ? `\n\n<details><summary>🔧 Lihat detail proses (${agent.steps.length} tool)</summary>\n\n${agent.steps.map((s:any)=>`- **${s.tool}** ${JSON.stringify(s.args)} → ${s.result?.ok ? 'ok' : s.result?.error||'fail'}`).join('\n')}\n</details>` : ''), sparkline: agent.sparkline, badge: agent.badge as any, meta:`Axelia agent • mimo-v2.5 • ${agent.steps?.length||0} tool(s) • ${agent.ticker||''}`, ticker: agent.ticker }, {incUnread:true});
+        return;
+      }
+      if (agent.via === 'notfound' && agent.text) {
+        pushMessage({ id:`a-${Date.now()}`, role:"assistant", text: agent.text, badge: agent.badge as any, ticker: agent.ticker }, {incUnread:true});
+        return;
+      }
+      const reply = await buildLocalFallback(text);
+      pushMessage(reply, { incUnread: true });
+    } finally { setTyping(false); sendingRef.current=false; }
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } };
   return (
     <>
-      <button aria-label={open ? "Minimize Axelia" : "Buka Axelia AI"} onClick={handleToggle} className="fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition hover:scale-[1.03] active:scale-[0.98] cursor-pointer md:bottom-6 md:right-6" style={{ boxShadow: "0 8px 32px color-mix(in srgb, var(--primary) 30%, transparent)" }}>
-        {open ? <ChevronDown className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
+      <button aria-label={open ? "Minimize Axelia" : "Buka Axelia AI"} onClick={handleToggle} className="fixed right-3 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-primary/95 text-primary-foreground shadow-lg transition hover:scale-[1.03] active:scale-[0.98] cursor-pointer md:bottom-6 md:right-6 md:h-14 md:w-14" style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))", boxShadow: "0 8px 20px color-mix(in srgb, var(--primary) 20%, transparent)" }}>
+        {open ? <ChevronDown className="h-5 w-5 md:h-6 md:w-6" /> : <Bot className="h-5 w-5 md:h-6 md:w-6" />}
         {!open && unread > 0 ? (<span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[11px] font-bold leading-none text-white ring-2 ring-[var(--background)]">{unread > 9 ? "9+" : unread}</span>) : null}
         {!open && unread === 0 ? (<span className="absolute inset-0 -z-10 animate-ping rounded-full bg-primary/20" style={{ animationDuration: "2.5s" }} />) : null}
       </button>

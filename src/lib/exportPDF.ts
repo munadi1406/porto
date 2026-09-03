@@ -70,8 +70,8 @@ export function exportToPDF(element: HTMLElement, options: { title?: string } = 
 /**
  * Export element to Image (PNG) using html2canvas
  */
-export async function exportToImage(element: HTMLElement, options: { fileName?: string } = {}) {
-    const { fileName = 'portfolio-share' } = options;
+export async function exportToImage(element: HTMLElement, options: { fileName?: string; share?: boolean; shareTitle?: string } = {}) {
+    const { fileName = 'portfolio-share', share = false, shareTitle = 'Portfolio Return' } = options;
 
     try {
         // Disable ALL stylesheets before html2canvas to prevent oklch() parse error.
@@ -113,6 +113,14 @@ export async function exportToImage(element: HTMLElement, options: { fileName?: 
                 canvas.toBlob((blob) => {
                     if (!blob) {
                         reject(new Error("Failed to create blob"));
+                        return;
+                    }
+                    const file = new File([blob], `${fileName}.png`, { type: 'image/png' });
+                    if (share && navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+                        navigator.share({ title: shareTitle, files: [file] }).then(() => resolve()).catch((error) => {
+                            if (error?.name === 'AbortError') resolve();
+                            else reject(error);
+                        });
                         return;
                     }
                     const url = URL.createObjectURL(blob);

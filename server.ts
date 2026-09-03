@@ -1,9 +1,8 @@
-// Custom Next.js Server with WebSocket support
+// Custom Next.js Server
 // Run with: npx tsx server.ts
 
 import { createServer } from "http";
 import next from "next";
-import { initWebSocket } from "./src/server/ws-server";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -17,11 +16,8 @@ app.prepare().then(() => {
         await handle(req, res);
     });
 
-    // Initialize WebSocket server
-    initWebSocket(server);
-
     server.listen(port, hostname, () => {
         console.log(`> Ready on http://${hostname}:${port}`);
-        console.log(`> WebSocket available at ws://${hostname}:${port}/ws`);
+        console.log("> Market data: API polling every 5 seconds");
     });
 });

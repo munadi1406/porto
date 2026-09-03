@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
         const transactions = await Transaction.findAll({
             where: { portfolioId },
             order: [['timestamp', 'DESC']],
-            limit: 100,
+            // Return enough history for normalized portfolio-return calculations.
+            // A short window can misclassify older holdings as unexplained cash flow.
+            limit: 5000,
         });
 
         return NextResponse.json({

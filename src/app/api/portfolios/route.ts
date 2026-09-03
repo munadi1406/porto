@@ -139,12 +139,13 @@ export async function DELETE(request: NextRequest) {
         }
 
         // Cascade delete using related models
-        const { PortfolioItem, Transaction, PortfolioSnapshot, CashHolding } = await import('@/lib/models');
+        const { PortfolioItem, Transaction, PortfolioSnapshot, CashHolding, CashLedger } = await import('@/lib/models');
 
         await PortfolioItem.destroy({ where: { portfolioId: id } });
         await Transaction.destroy({ where: { portfolioId: id } });
         await PortfolioSnapshot.destroy({ where: { portfolioId: id } });
         await CashHolding.destroy({ where: { portfolioId: id } });
+        await CashLedger.destroy({ where: { portfolioId: id } });
         await portfolio.destroy();
 
         return NextResponse.json({

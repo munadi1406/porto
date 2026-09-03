@@ -15,6 +15,7 @@ export interface PortfolioItem {
     lots: number;   // 1 lot = 100 shares
     averagePrice: number; // Avg price per share
     targetPercentage?: number;
+    createdAt?: string | number;
 }
 
 export interface StockPrice {

@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
     // 3) Live fetch ke Index Alpha
     try {
-        const url = `https://api.indexalpha.id/stocks/broker-summary?ticker=${stock}&from=${dISO}&to=${dISO}&investor=all`;
+        const url = `https://api.indexalpha.id/stocks/broker-summary?ticker=${stock}&from=${dISO}&to=${dISO}&investor=foreign`;
         const r = await fetch(url, {
             headers: { accept: 'application/json', Authorization: `Bearer ${key}` },
             signal: AbortSignal.timeout(15000),

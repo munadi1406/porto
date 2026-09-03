@@ -19,7 +19,7 @@ import StockStatistics from "@/components/StockStatistics";
 import FundamentalSummary from "@/components/FundamentalSummary";
 import NewsPanel from "@/components/NewsPanel";
 import FinancialReports from "@/components/FinancialReports";
-import ShareholderChart from "@/components/ShareholderChart";
+import ShareholderChart, { formatOwnershipPercentage, formatShareCount } from "@/components/ShareholderChart";
 import { InsiderOwnershipTracker, useOwnershipChange } from "@/components/InsiderOwnershipTracker";
 import ChartPatterns from "@/components/ChartPatterns";
 import OrderBookPanel from "@/components/OrderBookPanel";
@@ -36,17 +36,16 @@ const StockChart = dynamic(() => import("@/components/StockChart"), {
     ),
 });
 
-type Tab = "overview" | "chart" | "summary" | "financial" | "company" | "news" | "ownership" | "technical";
+type Tab = "overview" | "chart" | "summary" | "financial" | "company" | "news" | "ownership";
 
 const TABS: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
-    { key: "chart", label: "Chart" },
+    { key: "chart", label: "Technical" },
     { key: "summary", label: "Summary" },
     { key: "financial", label: "Financials" },
     { key: "company", label: "Company" },
     { key: "news", label: "News" },
     { key: "ownership", label: "Ownership" },
-    { key: "technical", label: "Technical" },
 ];
 
 export default function StockAnalysisPage({ params }: { params: Promise<{ ticker: string }> }) {
@@ -58,7 +57,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
     const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState("1y");
-    const [activeTab, setActiveTab] = useState<Tab>("chart");
+    const [activeTab, setActiveTab] = useState<Tab>("overview");
 
     const { data: smartMoney } = useFundamentals(ticker);
     const companyCode = ticker.replace('.JK', '');
@@ -114,7 +113,12 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
 
     const lastCandle = data.length > 0 ? data[data.length - 1] : null;
     const currentPrice = smartMoney?.currentPrice ?? lastCandle?.close ?? 0;
-    const changePercent = smartMoney?.priceChangePercent ?? 0;
+    const previousCandle = data.length > 1 ? data[data.length - 2] : null;
+    const changePercent = Number(
+        smartMoney?.priceChangePercent ??
+        (previousCandle?.close ? ((currentPrice - previousCandle.close) / previousCandle.close) * 100 : 0)
+    );
+    const changeValue = previousCandle?.close ? currentPrice - previousCandle.close : 0;
     const isUp = changePercent >= 0;
 
     // Deteksi pola chart untuk digambar langsung di chart (pakai data period terpilih, default 1 tahun)
@@ -145,70 +149,76 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
             <meta name="twitter:card" content="summary_large_image" />
             <meta name="twitter:title" content={`${ticker.replace(".JK", "")} — Analisis Saham | Porto`} />
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-2xl font-bold text-foreground">{ticker.replace(".JK", "")}</h1>
+            {/* Stock identity & quote */}
+            <section className="flex flex-col gap-5 overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-primary/[0.06] via-card to-card p-4 shadow-sm sm:flex-row sm:items-center sm:p-5">
+                <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">{ticker.replace(".JK", "")}</h1>
                         {smartMoney?.sharia && (
-                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-success/10 text-success text-[10px] font-bold rounded">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-success">
                                 <ShieldCheck className="w-3 h-3" /> Syariah
                             </span>
                         )}
                         <button
                             onClick={handleShare}
-                            className="ml-1 p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors cursor-pointer"
+                            className="ml-auto rounded-xl border border-border/70 bg-background/70 p-2 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:ml-1"
                             title="Bagikan link analisis"
                         >
-                            {copied ? <Link2 className="w-3.5 h-3.5 text-success" /> : <Share2 className="w-3.5 h-3.5" />}
+                            {copied ? <Link2 className="h-4 w-4 text-success" /> : <Share2 className="h-4 w-4" />}
                         </button>
                         <button
                             onClick={() => watchlist.toggle(ticker)}
                             className={cn(
-                                "p-1.5 rounded-lg border bg-card transition-colors cursor-pointer",
+                                "rounded-xl border p-2 transition-colors",
                                 isWatched
                                     ? "border-amber-500/50 text-amber-500 bg-amber-500/5"
                                     : "border-border text-muted-foreground hover:text-foreground hover:border-amber-500/40"
                             )}
                             title={isWatched ? "Hapus dari watchlist" : "Tambah ke watchlist"}
                         >
-                            <Star className={cn("w-3.5 h-3.5", isWatched && "fill-amber-500")} />
+                            <Star className={cn("h-4 w-4", isWatched && "fill-amber-500")} />
                         </button>
                         <AlertsPopover ticker={ticker} currentPrice={currentPrice} />
                     </div>
+                    <p className="mb-2 truncate text-xs font-semibold text-muted-foreground sm:text-sm">
+                        {companyDetail?.profile?.name || smartMoney?.industry || "Emiten Bursa Efek Indonesia"}
+                    </p>
                     {smartMoney?.sector && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                            <span>{smartMoney.sector}</span>
+                        <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <span className="rounded-full bg-muted/70 px-2 py-1">{smartMoney.sector}</span>
                             {smartMoney?.industry && <><span>·</span><span>{smartMoney.industry}</span></>}
                         </div>
                     )}
                     {currentPrice > 0 && (
-                        <div className="flex items-baseline gap-3">
-                            <span className="text-3xl font-bold text-foreground tabular-nums">Rp {currentPrice.toLocaleString("id-ID")}</span>
-                            <span className={cn("text-lg font-bold", isUp ? "text-success" : "text-destructive")}>
-                                {isUp ? "+" : ""}{(changePercent * 100).toFixed(2)}%
+                        <div className="flex flex-wrap items-end gap-2">
+                            <span className="text-3xl font-black tracking-tight text-foreground tabular-nums sm:text-4xl">Rp {currentPrice.toLocaleString("id-ID")}</span>
+                            <span className={cn("mb-1 inline-flex items-center rounded-lg px-2 py-1 text-sm font-black tabular-nums", isUp ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+                                {isUp ? <TrendingUp className="mr-1 h-3.5 w-3.5" /> : <TrendingDown className="mr-1 h-3.5 w-3.5" />}
+                                {isUp ? "+" : ""}{changePercent.toFixed(2)}%
                             </span>
+                            {changeValue !== 0 ? <span className="mb-1 text-xs font-semibold text-muted-foreground">{changeValue > 0 ? "+" : ""}{changeValue.toLocaleString("id-ID")} hari ini</span> : null}
                         </div>
                     )}
                 </div>
                 {lastCandle && (
-                    <div className="flex gap-6 text-xs">
-                        <div><p className="text-muted-foreground mb-0.5">Open</p><p className="font-bold text-foreground tabular-nums">{(lastCandle.open || 0).toLocaleString("id-ID")}</p></div>
-                        <div><p className="text-muted-foreground mb-0.5">High</p><p className="font-bold text-success tabular-nums">{(lastCandle.high || 0).toLocaleString("id-ID")}</p></div>
-                        <div><p className="text-muted-foreground mb-0.5">Low</p><p className="font-bold text-destructive tabular-nums">{(lastCandle.low || 0).toLocaleString("id-ID")}</p></div>
-                        <div><p className="text-muted-foreground mb-0.5">Volume</p><p className="font-bold text-foreground tabular-nums">{formatCompactIDR(lastCandle.volume || 0).replace("Rp", "")}</p></div>
+                    <div className="grid shrink-0 grid-cols-4 overflow-hidden rounded-xl border border-border/60 bg-background/60 text-xs shadow-sm sm:min-w-[360px]">
+                        <div className="border-r border-border/60 px-3 py-3"><p className="mb-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Open</p><p className="font-mono font-black text-foreground tabular-nums">{(lastCandle.open || 0).toLocaleString("id-ID")}</p></div>
+                        <div className="border-r border-border/60 px-3 py-3"><p className="mb-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">High</p><p className="font-mono font-black text-success tabular-nums">{(lastCandle.high || 0).toLocaleString("id-ID")}</p></div>
+                        <div className="border-r border-border/60 px-3 py-3"><p className="mb-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Low</p><p className="font-mono font-black text-destructive tabular-nums">{(lastCandle.low || 0).toLocaleString("id-ID")}</p></div>
+                        <div className="px-3 py-3"><p className="mb-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Volume</p><p className="font-mono font-black text-foreground tabular-nums">{formatCompactIDR(lastCandle.volume || 0).replace("Rp", "")}</p></div>
                     </div>
                 )}
-            </div>
+            </section>
 
             <div className="space-y-4">
-                <div className="flex gap-1 overflow-x-auto">
+                <section className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
+                <div className="flex gap-1 overflow-x-auto px-3 pt-3 sm:px-4 sm:pt-4">
                     {["1D", "1W", "1M", "3M", "6M", "1Y", "5Y"].map((p) => (
                         <button
                             key={p}
                             onClick={() => setPeriod(periodMap[p] || "3mo")}
                             className={cn(
-                                "px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap",
+                                "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
                                 period === (periodMap[p] || "3mo")
                                     ? "bg-primary text-primary-foreground"
                                     : "text-muted-foreground hover:bg-muted"
@@ -220,7 +230,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                 </div>
 
                 {lastCandle && (
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-3 text-[10px] text-muted-foreground sm:text-xs">
                         <span>O <b className="text-foreground">{lastCandle.open?.toLocaleString("id-ID")}</b></span>
                         <span>H <b className="text-foreground">{lastCandle.high?.toLocaleString("id-ID")}</b></span>
                         <span>L <b className="text-foreground">{lastCandle.low?.toLocaleString("id-ID")}</b></span>
@@ -233,7 +243,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
 
                 {/* Legend pola chart */}
                 {chartDrawings.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3">
                         {[
                             ["sr-zone", "RANGE", "#6366f1"],
                             ["support", "SUPPORT", "#0eaa68"],
@@ -253,7 +263,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                     </div>
                 )}
 
-                <div className="card p-0 overflow-hidden">
+                <div className="mt-3 overflow-hidden border-t border-border/60 p-0">
                     {loading ? (
                         <div className="h-[400px] flex items-center justify-center">
                             <Loader2 className="w-6 h-6 text-primary animate-spin" />
@@ -264,6 +274,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                         </div>
                     ) : (
                         <StockChart
+                            ticker={ticker}
                             data={data}
                             markers={analysis?.markers || []}
                             prediction={[]}
@@ -274,6 +285,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                         />
                     )}
                 </div>
+                </section>
 
                 {/* Tabs — PageTabs + C10 badge on Ownership when >1% change */}
                 <PageTabs
@@ -292,7 +304,7 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                         {smartMoney && (
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 {[
-                                    { label: "Market Cap", value: smartMoney.marketCap ? `Rp ${formatCompactIDR(smartMoney.marketCap)}` : "-" },
+                                    { label: "Market Cap", value: smartMoney.marketCap ? formatCompactIDR(smartMoney.marketCap) : "-" },
                                     { label: "PER (TTM)", value: smartMoney.peRatio ? `${smartMoney.peRatio.toFixed(1)}x` : "-" },
                                     { label: "PBV", value: smartMoney.pbRatio ? `${smartMoney.pbRatio.toFixed(1)}x` : "-" },
                                     { label: "ROE (TTM)", value: smartMoney.roe ? `${smartMoney.roe.toFixed(1)}%` : "-" },
@@ -324,20 +336,6 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
 
                         {/* Risiko vs IHSG */}
                         <RiskMetricsCard ticker={ticker} />
-
-                        {/* Chart preview */}
-                        <div className="card-flush">
-                            <div className="px-4 py-3 border-b border-border">
-                                <h3 className="card-title">Price Chart</h3>
-                            </div>
-                            {loading ? (
-                                <div className="h-[300px] flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
-                            ) : data.length > 0 ? (
-                                <StockChart data={data} markers={analysis?.markers || []} prediction={[]} buyPrice={analysis?.levels.dayTrade.buy} maLines={analysis?.maLines} drawings={chartDrawings} />
-                            ) : (
-                                <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">Tidak ada data harga</div>
-                            )}
-                        </div>
 
                         {/* Financial summary */}
                         {smartMoney && (
@@ -615,9 +613,12 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                                         </h3>
                                         <div className="space-y-2">
                                             {companyDetail.shareholders.map((s: any, i: number) => (
-                                                <div key={i} className="flex justify-between text-xs">
-                                                    <span className="font-medium">{s.name}</span>
-                                                    <span className="font-bold">{s.percentage?.toFixed(2)}%</span>
+                                                <div key={`${s.name}-${i}`} className="flex items-start justify-between gap-3 text-xs">
+                                                    <span className="min-w-0 font-medium">{s.name}</span>
+                                                    <span className="shrink-0 text-right">
+                                                        <span className="block font-mono font-bold">{formatOwnershipPercentage(s.percentage)}</span>
+                                                        <span className="block text-[9px] text-muted-foreground">{formatShareCount(s.count)}</span>
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -664,11 +665,37 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                     <div className="bg-card border border-border rounded-lg p-4">
                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Ownership Structure</h3>
                         <ShareholderChart
+                            shareholders={companyDetail?.shareholders}
                             insidersPercent={(smartMoney as any)?.insidersPercentHeld}
                             institutionsPercent={(smartMoney as any)?.institutionsPercentHeld}
                             institutionsCount={(smartMoney as any)?.institutionsCount}
                             sharia={smartMoney?.sharia}
                         />
+                        {companyDetail?.shareholders?.length ? (
+                            <div className="mt-5 overflow-hidden rounded-xl border border-border/60">
+                                <div className="border-b border-border/60 bg-muted/30 px-4 py-3">
+                                    <h4 className="text-xs font-black uppercase tracking-wider">Pemegang Saham Utama</h4>
+                                    <p className="mt-0.5 text-[10px] text-muted-foreground">Data kepemilikan yang tersedia dari IDX</p>
+                                </div>
+                                <div className="divide-y divide-border/50">
+                                    {companyDetail.shareholders.map((s: any, i: number) => (
+                                        <div key={`${s.name}-${i}`} className="flex items-center gap-3 px-4 py-2.5 text-xs">
+                                            <span className="w-5 text-muted-foreground">{i + 1}</span>
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate font-semibold">{s.name || 'Pemegang saham'}</span>
+                                                <span className="mt-0.5 block text-[9px] text-muted-foreground">{formatShareCount(s.count)}</span>
+                                            </span>
+                                            <span className="shrink-0 font-mono font-bold">{formatOwnershipPercentage(s.percentage)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="mt-5 rounded-xl border border-dashed border-border p-6 text-center">
+                                <p className="text-sm font-semibold">Data ownership belum tersedia</p>
+                                <p className="mt-1 text-xs text-muted-foreground">Yahoo/IDX belum mengirim persentase insider atau institusi untuk ticker ini.</p>
+                            </div>
+                        )}
                         {/* C10 Insider & Ownership Change Tracker — timeline per quarter, badge when >1% */}
                         <InsiderOwnershipTracker
                             ticker={ticker}
@@ -678,29 +705,6 @@ export default function StockAnalysisPage({ params }: { params: Promise<{ ticker
                     </div>
                 )}
 
-                {activeTab === "technical" && (
-                    <div className="space-y-4">
-                        {analysis && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {[
-                                    { label: "RSI (14)", value: analysis.indicators.rsi.toFixed(1), color: analysis.indicators.rsi > 70 ? "text-destructive" : analysis.indicators.rsi < 30 ? "text-success" : "" },
-                                    { label: "MACD", value: analysis.indicators.macd.histogram.toFixed(2), color: analysis.indicators.macd.histogram > 0 ? "text-success" : "text-destructive" },
-                                    { label: "Signal", value: analysis.recommendation.replace("_", " "), color: analysis.recommendation.includes("BUY") ? "text-success" : analysis.recommendation.includes("SELL") ? "text-destructive" : "text-warning" },
-                                    { label: "Trend", value: analysis.indicators.trend, color: analysis.indicators.trend === "UP" ? "text-success" : analysis.indicators.trend === "DOWN" ? "text-destructive" : "text-muted-foreground" },
-                                ].map(item => (
-                                    <div key={item.label} className="bg-card border border-border rounded-lg p-3 text-center">
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">{item.label}</p>
-                                        <p className={cn("text-sm font-bold uppercase", item.color)}>{item.value}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <div className="bg-card border border-border rounded-lg p-4">
-                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Technical Signals</h3>
-                            <TechnicalSignals analysis={analysis} />
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

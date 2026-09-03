@@ -83,6 +83,10 @@ export default function BrokerSummaryPanel() {
                 setData(res.data);
                 setSource(res.source);
                 setDate(res.date || "");
+                if (res.date) {
+                    const raw = String(res.date).replace(/-/g, "");
+                    setCalendarDate(`${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`);
+                }
             }
         } catch {} finally {
             setLoading(false);
@@ -110,6 +114,7 @@ export default function BrokerSummaryPanel() {
 
     // ── Broksum per saham (Top Buy / Top Sell) — semua hook SEBELUM early-return ──
     const [stockQuery, setStockQuery] = useState("BBCA");
+    const [calendarDate, setCalendarDate] = useState("");
     const [stockData, setStockData] = useState<StockBrokerData | null>(null);
     const [stockLoading, setStockLoading] = useState(false);
 
@@ -118,7 +123,7 @@ export default function BrokerSummaryPanel() {
         setStockLoading(true);
         try {
             const qs = new URLSearchParams({ stock: stock.trim().toUpperCase() });
-            if (date) qs.set("date", date.replace(/-/g, ""));
+            if (calendarDate) qs.set("date", calendarDate.replace(/-/g, ""));
             const r = await fetch(`/api/idx/broker-stock?${qs}`, { cache: "no-store" });
             setStockData(await r.json());
         } catch {
@@ -126,22 +131,22 @@ export default function BrokerSummaryPanel() {
         } finally {
             setStockLoading(false);
         }
-    }, [date]);
+    }, [calendarDate]);
 
     // Auto-load default saat pertama membuka tab Per Ticker
     const hasLoadedRef = useRef(false);
     useEffect(() => {
-        if (date && subTab === "ticker" && !hasLoadedRef.current) {
+        if (calendarDate && subTab === "ticker" && !hasLoadedRef.current) {
             hasLoadedRef.current = true;
             loadStock("BBCA");
         }
-    }, [date, subTab, loadStock]);
+    }, [calendarDate, subTab, loadStock]);
 
     if (loading && data.summary.brokerCount === 0 && !unavailable) {
         return (
             <div className="bg-card border border-border rounded-lg p-6 text-center text-sm text-muted-foreground">
                 <RefreshCw className="w-6 h-6 mx-auto mb-2 animate-spin opacity-50" />
-                Memuat ringkasan broker… (via browser anti-Cloudflare, bisa 30–90 detik pertama kali)
+                Memuat ringkasan broker… (mengambil data IDX melalui koneksi eksternal)
             </div>
         );
     }
@@ -201,8 +206,8 @@ export default function BrokerSummaryPanel() {
                     <CloudOff className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
                     <p className="text-sm font-black text-foreground">Ringkasan broker belum tersedia</p>
                     <p className="text-xs text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
-                        Browser anti-Cloudflare sedang mencoba mengambil data dari IDX.
-                        Proses pertama bisa memakan waktu hingga beberapa menit.
+                        Koneksi eksternal sedang mencoba mengambil data dari IDX.
+                        Proses pertama dapat memakan waktu lebih lama.
                     </p>
                     <div className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
                         <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: "3s" }} />
@@ -320,7 +325,7 @@ export default function BrokerSummaryPanel() {
             <div className="card-flush">
                 <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-wrap">
                     <Search className="w-3.5 h-3.5 text-muted-foreground" />
-                    <h3 className="card-title">Broksum per Saham</h3>
+                    <h3 className="card-title">Foreign flow per saham</h3>
                     {stockData?.cached && (
                         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                             {stockData.cached === "db" ? "dari database" : `fresh · sisa kuota ${stockData.quotaRemaining ?? "?"}/5`}
@@ -335,6 +340,13 @@ export default function BrokerSummaryPanel() {
                             onChange={e => setStockQuery(e.target.value.toUpperCase())}
                             placeholder="Kode saham (BBCA)"
                             className="w-40 px-2.5 py-1.5 text-xs font-bold uppercase bg-muted/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <input
+                            type="date"
+                            value={calendarDate}
+                            onChange={e => setCalendarDate(e.target.value)}
+                            aria-label="Tanggal foreign flow"
+                            className="w-36 px-2.5 py-1.5 text-xs bg-muted/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                         <button type="submit" disabled={stockLoading} className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50">
                             {stockLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />} Cari

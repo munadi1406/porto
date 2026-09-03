@@ -1,43 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-const mocks = vi.hoisted(() => ({
-    existsSync: vi.fn(),
-    readFileSync: vi.fn(),
-}));
-
-vi.mock('fs', () => ({
-    default: { existsSync: mocks.existsSync, readFileSync: mocks.readFileSync },
-    existsSync: mocks.existsSync,
-    readFileSync: mocks.readFileSync,
-}));
-
-import { getAllStocks } from '@/lib/screenerStockList';
+import { describe, it, expect } from 'vitest';
+import { filterStockTickers, getAllStocks } from '@/lib/screenerStockList';
 
 describe('screenerStockList', () => {
-    let cwdSpy: any;
-
-    beforeEach(() => {
-        mocks.existsSync.mockReset();
-        mocks.readFileSync.mockReset();
-        cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/fake/cwd');
+    it('memfilter ticker valid dan membuang baris header', () => {
+        expect(filterStockTickers(['NO.JK', 'KODE.JK', 'BBCA.JK', 'TLKM.JK', 'bad-ticker', 'A.JK', 'ABCDE.JK'])).toEqual(['BBCA.JK', 'TLKM.JK']);
     });
 
-    afterEach(() => cwdSpy.mockRestore());
-
-    it('membaca dan memfilter ticker valid (2-4 huruf + .JK) dari stocks-idx.json', () => {
-        mocks.existsSync.mockReturnValue(true);
-        mocks.readFileSync.mockReturnValue(JSON.stringify({ stocks: ['BBCA.JK', 'TLKM.JK', 'bad-ticker', 'A.JK', 'ABCDE.JK'] }));
-        expect(getAllStocks()).toEqual(['BBCA.JK', 'TLKM.JK']);
+    it('mengembalikan [] untuk input non-array', () => {
+        expect(filterStockTickers(null)).toEqual([]);
     });
 
-    it('mengembalikan [] jika file tidak ada', () => {
-        mocks.existsSync.mockReturnValue(false);
-        expect(getAllStocks()).toEqual([]);
-    });
-
-    it('mengembalikan [] jika JSON rusak', () => {
-        mocks.existsSync.mockReturnValue(true);
-        mocks.readFileSync.mockReturnValue('bukan json');
-        expect(getAllStocks()).toEqual([]);
+    it('membundel daftar saham ke runtime server', () => {
+        expect(getAllStocks().length).toBeGreaterThan(900);
+        expect(getAllStocks()).toContain('BBCA.JK');
     });
 });

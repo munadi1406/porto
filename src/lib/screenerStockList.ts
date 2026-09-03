@@ -1,14 +1,14 @@
-import fs from 'fs';
-import path from 'path';
+import stockData from '../../stocks-idx.json';
+
+const NON_TICKER_ROWS = new Set(['NO.JK', 'KODE.JK']);
+
+export function filterStockTickers(values: unknown): string[] {
+    if (!Array.isArray(values)) return [];
+    return values.filter((ticker): ticker is string =>
+        typeof ticker === 'string' && /^[A-Z]{2,4}\.JK$/.test(ticker) && !NON_TICKER_ROWS.has(ticker)
+    );
+}
 
 export function getAllStocks(): string[] {
-    try {
-        const jsonPath = path.join(process.cwd(), 'stocks-idx.json');
-        if (!fs.existsSync(jsonPath)) return [];
-        const raw = fs.readFileSync(jsonPath, 'utf-8');
-        const parsed = JSON.parse(raw);
-        return (parsed.stocks || []).filter((t: string) => /^[A-Z]{2,4}\.JK$/.test(t));
-    } catch {
-        return [];
-    }
+    return filterStockTickers(stockData.stocks);
 }

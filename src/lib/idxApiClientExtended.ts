@@ -1,5 +1,5 @@
 // Extended IDX API Client - New endpoints from IDX-API
-import { idxFetch, getCached, setCache, todayStr, dateStr, CACHE_TTL } from './idxApiClient';
+import { idxFetch, resilientFetch, firecrawlFetchJson, getCached, setCache, todayStr, dateStr, CACHE_TTL } from './idxApiClient';
 
 // ═══════════════════════════════════════════════════════════════════
 // FINANCIAL RATIO / STATEMENT (assets, liabilities, equity, sales, profit)
@@ -81,12 +81,18 @@ export async function getTradingInfoSS(code: string, start = 0, length = 1000) {
 // ═══════════════════════════════════════════════════════════════════
 // COMPANY DETAIL (Full profile)
 // ═══════════════════════════════════════════════════════════════════
-export async function getCompanyDetail(code: string, language = 'id-id') {
+export async function getCompanyDetail(code: string, language = 'id') {
     const key = `company-detail:${code}:${language}`;
     if (getCached(key, 60 * 60 * 1000)) return getCached(key, 60 * 60 * 1000);
-    const data = await idxFetch<any>(
-        `/primary/ListedCompany/GetCompanyProfilesDetail?KodeEmiten=${code}&language=${language}`
-    );
+    const path = `/primary/ListedCompany/GetCompanyProfilesDetail?KodeEmiten=${code}&language=${language}`;
+    let data: any;
+    try {
+        data = await resilientFetch<any>(path);
+    } catch (primaryError) {
+        // cPanel/shared hosting often cannot run Chromium. Firecrawl provides
+        // an external browser fallback when configured with FIRECRAWL_API_KEY.
+        data = await firecrawlFetchJson<any>(path).catch(() => { throw primaryError; });
+    }
     setCache(key, data);
     return data;
 }

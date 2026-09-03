@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-const IDX_BASE = "https://www.idx.co.id";
 const CACHE_KEY_PREFIX = "idx_cache_";
 const CACHE_TTL = 5 * 60 * 1000; // 5 menit
 
@@ -23,13 +22,11 @@ function setCache(key: string, data: any) {
 }
 
 async function idxFetchClient<T>(path: string, timeout = 15000): Promise<T> {
-    const fullUrl = path.startsWith("http") ? path : `${IDX_BASE}${path}`;
-    const res = await fetch(fullUrl, {
-        headers: {
-            "Referer": "https://www.idx.co.id/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-        },
+    const normalized = path
+        .replace(/^https:\/\/www\.idx\.co\.id\/primary\//, "")
+        .replace(/^\/primary\//, "")
+        .replace(/^\//, "");
+    const res = await fetch(`/api/idxx/${normalized}`, {
         signal: AbortSignal.timeout(timeout),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

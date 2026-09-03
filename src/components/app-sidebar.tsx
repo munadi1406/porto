@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { usePortfolios } from "@/hooks/usePortfolios"
 import { useTheme } from "@/hooks/useTheme"
 import { useWatchlist } from "@/hooks/useWatchlist"
-import { useSharedWs } from "@/components/WsProvider"
+import { useMarketData } from "@/hooks/useMarketData"
 import { getMarketStatus, type MarketSession } from "@/lib/market-hours"
 
 import {
@@ -53,21 +53,18 @@ function isActive(pathname: string, url: string): boolean {
   return pathname === url || pathname.startsWith(`${url}/`)
 }
 
-// Widget IHSG live via WebSocket — uses shared WsProvider when available (single socket per tab),
-// falls back to isolated useWebSocket outside provider (backward compat).
+// Widget IHSG live melalui API polling agar konsisten di semua environment.
 function LiveIhsgChip({ collapsed }: { collapsed?: boolean }) {
-  const { connected, prices, subscribe, unsubscribe } = useSharedWs()
+  const { prices, loading } = useMarketData(["^JKSE"])
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    if (!connected) return
-    subscribe(["^JKSE"])
-    return () => unsubscribe(["^JKSE"])
-  }, [connected, subscribe, unsubscribe])
+  }, [])
 
   const q = prices["^JKSE"]
   const up = (q?.changePercent ?? 0) >= 0
+  const connected = !!q && !loading
 
   if (collapsed) {
     return (

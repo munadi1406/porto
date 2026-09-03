@@ -22,7 +22,11 @@ function loadDisk(): CacheEntry | null {
     try {
         if (fs.existsSync(DISK_FILE)) {
             const p = JSON.parse(fs.readFileSync(DISK_FILE, 'utf8'));
-            if (p?.data?.netValue != null || p?.data?.participationValue != null) return p;
+            const hasNetFlow = Number.isFinite(p?.data?.netValue) && (
+                p.data.netValue !== 0 || p.data.buyValue > 0 || p.data.sellValue > 0
+            );
+            const hasParticipation = Number.isFinite(p?.data?.participationValue) && p.data.participationValue > 0;
+            if (hasNetFlow || hasParticipation) return p;
         }
     } catch {}
     return null;
@@ -88,44 +92,103 @@ function findRows(obj: unknown, depth = 0): Record<string, unknown>[] {
     return [];
 }
 
+function parseNumeric(value: unknown): number | null {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value !== 'string') return null;
+    const raw = value.trim().replace(/\s/g, '');
+    if (!raw || !/[0-9]/.test(raw)) return null;
+    let normalized = raw.replace(/[^\d,.-]/g, '');
+    const lastComma = normalized.lastIndexOf(',');
+    const lastDot = normalized.lastIndexOf('.');
+    if (lastComma >= 0 && lastDot >= 0) {
+        // Separator paling kanan adalah desimal; yang lain pemisah ribuan.
+        if (lastComma > lastDot) normalized = normalized.replace(/\./g, '').replace(',', '.');
+        else normalized = normalized.replace(/,/g, '');
+    } else if (lastDot >= 0) {
+        const groups = normalized.split('.');
+        // IDX memakai titik sebagai pemisah ribuan, mis. 48.316.978.038.240.
+        if (groups.length > 2 || groups.at(-1)?.length === 3) normalized = groups.join('');
+    } else if (lastComma >= 0) {
+        const groups = normalized.split(',');
+        if (groups.length > 2 || groups.at(-1)?.length === 3) normalized = groups.join('');
+        else normalized = normalized.replace(',', '.');
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function findValue(rows: Record<string, unknown>[], investor: 'foreign' | 'domestic'): number {
+    const investorTokens = investor === 'foreign' ? ['foreign', 'asing'] : ['domestic', 'domestik', 'lokal'];
+    const valueTokens = ['value', 'nilai', 'amount', 'total'];
+    const excludedTokens = ['volume', 'frequency', 'frekuensi', 'percent', 'persen', 'date', 'tanggal'];
+    let best: { score: number; value: number } | null = null;
+
+    for (const row of rows) {
+        for (const [key, raw] of Object.entries(row)) {
+            const normalizedKey = key.toLowerCase().replace(/[^a-z]/g, '');
+            if (excludedTokens.some(token => normalizedKey.includes(token))) continue;
+            const value = parseNumeric(raw);
+            if (value == null || value <= 0) continue;
+            let score = 0;
+            if (investorTokens.some(token => normalizedKey.includes(token))) score += 4;
+            if (valueTokens.some(token => normalizedKey.includes(token))) score += 2;
+            if (/buy|sell|beli|jual|net/.test(normalizedKey)) score -= 1;
+            if (!best || score > best.score || (score === best.score && value > best.value)) best = { score, value };
+        }
+    }
+    return best && best.score >= 2 ? best.value : 0;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} timeout`)), ms); }),
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
 async function fetchIdxMonthly(y: number, m: number) {
     const { getDailyTradingByInvestorType } = await import('@/lib/idxApiClient');
-    const fore = await getDailyTradingByInvestorType(y, m, 'foreign');
-    const dom = await getDailyTradingByInvestorType(y, m, 'domestic');
-    const fRow = findRows(fore)[findRows(fore).length - 1];
-    const dRow = findRows(dom)[findRows(dom).length - 1];
-    if (!fRow) throw new Error('tabel kosong');
-    const pick = (row: Record<string, unknown> | undefined, frag: string): number => {
-        if (!row) return 0;
-        for (const k of Object.keys(row)) {
-            const kl = k.toLowerCase().replace(/[^a-z]/g, '');
-            if (kl.includes(frag)) {
-                const v = typeof row[k] === 'number' ? row[k] : parseFloat(String(row[k]));
-                if (!isNaN(v)) return v;
-            }
-        }
-        return 0;
-    };
-    const participationValue = pick(fRow, 'foreignforeignvalue') || pick(fRow, 'foreignvalue');
-    const domesticValue = pick(fRow, 'foreigndomesticvalue') || (dRow ? pick(dRow, 'value') : 0);
-    const date = String(fRow['date'] ?? fRow['Date'] ?? `${y}-${String(m).padStart(2, '0')}`);
+    const [fore, dom] = await Promise.all([
+        getDailyTradingByInvestorType(y, m, 'foreign'),
+        getDailyTradingByInvestorType(y, m, 'domestic'),
+    ]);
+    const foreignRows = findRows(fore);
+    const domesticRows = findRows(dom);
+    if (foreignRows.length === 0) throw new Error('tabel asing kosong');
+    const participationValue = findValue(foreignRows, 'foreign');
+    const domesticValue = findValue(domesticRows, 'domestic');
+    if (participationValue <= 0) {
+        const keys = Object.keys(foreignRows[0] || {}).slice(0, 20).join(',');
+        throw new Error(`nilai partisipasi asing tidak ditemukan (kolom: ${keys || 'none'})`);
+    }
+    const datedRow = [...foreignRows].reverse().find(row => {
+        const date = String(row.date ?? row.Date ?? row.tanggal ?? row.Tanggal ?? '');
+        return date && date.toLowerCase() !== 'total';
+    });
+    const date = String(datedRow?.date ?? datedRow?.Date ?? datedRow?.tanggal ?? datedRow?.Tanggal ?? `${y}-${String(m).padStart(2, '0')}`);
     return { participationValue, domesticValue, date };
 }
 
 async function fetchOfficial() {
     const nowWib = new Date(Date.now() + 7 * 3600_000);
-    const y = nowWib.getUTCFullYear();
-    const m = nowWib.getUTCMonth() + 1;
-    try {
-        const cur = await fetchIdxMonthly(y, m);
-        if (cur.participationValue > 0) return cur;
-        throw new Error('bulan berjalan kosong');
-    } catch {
-        // Fallback: bulan sebelumnya (data final)
-        const pm = m === 1 ? 12 : m - 1;
-        const py = m === 1 ? y - 1 : y;
-        return await fetchIdxMonthly(py, pm);
+    let lastError: unknown = new Error('data IDX bulanan kosong');
+    // Publikasi statistik bulanan IDX dapat tertinggal lebih dari satu bulan.
+    // Mundur maksimal empat bulan dan pilih periode terakhir yang berisi nilai.
+    for (let offset = 0; offset < 4; offset++) {
+        const period = new Date(Date.UTC(nowWib.getUTCFullYear(), nowWib.getUTCMonth() - offset, 1));
+        try {
+            const result = await fetchIdxMonthly(period.getUTCFullYear(), period.getUTCMonth() + 1);
+            if (result.participationValue > 0) return result;
+        } catch (error) {
+            lastError = error;
+        }
     }
+    throw lastError;
 }
 
 function kick() {
@@ -146,7 +209,7 @@ function kick() {
                 }
             } catch {}
             // Fallback IDX bulanan
-            const idx = await fetchOfficial();
+            const idx = await withTimeout(fetchOfficial(), 20_000, 'IDX bulanan');
             const payload = { source: 'idx-monthly', date: idx.date, participationValue: idx.participationValue, domesticValue: idx.domesticValue };
             mem = { data: payload, ts: Date.now() };
             saveDisk(mem);
@@ -160,11 +223,13 @@ export async function GET(_req: NextRequest) {
     const dISO = lastTradingDayWIB();
 
     // 1) MySQL cache per tanggal (permanen — data harian final)
-    const dbHit = await getCachedJson(`ff:${dISO}`, 365 * 24 * 3600 * 1000);
-    if (dbHit) return Response.json({ success: true, ...dbHit, cached: 'db' });
+    const dbHit = await withTimeout(getCachedJson(`ff:${dISO}`, 365 * 24 * 3600 * 1000), 3000, 'cache database').catch(() => null);
+    if (dbHit?.netValue != null || dbHit?.participationValue > 0) {
+        return Response.json({ success: true, ...dbHit, cached: 'db' });
+    }
 
     // 2) Kuota Index Alpha
-    const usage = await getTodayUsage();
+    const usage = await withTimeout(getTodayUsage(), 3000, 'kuota database').catch(() => DAILY_QUOTA);
     const canCallAlpha = !!ALPHA_KEY && usage < DAILY_QUOTA;
 
     if (canCallAlpha) {
@@ -182,9 +247,9 @@ export async function GET(_req: NextRequest) {
 
     // 3) Fallback IDX bulanan (partisipasi asing)
     try {
-        const idx = await fetchOfficial();
+        const idx = await withTimeout(fetchOfficial(), 20_000, 'IDX bulanan');
         const payload = { source: 'idx-monthly', date: idx.date, participationValue: idx.participationValue, domesticValue: idx.domesticValue };
-        if (idx.participationValue > 0) await saveCachedJson(`ff:${dISO}`, payload);
+        await withTimeout(saveCachedJson(`ff:${dISO}`, payload), 3000, 'simpan cache').catch(() => undefined);
         return Response.json({ success: true, ...payload, note: 'Net buy/sell resmi belum tersedia — menampilkan partisipasi asing bulanan' });
     } catch (e: any) {
         // Terakhir: disk/mem cache lama apa pun

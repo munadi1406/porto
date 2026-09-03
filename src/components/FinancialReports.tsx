@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
-    ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
+    ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
 import { cn, formatCompactIDR, formatIDR } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Minus, Wallet, PieChart, Landmark, FileText, BarChart3, Activity, ArrowUpRight, ArrowDownRight, Shield, Users, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, PieChart, Landmark, FileText, BarChart3, Activity, Shield, Users, DollarSign, CalendarDays, Database, Sparkles } from "lucide-react";
 import type { FundamentalData } from "@/hooks/useFundamentals";
 import FinancialStatementTable from "./FinancialStatementTable";
 
@@ -19,6 +19,18 @@ const fmtNum = (v: number | null | undefined, dec = 2): string =>
 
 const fmtPct = (v: number | null | undefined): string =>
     v == null ? '-' : `${(v * 100).toFixed(1)}%`;
+
+const fmtReportedPct = (v: number | null | undefined): string =>
+    v == null ? '-' : `${(Math.abs(v) <= 1 ? v * 100 : v).toFixed(1)}%`;
+
+function formatStatementPeriod(value: string | undefined, period: 'annual' | 'quarterly'): string {
+    if (!value || value === 'Annual') return value || '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const year = date.getFullYear();
+    if (period === 'quarterly') return `Q${Math.ceil((date.getMonth() + 1) / 3)} ${year}`;
+    return `FY ${year}`;
+}
 
 const pctChange = (curr: number, prev: number | null | undefined): { val: string; up: boolean | null } => {
     if (prev == null || prev === 0) return { val: '-', up: null };
@@ -62,56 +74,70 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
         let cancelled = false;
         fetch(`/api/idx/financial-statement?code=${code}&period=${period}`)
             .then(r => r.json())
-            .then(res => { if (!cancelled && res.success && res.data) setLocalIdx(res.data); })
+            .then(res => { if (!cancelled && res.success && res.data) setLocalIdx({ ...res.data, __period: period }); })
             .catch(() => {});
         return () => { cancelled = true; };
     }, [code, period]);
 
     // Data IDX: gunakan localIdx (sesuai period), fallback ke idxData
-    const displayIdx = localIdx || idxData;
+    // Jangan tampilkan response annual lama ketika user sudah memilih kuartalan
+    // (request period-aware dapat selesai tidak berurutan).
+    const displayIdx = localIdx?.__period === period ? localIdx : period === 'annual' ? (localIdx || idxData) : null;
 
-    // Fallback: jika data (useFundamentals) kosong, gunakan idxData (financial-statement)
-    const stmt = (data as any) || displayIdx || {};
+    // Rasio bisa datang dari useFundamentals, tetapi histori laporan harus mengutamakan
+    // response period-aware dari endpoint financial-statement. Sebelumnya objek
+    // fundamentals yang truthy menutupi histori IDX sehingga seluruh tab detail kosong.
+    const stmt = useMemo(() => ({
+        ...((data as any) || {}),
+        ...((displayIdx as any) || {}),
+        incomeStatementHistory: displayIdx?.incomeStatementHistory ?? (data as any)?.incomeStatementHistory ?? [],
+        balanceSheetHistory: displayIdx?.balanceSheetHistory ?? (data as any)?.balanceSheetHistory ?? [],
+        cashflowStatementHistory: displayIdx?.cashflowStatementHistory ?? (data as any)?.cashflowStatementHistory ?? [],
+    }), [data, displayIdx]);
 
     const income = useMemo(() => {
         const src = stmt.incomeStatementHistory;
         if (!src || src.length === 0) return [];
-        return [...src].reverse().map((r: any) => ({
+        return [...src].sort((a: any, b: any) => String(a.period || a.year).localeCompare(String(b.period || b.year))).map((r: any) => ({
             ...r,
-            label: r.period || r.year,
-            periode: r.period || r.year,
+            rawPeriod: r.period || r.year,
+            label: formatStatementPeriod(r.period || r.year, period),
+            periode: formatStatementPeriod(r.period || r.year, period),
             grossMargin: r.grossMargin ?? (r.totalRevenue ? ((r.grossProfit ?? r.netInterestIncome ?? 0) / r.totalRevenue) * 100 : null),
             operatingMargin: r.operatingMargin ?? (r.totalRevenue ? ((r.operatingIncome ?? 0) / r.totalRevenue) * 100 : null),
             netMargin: r.netMargin ?? (r.totalRevenue ? ((r.netIncome ?? 0) / r.totalRevenue) * 100 : null),
             effectiveTaxRate: r.effectiveTaxRate ?? (r.preTaxIncome ? ((r.taxProvision ?? 0) / r.preTaxIncome) * 100 : null),
+            revenueGrowthPct: r.revenueGrowth != null ? +(r.revenueGrowth * 100).toFixed(1) : null,
         }));
-    }, [stmt]);
+    }, [stmt, period]);
 
     const balance = useMemo(() => {
         const src = stmt.balanceSheetHistory;
         if (!src || src.length === 0) return [];
-        return [...src].reverse().map((r: any) => ({
+        return [...src].sort((a: any, b: any) => String(a.year || a.period).localeCompare(String(b.year || b.period))).map((r: any) => ({
             ...r,
-            label: r.year || r.period,
-            periode: r.year || r.period,
+            rawPeriod: r.year || r.period,
+            label: formatStatementPeriod(r.year || r.period, period),
+            periode: formatStatementPeriod(r.year || r.period, period),
             ekuitas: r.totalStockholderEquity ?? r.totalEquity,
             aset: r.totalAssets,
             liabilitas: r.totalLiab ?? r.totalLiabilities,
             debtRatio: r.debtRatio ?? ((r.totalAssets || r.aset) ? (r.totalLiab ?? r.totalLiabilities ?? 0) / (r.totalAssets || r.aset) : null),
             currentRatio: r.currentRatio ?? (r.totalCurrentLiabilities ? (r.totalCurrentAssets ?? 0) / r.totalCurrentLiabilities : null),
         }));
-    }, [stmt]);
+    }, [stmt, period]);
 
     const cashflow = useMemo(() => {
         const src = stmt.cashflowStatementHistory;
         if (!src || src.length === 0) return [];
-        return [...src].reverse().map((r: any) => ({
+        return [...src].sort((a: any, b: any) => String(a.period || a.year).localeCompare(String(b.period || b.year))).map((r: any) => ({
             ...r,
-            label: r.period || r.year,
+            rawPeriod: r.period || r.year,
+            label: formatStatementPeriod(r.period || r.year, period),
             freeCashFlow: r.freeCashFlow ?? (r.operatingCashflow != null && r.capitalExpenditures != null
                 ? r.operatingCashflow - Math.abs(r.capitalExpenditures) : null),
         }));
-    }, [stmt]);
+    }, [stmt, period]);
 
     const ratios = useMemo(() => {
         if (!data) return null;
@@ -147,6 +173,24 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
     const hasRatios = !!ratios;
     const hasIdx = !!displayIdx && (displayIdx.totalAssets != null || displayIdx.sales != null);
 
+    const latestIncome = income[income.length - 1];
+    const previousIncome = income[income.length - 2];
+    const latestBalance = balance[balance.length - 1];
+    const latestCashflow = cashflow[cashflow.length - 1];
+    const revenue = latestIncome?.totalRevenue ?? displayIdx?.sales;
+    const netIncome = latestIncome?.netIncome ?? displayIdx?.profit;
+    const revenueChange = latestIncome?.revenueGrowth != null
+        ? { val: fmtPct(latestIncome.revenueGrowth), up: latestIncome.revenueGrowth >= 0 }
+        : revenue != null ? pctChange(revenue, previousIncome?.totalRevenue) : { val: '-', up: null };
+    const profitChange = latestIncome?.profitGrowth != null
+        ? { val: fmtPct(latestIncome.profitGrowth), up: latestIncome.profitGrowth >= 0 }
+        : netIncome != null ? pctChange(netIncome, previousIncome?.netIncome) : { val: '-', up: null };
+    const roeValue = displayIdx?.roe != null
+        ? `${displayIdx.roe.toFixed(1)}%`
+        : ratios?.roe != null ? `${(ratios.roe * 100).toFixed(1)}%` : '-';
+    const derValue = displayIdx?.der != null ? displayIdx.der : ratios?.der;
+    const reportPeriod = latestIncome?.periode || displayIdx?.fsDate || latestBalance?.periode || 'Periode terbaru';
+
     const tabs: { key: TabKey; label: string; icon: React.ReactNode; available: boolean }[] = [
         { key: 'idx', label: 'Data IDX', icon: <Landmark className="w-4 h-4" />, available: hasIdx },
         { key: 'income', label: 'Laba Rugi', icon: <FileText className="w-4 h-4" />, available: hasIncome },
@@ -157,16 +201,47 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex gap-2 flex-wrap">
+            <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <div className="flex flex-col gap-4 border-b border-border/60 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                    <div>
+                        <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
+                            <Sparkles className="h-3.5 w-3.5" /> Financial snapshot
+                        </div>
+                        <h2 className="text-xl font-black tracking-tight sm:text-2xl">Kinerja keuangan {code || ''}</h2>
+                        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                            Ringkasan profitabilitas, kesehatan neraca, dan arus kas sebelum masuk ke laporan detail.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/80 px-3 py-1.5">
+                            <CalendarDays className="h-3.5 w-3.5" /> {reportPeriod}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/80 px-3 py-1.5">
+                            <Database className="h-3.5 w-3.5" /> Mata uang: {displayIdx?.financialCurrency || 'IDR'} · nilai asli
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 md:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
+                    <FinancialKpi label="Pendapatan" value={fmtShort(revenue)} change={revenueChange.val} positive={revenueChange.up} />
+                    <FinancialKpi label="Laba Bersih" value={fmtShort(netIncome)} change={profitChange.val} positive={profitChange.up} />
+                    <FinancialKpi label="ROE" value={roeValue} helper="Imbal hasil ekuitas" />
+                    <FinancialKpi label="D/E Ratio" value={derValue != null ? derValue.toFixed(2) : '-'} helper="Struktur pendanaan" />
+                    <FinancialKpi label="Arus Kas Operasi" value={fmtShort(latestCashflow?.operatingCashflow ?? displayIdx?.operatingCashflow)} helper="Kas dari bisnis inti" />
+                    <FinancialKpi label="Free Cash Flow" value={fmtShort(latestCashflow?.freeCashFlow ?? displayIdx?.freeCashFlow)} helper="Setelah belanja modal" positive={(latestCashflow?.freeCashFlow ?? displayIdx?.freeCashFlow) != null ? (latestCashflow?.freeCashFlow ?? displayIdx?.freeCashFlow) >= 0 : null} />
+                </div>
+            </section>
+
+            <div className="sticky top-16 z-20 -mx-1 flex items-center justify-between gap-3 overflow-hidden rounded-xl border border-border bg-background/90 p-1.5 shadow-sm backdrop-blur-xl">
+                <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto scrollbar-none">
                     {tabs.map((t) => (
                         <button
                             key={t.key}
                             disabled={!t.available}
                             onClick={() => setTab(t.key)}
                             className={cn(
-                                'flex items-center gap-2 px-4 py-2 text-sm rounded-xl border transition-all font-bold',
-                                !t.available ? 'opacity-40 cursor-not-allowed' : tab === t.key ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-primary/40'
+                                'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-all sm:px-4 sm:text-sm',
+                                !t.available ? 'cursor-not-allowed opacity-35' : tab === t.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                             )}
                         >
                             <span className="p-1.5 rounded-lg">{t.icon}</span>
@@ -175,13 +250,13 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                         </button>
                     ))}
                 </div>
-                <div className="flex gap-1 bg-card border border-border rounded-lg p-1">
+                <div className="flex shrink-0 gap-1 border-l border-border pl-1.5">
                     {(['annual', 'quarterly'] as const).map(p => (
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={cn(
-                                'px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors cursor-pointer',
+                                'px-2.5 py-1.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer sm:px-3 sm:text-[11px]',
                                 period === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                             )}
                         >
@@ -192,18 +267,15 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
             </div>
 
             {/* ==================== IDX DATA ==================== */}
-            {tab === 'idx' && idxData && (
+            {tab === 'idx' && hasIdx && (
                 <div className="space-y-6">
-                    {/* Summary */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <SummaryStat label="Total Aset" value={displayIdx.totalAssets != null ? formatIDR(displayIdx.totalAssets) : '-'} />
-                        <SummaryStat label="Total Liabilitas" value={displayIdx.totalLiabilities != null ? formatIDR(displayIdx.totalLiabilities) : '-'} />
-                        <SummaryStat label="Total Ekuitas" value={displayIdx.totalEquity != null ? formatIDR(displayIdx.totalEquity) : '-'} />
-                        <SummaryStat label="Pendapatan" value={displayIdx.sales != null ? formatIDR(displayIdx.sales) : '-'} />
-                        <SummaryStat label="Laba Bersih" value={displayIdx.profit != null ? formatIDR(displayIdx.profit) : '-'} />
-                        <SummaryStat label="Growth Pendapatan" value={fmtPct(displayIdx.revenueGrowth)} />
-                        <SummaryStat label="ROE / ROA" value={`${displayIdx.roe != null ? `${displayIdx.roe.toFixed(1)}%` : '-'} / ${displayIdx.roa != null ? `${displayIdx.roa.toFixed(1)}%` : '-'}`} />
-                        <SummaryStat label="Free Cash Flow" value={displayIdx.freeCashFlow != null ? formatIDR(displayIdx.freeCashFlow) : '-'} />
+                    {/* Detail ringkas: KPI sudah dirangkum di Financial Snapshot di atas. */}
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-xs">
+                        <span className="font-bold text-foreground">Ringkasan laporan IDX</span>
+                        <span className="text-muted-foreground">Aset <b className="text-foreground">{fmtShort(displayIdx.totalAssets)}</b></span>
+                        <span className="text-muted-foreground">Ekuitas <b className="text-foreground">{fmtShort(displayIdx.totalEquity)}</b></span>
+                        <span className="text-muted-foreground">Pendapatan <b className="text-foreground">{fmtShort(displayIdx.sales)}</b></span>
+                        <span className="text-muted-foreground">Laba bersih <b className="text-foreground">{fmtShort(displayIdx.profit)}</b></span>
                     </div>
 
                     {/* Balance Sheet (Neraca) */}
@@ -212,12 +284,13 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                             <div className="h-56">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ComposedChart data={[{ name: 'Neraca', aset: displayIdx.totalAssets, liabilitas: displayIdx.totalLiabilities, ekuitas: displayIdx.totalEquity }]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={55}
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={55}
                                             tickFormatter={(v) => formatCompactIDR(v).replace('Rp', '')} />
+                                        <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-semibold text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-chart-1" />Aset</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-chart-3" />Liabilitas</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-chart-2" />Ekuitas</span></div>
                                         <Tooltip
-                                            cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                            cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                             content={({ active, payload }) => {
                                                 if (!active || !payload?.length) return null;
                                                 const d = payload[0].payload;
@@ -230,9 +303,9 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                                 );
                                             }}
                                         />
-                                        <Bar dataKey="aset" name="Aset" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={30} />
-                                        <Bar dataKey="liabilitas" name="Liabilitas" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} barSize={30} />
-                                        <Bar dataKey="ekuitas" name="Ekuitas" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={30} />
+                                        <Bar dataKey="aset" name="Aset" fill="var(--chart-1)" radius={[4, 4, 0, 0]} barSize={30} />
+                                        <Bar dataKey="liabilitas" name="Liabilitas" fill="var(--chart-3)" radius={[4, 4, 0, 0]} barSize={30} />
+                                        <Bar dataKey="ekuitas" name="Ekuitas" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={30} />
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
@@ -265,7 +338,7 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                 <Row label="Beban Pajak" value={fmtShort(displayIdx.taxProvision)} />
                                 <Row label="Laba Bersih" value={fmtShort(displayIdx.profit)} good={displayIdx.profit >= 0} />
                                 <Row label="Growth Laba YoY" value={fmtPct(displayIdx.profitGrowth)} good={displayIdx.profitGrowth != null ? displayIdx.profitGrowth >= 0 : null} />
-                                <Row label="Margin Bersih (NPM)" value={fmtPct(displayIdx.netMargin)} good={displayIdx.netMargin != null ? displayIdx.netMargin >= 10 : null} />
+                                <Row label="Margin Bersih (NPM)" value={fmtReportedPct(displayIdx.netMargin)} good={displayIdx.netMargin != null ? (Math.abs(displayIdx.netMargin) <= 1 ? displayIdx.netMargin * 100 : displayIdx.netMargin) >= 10 : null} />
                                 <Row label="Laba atribusi pemilik" value={fmtShort(displayIdx.profitAttrOwner)} good={displayIdx.profitAttrOwner >= 0} />
                                 <Row label="EPS" value={displayIdx.eps != null ? `Rp${displayIdx.eps.toLocaleString('id-ID')}` : '-'} good={displayIdx.eps > 0} />
                                 <Row label="Book Value / Saham" value={displayIdx.bookValue != null ? `Rp${displayIdx.bookValue.toLocaleString('id-ID')}` : '-'} />
@@ -294,9 +367,13 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                     )}
 
                     <p className="text-[10px] text-muted-foreground text-center">
-                        Sumber: IDX Financial Data Ratio {displayIdx.fsDate ? `Â· Periode ${displayIdx.fsDate}` : ''}
+                        Sumber: IDX Financial Data Ratio {displayIdx.fsDate ? `· Periode ${displayIdx.fsDate}` : ''}
                     </p>
                 </div>
+            )}
+
+            {tab === 'idx' && !hasIdx && (
+                <EmptyState label="Data IDX belum tersedia. Gunakan tab laporan lain yang aktif untuk melihat data keuangan." />
             )}
 
             {/* ==================== INCOME STATEMENT ==================== */}
@@ -307,13 +384,14 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                         <div className="h-80">
                             <ResponsiveContainer>
                                 <ComposedChart data={income} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                    <YAxis yAxisId="amt" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={55}
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                    <XAxis dataKey="label" interval={0} minTickGap={0} angle={period === 'quarterly' ? -20 : 0} height={period === 'quarterly' ? 42 : 30} tickMargin={8} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                    <YAxis yAxisId="amt" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={55}
                                         tickFormatter={(v) => formatCompactIDR(v).replace('Rp', '')} />
-                                    <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40}
+                                    <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={40}
                                         tickFormatter={(v) => `${v}%`} />
-                                    <Tooltip cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                    <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-semibold text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-chart-1" />Pendapatan</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-chart-2" />Laba Bersih</span></div>
+                                    <Tooltip cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) return null;
                                             const d = payload[0].payload;
@@ -327,9 +405,8 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                                 ]} />
                                             );
                                         }} />
-                                    <Bar yAxisId="amt" dataKey="totalRevenue" name="Pendapatan" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={26} />
-                                    <Bar yAxisId="amt" dataKey="netIncome" name="Laba Bersih" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={26} />
-                                    <Line yAxisId="pct" type="monotone" dataKey={(r: any) => r.revenueGrowth != null ? +(r.revenueGrowth * 100).toFixed(1) : null} name="Growth %" stroke="hsl(var(--chart-4))" strokeWidth={2} dot={{ r: 3 }} />
+                                    <Bar yAxisId="amt" dataKey="totalRevenue" name="Pendapatan" fill="var(--chart-1)" radius={[4, 4, 0, 0]} barSize={26} />
+                                    <Bar yAxisId="amt" dataKey="netIncome" name="Laba Bersih" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={26} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -340,27 +417,27 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                         <div className="h-56">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={income} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40}
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={40}
                                         tickFormatter={(v) => `${v}%`} />
-                                    <Tooltip cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                    <Tooltip cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) return null;
                                             const d = payload[0].payload;
                                             return (
                                                 <TooltipShell title={d.periode} rows={[
-                                                    { label: 'Gross Margin', value: fmtPct(d.grossMargin != null ? d.grossMargin : null), up: d.grossMargin != null ? d.grossMargin >= 30 : null },
-                                                    { label: 'Operating Margin', value: fmtPct(d.operatingMargin) },
-                                                    { label: 'Net Margin', value: fmtPct(d.netMargin) },
-                                                    { label: 'Tax Rate', value: fmtPct(d.effectiveTaxRate) },
+                                                    { label: 'Gross Margin', value: fmtReportedPct(d.grossMargin), up: d.grossMargin != null ? d.grossMargin >= 30 : null },
+                                                    { label: 'Operating Margin', value: fmtReportedPct(d.operatingMargin) },
+                                                    { label: 'Net Margin', value: fmtReportedPct(d.netMargin) },
+                                                    { label: 'Tax Rate', value: fmtReportedPct(d.effectiveTaxRate) },
                                                 ]} />
                                             );
                                         }} />
-                                    <Area type="monotone" dataKey="grossMargin" name="Gross Margin" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.08} strokeWidth={2} dot={{ r: 3 }} />
-                                    <Line type="monotone" dataKey="operatingMargin" name="Operating Margin" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ r: 3 }} />
-                                    <Line type="monotone" dataKey="netMargin" name="Net Margin" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 3 }} />
-                                    <Line type="monotone" dataKey={(r: any) => r.effectiveTaxRate ?? null} name="Tax Rate" stroke="hsl(var(--chart-4))" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+                                    <Area type="monotone" dataKey="grossMargin" name="Gross Margin" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.08} strokeWidth={2} dot={{ r: 3 }} />
+                                    <Line type="monotone" dataKey="operatingMargin" name="Operating Margin" stroke="var(--chart-3)" strokeWidth={2} dot={{ r: 3 }} />
+                                    <Line type="monotone" dataKey="netMargin" name="Net Margin" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 3 }} />
+                                    <Line type="monotone" dataKey={(r: any) => r.effectiveTaxRate ?? null} name="Tax Rate" stroke="var(--chart-4)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -368,11 +445,11 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
 
                     {/* Detailed income table */}
                     <CardShell title="Rincian Laba Rugi" icon={<FileText className="w-4 h-4" />}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                        <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
+                            <table className="min-w-max text-sm">
                                 <thead>
                                     <tr>
-                                        <th className="text-left py-2 pr-4 text-xs font-bold text-muted-foreground sticky left-0 bg-card">Pos</th>
+                                        <th className="sticky left-0 z-20 min-w-36 bg-card py-2 pr-4 text-left text-xs font-bold text-muted-foreground">Pos</th>
                                         {income.map(r => (
                                             <th key={r.periode} className="text-right py-2 pl-4 text-xs font-bold text-muted-foreground whitespace-nowrap">{r.periode}</th>
                                         ))}
@@ -401,10 +478,10 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                         { label: 'Saham Dilusi (M)', v: (r: any) => r.dilutedAverageShares != null ? (r.dilutedAverageShares / 1e6).toFixed(1) : '-' },
                                         { label: 'Growth Pendapatan', v: (r: any) => r.revenueGrowth != null ? fmtPct(r.revenueGrowth) : '-', highlight: true },
                                         { label: 'Growth Laba', v: (r: any) => r.profitGrowth != null ? fmtPct(r.profitGrowth) : '-', highlight: true },
-                                        { label: 'Net Margin', v: (r: any) => fmtPct(r.netMargin) },
-                                        { label: 'Effective Tax Rate', v: (r: any) => fmtPct(r.effectiveTaxRate) },
+                                        { label: 'Net Margin', v: (r: any) => fmtReportedPct(r.netMargin) },
+                                        { label: 'Effective Tax Rate', v: (r: any) => fmtReportedPct(r.effectiveTaxRate) },
                                     ].map((row, i) => (
-                                        <tr key={row.label} className={cn("border-b border-border/30 last:border-b-0", i % 2 === 0 && "bg-muted/20")}>
+                                        <tr key={row.label} className={cn("border-b border-border/30 last:border-b-0", i % 2 === 0 && "bg-muted/20", row.strong && "border-t-2 border-primary/20")}>
                                             <td className={cn("py-2.5 pr-4 text-muted-foreground sticky left-0 bg-card", row.strong && "font-bold text-foreground", row.highlight && "text-primary font-semibold")}>{row.label}</td>
                                             {income.map(r => (
                                                 <td key={r.periode} className={cn("py-2.5 pl-4 text-right font-mono", row.strong && "font-bold", row.highlight && "text-primary")}>{row.v(r)}</td>
@@ -417,7 +494,7 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                     </CardShell>
 
                     {/* Quarterly pivot table */}
-                    <FinancialStatementTable incomeData={income} balanceData={balance} cashflowData={cashflow} />
+                    <FinancialStatementTable incomeData={income} balanceData={balance} cashflowData={cashflow} mode={period} />
                 </div>
             ) : (
                 <p className="text-sm text-muted-foreground italic">Data laporan laba rugi tidak tersedia.</p>
@@ -431,11 +508,11 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                         <div className="h-80">
                             <ResponsiveContainer>
                                 <ComposedChart data={balance} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={55}
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={55}
                                         tickFormatter={(v) => formatCompactIDR(v).replace('Rp', '')} />
-                                    <Tooltip cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                    <Tooltip cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) return null;
                                             const d = payload[0].payload;
@@ -448,9 +525,9 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                                 ]} />
                                             );
                                         }} />
-                                    <Bar dataKey="aset" name="Aset" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={24} />
-                                    <Bar dataKey="liabilitas" name="Liabilitas" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} barSize={24} />
-                                    <Line type="monotone" dataKey="ekuitas" name="Ekuitas" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 4 }} />
+                                    <Bar dataKey="aset" name="Aset" fill="var(--chart-1)" radius={[4, 4, 0, 0]} barSize={24} />
+                                    <Bar dataKey="liabilitas" name="Liabilitas" fill="var(--chart-3)" radius={[4, 4, 0, 0]} barSize={24} />
+                                    <Line type="monotone" dataKey="ekuitas" name="Ekuitas" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 4 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -462,11 +539,11 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                             <div className="h-56">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ComposedChart data={balance} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={40} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={40} />
                                         <Tooltip
-                                            cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                            cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                             content={({ active, payload }) => {
                                                 if (!active || !payload?.length) return null;
                                                 const d = payload[0].payload;
@@ -478,8 +555,8 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                                 );
                                             }}
                                         />
-                                        <Line type="monotone" dataKey="currentRatio" name="Current Ratio" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 4 }} />
-                                        <Line type="monotone" dataKey="debtRatio" name="Debt Ratio" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={{ r: 4 }} />
+                                        <Line type="monotone" dataKey="currentRatio" name="Current Ratio" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 4 }} />
+                                        <Line type="monotone" dataKey="debtRatio" name="Debt Ratio" stroke="var(--chart-3)" strokeWidth={2} dot={{ r: 4 }} />
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
@@ -488,11 +565,11 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
 
                     {/* Detailed Balance Table */}
                     <CardShell title="Rincian Neraca" icon={<Landmark className="w-4 h-4" />}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                        <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
+                            <table className="min-w-max text-sm">
                                 <thead>
                                     <tr>
-                                        <th className="text-left py-2 pr-4 text-xs font-bold text-muted-foreground sticky left-0 bg-card">Pos</th>
+                                        <th className="sticky left-0 z-20 min-w-36 bg-card py-2 pr-4 text-left text-xs font-bold text-muted-foreground">Pos</th>
                                         {balance.map(r => (
                                             <th key={r.periode} className="text-right py-2 pl-4 text-xs font-bold text-muted-foreground whitespace-nowrap">{r.periode}</th>
                                         ))}
@@ -528,7 +605,7 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                         { label: 'Debt Ratio', v: (r: any) => r.debtRatio != null ? `${(r.debtRatio * 100).toFixed(1)}%` : '-', highlight: true },
                                         { label: 'DER', v: (r: any) => r.der != null ? r.der.toFixed(2) : '-', highlight: true },
                                     ].map((row, i) => (
-                                        <tr key={row.label} className={cn("border-b border-border/30 last:border-b-0", i % 2 === 0 && "bg-muted/20")}>
+                                        <tr key={row.label} className={cn("border-b border-border/30 last:border-b-0", i % 2 === 0 && "bg-muted/20", row.strong && "border-t-2 border-primary/20")}>
                                             <td className={cn("py-2.5 pr-4 text-muted-foreground sticky left-0 bg-card", row.strong && "font-bold text-foreground", row.highlight && "text-primary font-semibold")}>{row.label}</td>
                                             {balance.map(r => (
                                                 <td key={r.periode} className={cn("py-2.5 pl-4 text-right font-mono", row.strong && "font-bold", row.highlight && "text-primary")}>{row.v(r)}</td>
@@ -550,11 +627,11 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={cashflow} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={55}
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={55}
                                         tickFormatter={(v) => formatCompactIDR(v).replace('Rp', '')} />
-                                    <Tooltip cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                    <Tooltip cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) return null;
                                             const d = payload[0].payload;
@@ -568,9 +645,9 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                                 ]} />
                                             );
                                         }} />
-                                    <Bar dataKey="operatingCashflow" name="Arus Kas Operasi" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={24} />
-                                    <Bar dataKey="financingCashflow" name="Arus Kas Pendanaan" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} barSize={24} />
-                                    <Line type="monotone" dataKey="freeCashFlow" name="Free Cash Flow" stroke="hsl(var(--chart-1))" strokeWidth={2.5} dot={{ r: 4 }} />
+                                    <Bar dataKey="operatingCashflow" name="Arus Kas Operasi" fill="var(--chart-2)" radius={[4, 4, 0, 0]} barSize={24} />
+                                    <Bar dataKey="financingCashflow" name="Arus Kas Pendanaan" fill="var(--chart-4)" radius={[4, 4, 0, 0]} barSize={24} />
+                                    <Line type="monotone" dataKey="freeCashFlow" name="Free Cash Flow" stroke="var(--chart-1)" strokeWidth={2.5} dot={{ r: 4 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -581,12 +658,12 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                         <div className="h-56">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={cashflow} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={55}
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} width={55}
                                         tickFormatter={(v) => formatCompactIDR(v).replace('Rp', '')} />
                                     <Tooltip
-                                        cursor={{ fill: 'hsl(var(--muted) / 40%)' }}
+                                        cursor={{ fill: 'color-mix(in srgb, var(--muted) 40%, transparent)' }}
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length) return null;
                                             const d = payload[0].payload;
@@ -597,11 +674,11 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                             );
                                         }}
                                     />
-                                    <Area type="monotone" dataKey="freeCashFlow" name="FCF" fill="url(#fcfGrad)" stroke="hsl(var(--chart-1))" strokeWidth={2} />
+                                    <Area type="monotone" dataKey="freeCashFlow" name="FCF" fill="url(#fcfGrad)" stroke="var(--chart-1)" strokeWidth={2} />
                                     <defs>
                                         <linearGradient id="fcfGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.05} />
+                                            <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.05} />
                                         </linearGradient>
                                     </defs>
                                 </ComposedChart>
@@ -611,10 +688,10 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
 
                     {/* Detailed Cash Flow Table */}
                     <CardShell title="Rincian Arus Kas" icon={<Wallet className="w-4 h-4" />}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                        <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
+                            <table className="min-w-max text-sm">
                                 <thead><tr>
-                                    <th className="text-left py-2 pr-4 text-xs font-bold text-muted-foreground sticky left-0 bg-card">Pos</th>
+                                    <th className="sticky left-0 z-20 min-w-36 bg-card py-2 pr-4 text-left text-xs font-bold text-muted-foreground">Pos</th>
                                     {cashflow.map(r => <th key={r.period} className="text-right py-2 pl-4 text-xs font-bold text-muted-foreground whitespace-nowrap">{r.period}</th>)}
                                 </tr></thead>
                                 <tbody>
@@ -638,7 +715,7 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
                                         { label: 'Kas Awal', v: (r: any) => fmtShort(r.beginningCashPosition) },
                                         { label: 'Kas Akhir', v: (r: any) => fmtShort(r.endCashPosition), strong: true },
                                     ].map((row, i) => (
-                                        <tr key={row.label} className={cn("border-b border-border/30 last:border-b-0", i % 2 === 0 && "bg-muted/20")}>
+                                        <tr key={row.label} className={cn("border-b border-border/30 last:border-b-0", i % 2 === 0 && "bg-muted/20", row.strong && "border-t-2 border-primary/20")}>
                                             <td className={cn("py-2.5 pr-4 text-muted-foreground sticky left-0 bg-card", row.strong && "font-bold text-foreground", row.highlight && "text-primary font-semibold")}>{row.label}</td>
                                             {cashflow.map(r => (
                                                 <td key={r.period} className={cn("py-2.5 pl-4 text-right font-mono", row.strong && "font-bold")}>{row.v(r)}</td>
@@ -724,6 +801,25 @@ export default function FinancialReports({ data, idxData, code }: { data: Fundam
     );
 }
 
+function FinancialKpi({ label, value, change, helper, positive }: { label: string; value: string; change?: string; helper?: string; positive?: boolean | null }) {
+    return (
+        <div className="min-h-28 p-4 sm:p-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+            <p className="mt-2 truncate text-lg font-black tabular-nums text-foreground sm:text-xl" title={value}>{value}</p>
+            {(change || helper) && (
+                <div className={cn(
+                    "mt-2 flex items-center gap-1 text-[10px] font-semibold",
+                    positive === true ? "text-success" : positive === false ? "text-destructive" : "text-muted-foreground"
+                )}>
+                    {positive === true && <TrendingUp className="h-3 w-3" />}
+                    {positive === false && <TrendingDown className="h-3 w-3" />}
+                    <span>{change ? `${change} YoY` : helper}</span>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function RatioCard({ label, value, sub, good, bad }: { label: string; value: string; sub?: string; good?: boolean; bad?: boolean }) {
     return (
         <div className={cn("p-4 rounded-xl border transition-all", good ? "bg-success/5 border-success/20" : bad ? "bg-destructive/5 border-destructive/20" : "bg-muted/30 border-border/50")}>
@@ -739,15 +835,6 @@ function EmptyState({ label }: { label: string }) {
         <div className="text-center py-16">
             <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">{label}</p>
-        </div>
-    );
-}
-
-function SummaryStat({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="p-4 rounded-xl border border-border/50 bg-muted/30">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1">{label}</p>
-            <p className="text-lg font-black text-foreground truncate">{value}</p>
         </div>
     );
 }

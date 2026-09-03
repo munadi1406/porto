@@ -416,6 +416,41 @@ CashHolding.init(
     }
 );
 
+interface CashLedgerAttributes {
+    id: string;
+    portfolioId: string;
+    amount: number;
+    balanceAfter: number;
+    kind: 'deposit' | 'withdrawal' | 'trade_buy' | 'trade_sell' | 'adjustment';
+    timestamp: Date;
+}
+
+export class CashLedger extends Model<CashLedgerAttributes, Optional<CashLedgerAttributes, 'id'>> implements CashLedgerAttributes {
+    declare id: string;
+    declare portfolioId: string;
+    declare amount: number;
+    declare balanceAfter: number;
+    declare kind: CashLedgerAttributes['kind'];
+    declare timestamp: Date;
+}
+
+CashLedger.init({
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    portfolioId: { type: DataTypes.UUID, allowNull: false, references: { model: 'portfolios', key: 'id' } },
+    amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    balanceAfter: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    kind: { type: DataTypes.ENUM('deposit', 'withdrawal', 'trade_buy', 'trade_sell', 'adjustment'), allowNull: false },
+    timestamp: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
+}, {
+    sequelize,
+    tableName: 'cash_ledger',
+    timestamps: true,
+    indexes: [
+        { fields: ['portfolioId'], name: 'cash_ledger_portfolio_idx' },
+        { fields: ['timestamp'], name: 'cash_ledger_timestamp_idx' },
+    ],
+});
+
 // ============================================
 // Sync all models with database
 // ============================================

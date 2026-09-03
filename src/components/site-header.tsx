@@ -58,14 +58,14 @@ export function SiteHeader() {
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2 text-xs">
               <div className={`size-2 rounded-full ${isOpen ? "bg-success" : "bg-muted-foreground"}`} />
-              <span className="text-muted-foreground hidden sm:inline">
+              <span className="text-muted-foreground">
                 {isOpen ? "Market Open" : "Market Closed"}
               </span>
-              <span className="font-mono text-foreground font-medium">{time}</span>
+              <span className="hidden font-mono text-foreground font-medium sm:inline">{time}</span>
             </div>
 
             <button
-              className="relative hidden sm:flex size-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="relative flex size-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               aria-label="Notifikasi"
             >
               <Bell className="size-4" />

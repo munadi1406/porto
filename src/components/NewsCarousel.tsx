@@ -122,12 +122,12 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
             onMouseLeave={() => setPaused(false)}
         >
             {/* header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
+            <div className="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 border-b border-border bg-muted/20">
                 <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-primary text-primary-foreground"><Newspaper className="w-3.5 h-3.5" /></div>
                     <div>
                         <h3 className="text-sm font-black leading-none">{title}</h3>
-                        <p className="text-[10px] text-muted-foreground">{cur.source || 'Berita'} · {cur.publishTime ? timeAgo(cur.publishTime) : 'baru saja'}</p>
+                        <p className="text-[11px] text-muted-foreground">{cur.source || 'Berita'} · {cur.publishTime ? timeAgo(cur.publishTime) : 'baru saja'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -151,7 +151,7 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
 
             {/* slide */}
             <div className="relative">
-                <div className="p-4 pr-4">
+                <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-3">
                         <div className="hidden sm:flex p-2 rounded-xl bg-primary/10 text-primary shrink-0">
                             {symbols[0] === 'IHSG' ? <Globe className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
@@ -174,9 +174,9 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
                                     <span className="text-[10px] font-black uppercase tracking-wider text-primary">Ringkasan AI (mimo-v2.5)</span>
                                     {cur.category && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-muted border">{cur.category}</span>}
                                 </div>
-                                <p className="text-xs leading-relaxed text-foreground/90">{stripHTML(cur.summary || cur.reason || '')}</p>
+                                <p className="text-xs leading-relaxed text-foreground/90 line-clamp-3 sm:line-clamp-none">{stripHTML(cur.summary || cur.reason || '')}</p>
                                 {cur.reason && cur.summary && cur.reason !== cur.summary && (
-                                    <p className="text-[11px] text-muted-foreground mt-1">Dampak: {cur.reason} · {cur.confidence}%</p>
+                                    <p className="hidden text-[11px] text-muted-foreground mt-1 sm:block">Dampak: {cur.reason} · {cur.confidence}%</p>
                                 )}
                                 {cur.tickers && cur.tickers.length > 0 && (
                                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -234,7 +234,7 @@ export default function NewsCarousel({ symbols = DEFAULT_SYMBOLS, title = "Berit
             </div>
 
             {/* tiny strip: upcoming titles */}
-            <div className="border-t bg-muted/20 px-3 py-2 flex gap-2 overflow-x-auto scrollbar-none">
+            <div className="hidden border-t bg-muted/20 px-3 py-2 gap-2 overflow-x-auto scrollbar-none sm:flex">
                 {allNews.slice(0, 6).map((n, i) => (
                     <button
                         key={n.link}

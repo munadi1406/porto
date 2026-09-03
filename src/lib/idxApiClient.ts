@@ -127,6 +127,9 @@ function isCloudflareBlock(text: string): boolean {
 }
 
 export async function idxFetch<T>(path: string, timeout = 15000): Promise<T> {
+    if (String(process.env.IDX_FETCH_PROVIDER ?? '').toLowerCase() === 'firecrawl') {
+        return firecrawlFetchJson<T>(path);
+    }
     const fullUrl = path.startsWith('http') ? path : `${IDX_BASE}${path}`;
     const cookie = await ensureSession();
     const headers = { ...HEADERS, ...(cookie ? { Cookie: cookie } : {}) };
@@ -713,6 +716,18 @@ export async function getMonthlyPageData(pagePath: PagePath, filter: { year: str
 export async function resilientFetch<T>(path: string, timeout = 15000): Promise<T> {
     const errors: string[] = [];
 
+    // cPanel mode: use Firecrawl's hosted browser for every IDX endpoint.
+    // This avoids requiring Chromium/system packages on shared hosting.
+    const provider = String(process.env.IDX_FETCH_PROVIDER ?? '').toLowerCase();
+    if (provider === 'firecrawl') {
+        try {
+            return await firecrawlFetchJson<T>(path);
+        } catch (e: any) {
+            errors.push(`firecrawl: ${e.message}`);
+            throw new Error(`IDX Firecrawl fetch failed for ${path}: ${errors.join(' | ')}`);
+        }
+    }
+
     // Strategy 1: Direct
     try {
         const data = await idxFetch<T>(path, timeout);
@@ -734,8 +749,22 @@ export async function resilientFetch<T>(path: string, timeout = 15000): Promise<
         errors.push(`proxy: ${proxyRes.status}`);
     } catch (e: any) { errors.push(`proxy: ${e.message}`); }
 
+    // External Firecrawl fallback (also works when local Chromium is unavailable).
+    if (process.env.FIRECRAWL_API_KEY) {
+        try {
+            return await firecrawlFetchJson<T>(path);
+        } catch (e: any) { errors.push(`firecrawl: ${e.message}`); }
+    }
+
     // Strategy 3: Chromium headless via Playwright (menembus challenge Cloudflare).
     // Berat (~20-60 dtk) tapi andal — antrean terserialisasi di idxBrowserFetch.
+    // Bisa dimatikan sementara untuk menguji apakah endpoint IDX tembus tanpa browser.
+    const browserFallbackDisabled = ['1', 'true', 'yes', 'on'].includes(
+        String(process.env.IDX_DISABLE_BROWSER_FALLBACK ?? '').toLowerCase()
+    );
+    if (browserFallbackDisabled) {
+        throw new Error(`IDX browser fallback disabled (direct/proxy failed): ${path}`);
+    }
     try {
         const fullUrl = path.startsWith('http') ? path : `${IDX_BASE}${path}`;
         const { idxBrowserFetchText } = await import('./idxBrowserFetch');
@@ -744,6 +773,46 @@ export async function resilientFetch<T>(path: string, timeout = 15000): Promise<
     } catch (e: any) { errors.push(`browser: ${e.message}`); }
 
     throw new Error(`All strategies failed for ${path}: ${errors.join(' | ')}`);
+}
+
+/** Fetch and parse an IDX JSON endpoint through Firecrawl's hosted browser. */
+export async function firecrawlFetchJson<T>(path: string): Promise<T> {
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) throw new Error('FIRECRAWL_API_KEY is not configured');
+    const url = path.startsWith('http') ? path : `${IDX_BASE}${path}`;
+    const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+            url,
+            proxy: 'auto',
+            onlyMainContent: true,
+            maxAge: 300000,
+            // IDX endpoints already return JSON. Markdown preserves that raw
+            // response more reliably than Firecrawl's AI JSON extraction.
+            formats: ['markdown'],
+        }),
+        signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok) throw new Error(`Firecrawl scrape failed (${response.status})`);
+    const payload: any = await response.json();
+    const markdown = String(payload?.data?.markdown ?? payload?.markdown ?? '');
+    const cleaned = markdown
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+    const candidates = [cleaned];
+    const objectStart = cleaned.indexOf('{');
+    const objectEnd = cleaned.lastIndexOf('}');
+    if (objectStart >= 0 && objectEnd > objectStart) candidates.push(cleaned.slice(objectStart, objectEnd + 1));
+    const arrayStart = cleaned.indexOf('[');
+    const arrayEnd = cleaned.lastIndexOf(']');
+    if (arrayStart >= 0 && arrayEnd > arrayStart) candidates.push(cleaned.slice(arrayStart, arrayEnd + 1));
+    for (const candidate of candidates) {
+        try { return JSON.parse(candidate) as T; } catch {}
+    }
+    throw new Error(`Firecrawl returned unparseable IDX JSON (${markdown.length} chars)`);
 }
 
 // ═══════════════════════════════════════════════════════════════════
